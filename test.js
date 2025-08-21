@@ -5,6 +5,7 @@ let Client = new AtmosXWireParser({
         onlyCap: false, // Set to true to only receive CAP messages only
         betterEvents: true, // Set to true to receive better event handling
         ugcPolygons: false, // Set to true to receive UGC Polygons instead of reading from raw products. 
+        expiryCheck: true, // Set to true to filter out expired alerts
         filteredAlerts: [] // Alerts you want to only log, leave empty to receive all alerts (Ex. ["Tornado Warning", "Radar Indicated Tornado Warning"])
     },
     xmpp: {

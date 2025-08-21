@@ -26,13 +26,14 @@ class NoaaWeatherWireServiceEvents {
         let tags = [`No tags found`];
         let eventName = event.properties.event
         let dmgTheat = event.properties.parameters.thunderstormDamageThreat?.[0] || event.properties.parameters.tornadoDamageThreat?.[0] || `N/A`;
+        let torThreat = event.properties.parameters.tornadoDetection || `N/A`;
         let description = event.properties.description.toLowerCase() || `No description available.`;
         if (description.includes(`flash flood emergency`) && eventName == `Flash Flood Warning`) eventName = `Flash Flood Emergency`;
-        if (description.includes(`particularly dangerous situation`) && eventName == `Tornado Warning` && dmgTheat == `CONSIDERABLE`) eventName = `Particularly Dangerous Situation Tornado Warning`;
-        if (description.includes(`particularly dangerous situation`) && eventName == `Tornado Watch`) eventName = `Particularly Dangerous Situation Tornado Watch`;
-        if (description.includes(`extremely dangerous situation`) && eventName == `Severe Thunderstorm Warning`) eventName = `Extremely Dangerous Situation Severe Thunderstorm Warning`;
+        if (description.includes(`particularly dangerous situation`) && eventName == `Tornado Warning` && dmgTheat == `CONSIDERABLE`) eventName = `PDS Tornado Warning`;
+        if (description.includes(`particularly dangerous situation`) && eventName == `Tornado Watch`) eventName = `PDS Tornado Watch`;
+        if (description.includes(`extremely dangerous situation`) && eventName == `Severe Thunderstorm Warning`) eventName = `EDS Severe Thunderstorm Warning`;
         if (description.includes(`tornado emergency`) && eventName == `Tornado Warning` && dmgTheat == `CATASTROPHIC`) eventName = `Tornado Emergency`;
-        
+
         if (eventName == `Tornado Warning`) {
             eventName = `Radar Indicated Tornado Warning`;
             if (event.properties.parameters.tornadoDetection == `RADAR INDICATED`) eventName = `Radar Indicated Tornado Warning`;
@@ -41,6 +42,7 @@ class NoaaWeatherWireServiceEvents {
         if (eventName == `Severe Thunderstorm Warning`) {
             if (dmgTheat == `CONSIDERABLE`) eventName = `Considerable Severe Thunderstorm Warning`;
             if (dmgTheat == `DESTRUCTIVE`) eventName = `Destructive Severe Thunderstorm Warning`;
+            if (torThreat == `POSSIBLE`) eventName = `${eventName} (TPROB)`;
         }
         if (eventName == `Flash Flood Warning`) {
             if (dmgTheat == `CONSIDERABLE`) eventName = `Considerable Flash Flood Warning`;
@@ -70,7 +72,14 @@ class NoaaWeatherWireServiceEvents {
             }
         }
         if (loader.settings.alertSettings.filteredAlerts && loader.settings.alertSettings.filteredAlerts.length > 0) {
-            alerts = alerts.filter(alert => loader.settings.alertSettings.filteredAlerts.includes(alert.properties.event));
+            alerts = alerts.filter(alert => 
+                loader.settings.alertSettings.filteredAlerts.includes(alert.properties.event)
+            );
+        }
+        if (loader.settings.alertSettings.expiryCheck) {
+            alerts = alerts.filter(alert => 
+                new Date(alert.properties.expires) > new Date()
+            );
         }
         if (alerts.length === 0) { return; }
         loader.static.events.emit(`onAlert`, alerts);
@@ -150,6 +159,7 @@ class NoaaWeatherWireServiceEvents {
                     let getHail = loader.packages.mText.getString(msg, `MAX HAIL SIZE...`, [`IN`]) || loader.packages.mText.getString(msg, `HAIL...`, [`IN`]);
                     let getGusts = loader.packages.mText.getString(msg, `MAX WIND GUST...`) || loader.packages.mText.getString(msg, `WIND...`);
                     let getThreat = loader.packages.mText.getString(msg, `DAMAGE THREAT...`);
+                    let getTempIssue = loader.packages.mText.getString(msg, `ISSUED TIME...`);
                     let senderOffice = loader.packages.mText.getOffice(msg) || vtec.tracking.split(`-`)[0];
                     let getCoordinates = loader.packages.mText.getPolygonCoordinates(msg);
                     let getDescription = loader.packages.mText.getCleanDescription(msg, vtec);
@@ -161,8 +171,8 @@ class NoaaWeatherWireServiceEvents {
                         history: [{description: getDescription, action: vtec.status, issued: new Date(vtec.issued)}],
                         properties: {
                             areaDesc: mUgc.locations.join(`; `) || `N/A`,
-                            expires: new Date(vtec.expires) == `Invalid Date` ? new Date(new Date().getTime() + 999999 * 60 * 60 * 1000) : new Date(vtec.expires),
-                            sent: new Date(vtec.issued),
+                            expires: new Date(vtec.expires) == `Invalid Date` ? new Date(9999, 0, 1) : new Date(vtec.expires),
+                            sent: new Date(vtec.issued) == `Invalid Date` ? getTempIssue ? new Date(getTempIssue) : new Date(vtec.issued) : new Date(vtec.issued),
                             messageType: vtec.status, 
                             event: vtec.event || `Unknown Event`,
                             sender: senderOffice,

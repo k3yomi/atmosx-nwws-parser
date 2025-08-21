@@ -86,6 +86,7 @@ module.exports.settings = {
         ugcPolygons: false,
         onlyCap: false,
         betterEvents: false,
+        expiryCheck: true,
         filteredAlerts: [],
     },
     xmpp: {

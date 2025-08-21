@@ -35,7 +35,7 @@ class NoaaWeatherWireServiceVtec {
 				status: this.getEventStatus(splitVTEC),
 				wmo: message.match(new RegExp(loader.definitions.expressions.wmo, 'gimu')),
 				expires: this.getExpires(vtecDates),
-				issued: attributes.issue
+				issued: attributes.issue 
 			};
 		});
       	return vtecs;

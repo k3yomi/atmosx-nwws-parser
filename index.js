@@ -28,7 +28,7 @@ class NoaaWeatherWireServiceCore {
         if (loader.settings.cacheSettings.readCache && loader.settings.cacheSettings.cacheDir) {
             let target = `${loader.settings.cacheSettings.cacheDir}/nwws-raw-category-defaults-raw-vtec.bin`;
             if (loader.packages.fs.existsSync(target)) {
-                this.forwardCustomStanza(loader.packages.fs.readFileSync(target, 'utf8'), { awipsid: 'alert', category: 'default', raw: true });
+                this.forwardCustomStanza(loader.packages.fs.readFileSync(target, 'utf8'), { awipsid: 'alert', category: 'default', raw: true, issue: undefined });
             }
         }
         
