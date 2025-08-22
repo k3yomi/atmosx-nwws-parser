@@ -12,7 +12,7 @@ npm install atmosx-nwws-parser
 
 ## Usage
 ```js
-const AtmosXWireParser = require(`atmosx-nwws-parser`); // or require(`@k3y0mi/nwws-parser`);
+const AtmosXWireParser = require(`atmosx-nwws-parser`);
 ```
 
 ## Configuration and Initialization
