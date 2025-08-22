@@ -27,8 +27,24 @@ class NoaaWeatherWireServiceCore {
         
         if (loader.settings.cacheSettings.readCache && loader.settings.cacheSettings.cacheDir) {
             let target = `${loader.settings.cacheSettings.cacheDir}/nwws-raw-category-defaults-raw-vtec.bin`;
-            if (loader.packages.fs.existsSync(target)) {
-                this.forwardCustomStanza(loader.packages.fs.readFileSync(target, 'utf8'), { awipsid: 'alert', category: 'default', raw: true, issue: undefined });
+            let targetCap = `${loader.settings.cacheSettings.cacheDir}/nwws-raw-category-defaults-cap-vtec.bin`;
+            let targetStatements = `${loader.settings.cacheSettings.cacheDir}/nwws-raw-category-special-weather-statements-raw.bin`;
+            let targetMesoscale = `${loader.settings.cacheSettings.cacheDir}/nwws-raw-category-mesoscale-discussions-raw.bin`;
+            let targetStormReports = `${loader.settings.cacheSettings.cacheDir}/nwws-raw-category-local-storm-reports-raw.bin`;
+            if (loader.packages.fs.existsSync(target) && !loader.settings.alertSettings.onlyCap) {
+                this.forwardCustomStanza(loader.packages.fs.readFileSync(target, 'utf8'), { awipsid: 'alert', isCap: false, raw: true, issue: undefined });
+            }
+            if (loader.packages.fs.existsSync(targetCap) && loader.settings.alertSettings.onlyCap) {
+                this.forwardCustomStanza(loader.packages.fs.readFileSync(targetCap, 'utf8'), { awipsid: 'alert', isCap: true, raw: false, issue: undefined });
+            }
+            if (loader.packages.fs.existsSync(targetStatements)) {
+                this.forwardCustomStanza(loader.packages.fs.readFileSync(targetStatements, 'utf8'), { awipsid: 'SPS001', isCap: false, raw: true, issue: undefined });
+            }
+            if (loader.packages.fs.existsSync(targetMesoscale)) {
+                this.forwardCustomStanza(loader.packages.fs.readFileSync(targetMesoscale, 'utf8'), { awipsid: 'SWOMCD001', isCap: false, raw: true, issue: undefined });
+            }
+            if (loader.packages.fs.existsSync(targetStormReports)) {
+                this.forwardCustomStanza(loader.packages.fs.readFileSync(targetStormReports, 'utf8'), { awipsid: 'LSR001', isCap: false, raw: true, issue: undefined });
             }
         }
         

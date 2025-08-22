@@ -28,7 +28,7 @@ class NoaaWeatherWireServiceStanza {
             if (isDebug != false) {
                 let message = isDebug.stanza
                 let attributes = isDebug.attrs;
-                let isCap = message.includes(`<?xml version="1.0"`)
+                let isCap = isDebug.isCap || message.includes(`<?xml version="1.0"`);
                 let hasCapArea = message.includes(`<areaDesc>`);
                 let hasVtec = message.match(loader.definitions.expressions.vtec) != null;
                 let getId = this.getAwipsType(attributes)

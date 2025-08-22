@@ -72,9 +72,8 @@ class NoaaWeatherWireServiceEvents {
             }
         }
         if (loader.settings.alertSettings.filteredAlerts && loader.settings.alertSettings.filteredAlerts.length > 0) {
-            alerts = alerts.filter(alert => 
-                loader.settings.alertSettings.filteredAlerts.includes(alert.properties.event)
-            );
+            let pSet = new Set((loader.settings.alertSettings.filteredAlerts || []).map(p => String(p).toLowerCase()));
+            alerts = alerts.filter(alert => pSet.has(String(alert.properties?.event || '').toLowerCase()));
         }
         if (loader.settings.alertSettings.expiryCheck) {
             alerts = alerts.filter(alert => 
@@ -93,47 +92,52 @@ class NoaaWeatherWireServiceEvents {
       */
     
     newCapEvent = async function(stanza) { 
-        let message = stanza.message.substring(stanza.message.indexOf(`<?xml version="1.0"`), stanza.message.length);
-        let data = loader.packages.xml2js.Parser();
-        let result = await data.parseStringPromise(message);
-        let tracking = result.alert.info[0].parameter.find(p => p.valueName[0] == "VTEC")?.value[0] || "N/A";
-        let action = "N/A";
-        if (tracking !== "N/A") {
-            let splitVTEC = tracking.split(".");
-            tracking = `${splitVTEC[2]}-${splitVTEC[3]}-${splitVTEC[4]}-${splitVTEC[5]}`;
-            action = loader.definitions.status[splitVTEC[1]];
-        } else {
-            action = result.alert.msgType[0];
-            tracking = `${result.alert.info[0].parameter.find(p => p.valueName[0] == "WMOidentifier")?.value[0]}-${result.alert.info[0].area[0].geocode.filter(g => g.valueName[0] == "UGC").map(g => g.value[0]).join("-")}`;
-        }
-        let alert = {
-            id: `Wire-${tracking}`,
-            tracking: tracking,
-            action: action,
-            history: [{ description: result.alert.info[0].description[0], action: action, issued: new Date(stanza.attributes.issue) }],
-            properties: {
-                areaDesc: result.alert.info[0].area[0].areaDesc[0],
-                expires: new Date(result.alert.info[0].expires[0]),
-                sent: new Date(result.alert.sent[0]),
-                messageType: action,
-                event: result.alert.info[0].event[0],
-                sender: result.alert.sender[0],
-                senderName: result.alert.info[0].senderName[0],
-                description: result.alert.info[0].description[0],
-                geocode: { UGC: result.alert.info[0].area[0].geocode.filter(g => g.valueName[0] == "UGC").map(g => g.value[0]) },
-                parameters: {
-                    WMOidentifier: [result.alert.info[0].parameter.find(p => p.valueName[0] == "WMOidentifier")?.value[0] || "N/A"],
-                    tornadoDetection: result.alert.info[0].parameter.find(p => p.valueName[0] == "tornadoDetection")?.value[0] || result.alert.info[0].parameter.find(p => p.valueName[0] == "waterspoutDetection")?.value[0] || "N/A",
-                    maxHailSize: result.alert.info[0].parameter.find(p => p.valueName[0] == "maxHailSize")?.value[0] || "N/A",
-                    maxWindGust: result.alert.info[0].parameter.find(p => p.valueName[0] == "maxWindGust")?.value[0] || "N/A",
-                    thunderstormDamageThreat: [result.alert.info[0].parameter.find(p => p.valueName[0] == "thunderstormDamageThreat")?.value[0] || result.alert.info[0].parameter.find(p => p.valueName[0] == "tornadoDamageThreat")?.value[0] || "N/A"],
+        let message = stanza.message.match(/<\?xml[\s\S]*?<\/alert>/g) ?.map(xml => xml.trim()) || [];
+        let alerts = []
+        for (let msg of message) {
+            msg = msg.substring(msg.indexOf(`<?xml version="1.0"`), msg.lastIndexOf(`>`) + 1);
+            let data = loader.packages.xml2js.Parser();
+            let result = await data.parseStringPromise(msg);
+            let tracking = result.alert.info[0].parameter.find(p => p.valueName[0] == "VTEC")?.value[0] || "N/A";
+            let action = "N/A";
+            if (tracking !== "N/A") {
+                let splitVTEC = tracking.split(".");
+                tracking = `${splitVTEC[2]}-${splitVTEC[3]}-${splitVTEC[4]}-${splitVTEC[5]}`;
+                action = loader.definitions.status[splitVTEC[1]];
+            } else {
+                action = result.alert.msgType[0];
+                tracking = `${result.alert.info[0].parameter.find(p => p.valueName[0] == "WMOidentifier")?.value[0]}-${result.alert.info[0].area[0].geocode.filter(g => g.valueName[0] == "UGC").map(g => g.value[0]).join("-")}`;
+            }
+            let alert = {
+                id: `Wire-${tracking}`,
+                tracking: tracking,
+                action: action,
+                history: [{ description: result.alert.info[0].description[0], action: action, issued: new Date(stanza.attributes.issue) }],
+                properties: {
+                    areaDesc: result.alert.info[0].area[0].areaDesc[0],
+                    expires: new Date(result.alert.info[0].expires[0]),
+                    sent: new Date(result.alert.sent[0]),
+                    messageType: action,
+                    event: result.alert.info[0].event[0],
+                    sender: result.alert.sender[0],
+                    senderName: result.alert.info[0].senderName[0],
+                    description: result.alert.info[0].description[0],
+                    geocode: { UGC: result.alert.info[0].area[0].geocode.filter(g => g.valueName[0] == "UGC").map(g => g.value[0]) },
+                    parameters: {
+                        WMOidentifier: [result.alert.info[0].parameter.find(p => p.valueName[0] == "WMOidentifier")?.value[0] || "N/A"],
+                        tornadoDetection: result.alert.info[0].parameter.find(p => p.valueName[0] == "tornadoDetection")?.value[0] || result.alert.info[0].parameter.find(p => p.valueName[0] == "waterspoutDetection")?.value[0] || "N/A",
+                        maxHailSize: result.alert.info[0].parameter.find(p => p.valueName[0] == "maxHailSize")?.value[0] || "N/A",
+                        maxWindGust: result.alert.info[0].parameter.find(p => p.valueName[0] == "maxWindGust")?.value[0] || "N/A",
+                        thunderstormDamageThreat: [result.alert.info[0].parameter.find(p => p.valueName[0] == "thunderstormDamageThreat")?.value[0] || result.alert.info[0].parameter.find(p => p.valueName[0] == "tornadoDamageThreat")?.value[0] || "N/A"],
+                    },
                 },
-            },
-        };
-        if (result.alert.info[0].area[0].polygon) {
-            alert.geometry = { type: "Polygon", coordinates: [result.alert.info[0].area[0].polygon[0].split(" ").map(coord => { let [lat, lon] = coord.split(",").map(parseFloat); return [lon, lat]; })] };
+            };
+            if (result.alert.info[0].area[0].polygon) {
+                alert.geometry = { type: "Polygon", coordinates: [result.alert.info[0].area[0].polygon[0].split(" ").map(coord => { let [lat, lon] = coord.split(",").map(parseFloat); return [lon, lat]; })] };
+            }
+            alerts.push(alert);
         }
-        this.onFinished([alert]);
+        this.onFinished(alerts);
     }
 
     /**
