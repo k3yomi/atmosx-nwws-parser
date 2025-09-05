@@ -227,10 +227,11 @@ class NoaaWeatherWireServiceEvents {
                 let getHail = loader.packages.mText.getString(msg, `MAX HAIL SIZE...`, [`IN`]) || loader.packages.mText.getString(msg, `HAIL...`, [`IN`]);
                 let getGusts = loader.packages.mText.getString(msg, `MAX WIND GUST...`) || loader.packages.mText.getString(msg, `WIND...`);
                 let getThreat = loader.packages.mText.getString(msg, `DAMAGE THREAT...`); 
-                let getTempIssue = loader.packages.mText.getString(msg, `ISSUED TIME...`) || new Date();
+                let getTempIssue = loader.packages.mText.getString(msg, `ISSUED TIME...`);
                 let senderOffice = loader.packages.mText.getOffice(msg) || `NWS`;
                 let getCoordinates = loader.packages.mText.getPolygonCoordinates(msg);
                 let getDescription = loader.packages.mText.getCleanDescription(msg, null);
+                let issuedDate = new Date(stanza.attributes.issue) == `Invalid Date` ? getTempIssue ? new Date(getTempIssue) : new Date(stanza.attributes.issue) : new Date(stanza.attributes.issue);
                 let alert = { 
                     hitch: `${new Date().getTime() - startTime}ms`,
                     id: `Wire-${defaultWMO ? defaultWMO[0] : `N/A`}-${mUgc.zones.join(`-`)}`,
@@ -239,8 +240,9 @@ class NoaaWeatherWireServiceEvents {
                     history: [{description: getDescription, action: `Issued`, issued: new Date(getTempIssue)}],
                     properties: {
                         areaDesc: mUgc.locations.join(`; `) || `N/A`,
-                        expires: new Date(new Date().getTime() + 1 * 60 * 60 * 1000),
-                        sent: new Date(getTempIssue) == `Invalid Date` ? new Date(stanza.attributes.issue) : new Date(getTempIssue),
+                        // expieres is based off issuedDate
+                        expires: new Date(issuedDate.getTime() + 1 * 60 * 60 * 1000),
+                        sent: issuedDate,
                         messageType: `Issued`,
                         event: `Special Weather Statement`,
                         sender: senderOffice,

@@ -135,8 +135,10 @@ class NoaaWeatherWireServiceCore {
                     await loader.static.session.stop().catch(() => {});
                     await loader.static.session.start().catch(() => {});
                 }, 2 * 1000);
+                loader.cache.sigHault = true;
                 throw new Error(`rapid-reconnect`);
             }
+            loader.cache.sigHault = false;
             loader.static.lastConnect = new Date().getTime();
             loader.cache.isConnected = true;
             loader.static.session.send(loader.packages.xmpp.xml('presence', { to: `nwws@conference.nwws-oi.weather.gov/${this.metadata.authentication.display}`, xmlns: 'http://jabber.org/protocol/muc' }))
@@ -147,11 +149,12 @@ class NoaaWeatherWireServiceCore {
             }
         })
         loader.static.session.on(`offline`, () => {
-            loader.static.session.stop().catch(() => {});
             loader.cache.isConnected = false;
+            loader.cache.sigHault = true;
             throw new Error(`unreachable-host`);
         })
         loader.static.session.on(`error`, async (error) => {
+            loader.cache.sigHault = true;
             throw new Error(error.message || `service-error`);
         })
         loader.static.session.on(`stanza`, (stanza) => {
@@ -182,7 +185,7 @@ class NoaaWeatherWireServiceCore {
       */
 
     isReconnectEligible = async function(minSeconds=60) {
-        if (loader.cache.isConnected && loader.static.session) {
+        if ((loader.cache.isConnected || loader.cache.sigHault == true) && loader.static.session) {
             let lastStanza = new Date().getTime() - loader.cache.lastStanza;
             if (lastStanza > minSeconds * 1000) {
                 if (!loader.cache.attemptingReconnect) {
@@ -190,8 +193,8 @@ class NoaaWeatherWireServiceCore {
                     loader.cache.isConnected = false;
                     loader.cache.totalReconnects += 1;
                     loader.static.events.emit(`onReconnect`, { reconnects: loader.cache.totalReconnects, lastStanza: lastStanza / 1000, lastName: this.metadata.authentication.display});
-                    await loader.static.session.stop().catch(() => {});
-                    await loader.static.session.start().catch(() => {});
+                    await loader.static.session.stop().catch(() => {})
+                    await loader.static.session.start().catch(() => {})
                 } 
             }
         }

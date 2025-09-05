@@ -103,6 +103,7 @@ module.exports.settings = {
 module.exports.cache = { 
     lastStanza: new Date().getTime(), 
     session: null, 
+    sigHault: false,
     isConnected: false, 
     attemptingReconnect: false, 
     totalReconnects: 0 
