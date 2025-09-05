@@ -172,7 +172,7 @@ class NoaaWeatherWireServiceEvents {
                         id: `Wire-${vtec.tracking}`,
                         tracking: vtec.tracking,
                         action: vtec.status,
-                        history: [{description: getDescription, action: vtec.status, issued: new Date(vtec.issued)}],
+                        history: [{description: getDescription, action: vtec.status, issued: new Date(getTempIssue)}],
                         properties: {
                             areaDesc: mUgc.locations.join(`; `) || `N/A`,
                             expires: new Date(vtec.expires) == `Invalid Date` ? new Date(9999, 0, 1) : new Date(vtec.expires),
@@ -226,7 +226,8 @@ class NoaaWeatherWireServiceEvents {
                 let getTornado = loader.packages.mText.getString(msg, `TORNADO...`) || loader.packages.mText.getString(msg, `WATERSPOUT...`)
                 let getHail = loader.packages.mText.getString(msg, `MAX HAIL SIZE...`, [`IN`]) || loader.packages.mText.getString(msg, `HAIL...`, [`IN`]);
                 let getGusts = loader.packages.mText.getString(msg, `MAX WIND GUST...`) || loader.packages.mText.getString(msg, `WIND...`);
-                let getThreat = loader.packages.mText.getString(msg, `DAMAGE THREAT...`);
+                let getThreat = loader.packages.mText.getString(msg, `DAMAGE THREAT...`); 
+                let getTempIssue = loader.packages.mText.getString(msg, `ISSUED TIME...`) || new Date();
                 let senderOffice = loader.packages.mText.getOffice(msg) || `NWS`;
                 let getCoordinates = loader.packages.mText.getPolygonCoordinates(msg);
                 let getDescription = loader.packages.mText.getCleanDescription(msg, null);
@@ -235,11 +236,11 @@ class NoaaWeatherWireServiceEvents {
                     id: `Wire-${defaultWMO ? defaultWMO[0] : `N/A`}-${mUgc.zones.join(`-`)}`,
                     tracking: `${defaultWMO ? defaultWMO[0] : `N/A`}-${mUgc.zones.join(`-`)}`,
                     action: `Issued`,
-                    history: [{description: getDescription, action: `Issued`, issued: new Date(stanza.attributes.issue)}],
+                    history: [{description: getDescription, action: `Issued`, issued: new Date(getTempIssue)}],
                     properties: {
                         areaDesc: mUgc.locations.join(`; `) || `N/A`,
                         expires: new Date(new Date().getTime() + 1 * 60 * 60 * 1000),
-                        sent: new Date(stanza.attributes.issue),
+                        sent: new Date(getTempIssue) == `Invalid Date` ? new Date(stanza.attributes.issue) : new Date(getTempIssue),
                         messageType: `Issued`,
                         event: `Special Weather Statement`,
                         sender: senderOffice,
