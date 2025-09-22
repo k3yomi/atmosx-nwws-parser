@@ -172,11 +172,11 @@ class NoaaWeatherWireServiceEvents {
                         id: `Wire-${vtec.tracking}`,
                         tracking: vtec.tracking,
                         action: vtec.status,
-                        history: [{description: getDescription, action: vtec.status, issued: new Date(getTempIssue)}],
+                        history: [{description: getDescription, action: vtec.status, issued: getTempIssue}],
                         properties: {
                             areaDesc: mUgc.locations.join(`; `) || `N/A`,
                             expires: new Date(vtec.expires) == `Invalid Date` ? new Date(9999, 0, 1) : new Date(vtec.expires),
-                            sent: new Date(vtec.issued) == `Invalid Date` ? getTempIssue ? new Date(getTempIssue) : new Date(vtec.issued) : new Date(vtec.issued),
+                            sent: new Date(vtec.issued) == `Invalid Date` ? getTempIssue : new Date(vtec.issued),
                             messageType: vtec.status, 
                             event: vtec.event || `Unknown Event`,
                             sender: senderOffice,
@@ -231,13 +231,13 @@ class NoaaWeatherWireServiceEvents {
                 let senderOffice = loader.packages.mText.getOffice(msg) || `NWS`;
                 let getCoordinates = loader.packages.mText.getPolygonCoordinates(msg);
                 let getDescription = loader.packages.mText.getCleanDescription(msg, null);
-                let issuedDate = new Date(stanza.attributes.issue) == `Invalid Date` ? getTempIssue ? new Date(getTempIssue) : new Date(stanza.attributes.issue) : new Date(stanza.attributes.issue);
+                let issuedDate = new Date(stanza.attributes.issue) == `Invalid Date` ? getTempIssue : new Date(stanza.attributes.issue);
                 let alert = { 
                     hitch: `${new Date().getTime() - startTime}ms`,
                     id: `Wire-${defaultWMO ? defaultWMO[0] : `N/A`}-${mUgc.zones.join(`-`)}`,
                     tracking: `${defaultWMO ? defaultWMO[0] : `N/A`}-${mUgc.zones.join(`-`)}`,
                     action: `Issued`,
-                    history: [{description: getDescription, action: `Issued`, issued: new Date(getTempIssue)}],
+                    history: [{description: getDescription, action: `Issued`, issued: getTempIssue}],
                     properties: {
                         areaDesc: mUgc.locations.join(`; `) || `N/A`,
                         // expieres is based off issuedDate
