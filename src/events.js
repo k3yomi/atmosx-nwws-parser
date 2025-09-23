@@ -165,6 +165,7 @@ class NoaaWeatherWireServiceEvents {
                     let getThreat = loader.packages.mText.getString(msg, `DAMAGE THREAT...`);
                     let timeIssued = loader.packages.mText.getString(msg, `ISSUED TIME...`);
                     if (timeIssued == null) { timeIssued = stanza.attributes.issue; }
+                    if (timeIssued == null) { new Date().toISOString(); }
                     let senderOffice = loader.packages.mText.getOffice(msg) || vtec.tracking.split(`-`)[0];
                     let getCoordinates = loader.packages.mText.getPolygonCoordinates(msg);
                     let getDescription = loader.packages.mText.getCleanDescription(msg, vtec);
@@ -233,6 +234,7 @@ class NoaaWeatherWireServiceEvents {
                 let getDescription = loader.packages.mText.getCleanDescription(msg, null);
                 let timeIssued = loader.packages.mText.getString(msg, `ISSUED TIME...`);
                 if (timeIssued == null) { timeIssued = stanza.attributes.issue; }
+                if (timeIssued == null) { new Date().toISOString(); }
                 let alert = { 
                     hitch: `${new Date().getTime() - startTime}ms`,
                     id: `Wire-${defaultWMO ? defaultWMO[0] : `N/A`}-${mUgc.zones.join(`-`)}`,
