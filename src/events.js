@@ -173,7 +173,7 @@ class NoaaWeatherWireServiceEvents {
                         id: `Wire-${vtec.tracking}`,
                         tracking: vtec.tracking,
                         action: vtec.status,
-                        history: [{description: getDescription, action: vtec.status, issued: timeIssued}],
+                        history: [{description: getDescription, action: vtec.status, issued: new Date(timeIssued) == `Invalid Date` ? new Date(timeIssued) : timeIssued}],
                         properties: {
                             areaDesc: mUgc.locations.join(`; `) || `N/A`,
                             expires: new Date(vtec.expires) == `Invalid Date` ? new Date(9999, 0, 1) : new Date(vtec.expires),
@@ -238,7 +238,7 @@ class NoaaWeatherWireServiceEvents {
                     id: `Wire-${defaultWMO ? defaultWMO[0] : `N/A`}-${mUgc.zones.join(`-`)}`,
                     tracking: `${defaultWMO ? defaultWMO[0] : `N/A`}-${mUgc.zones.join(`-`)}`,
                     action: `Issued`,
-                    history: [{description: getDescription, action: `Issued`, issued: timeIssued}],
+                    history: [{description: getDescription, action: `Issued`, issued: new Date(timeIssued) == `Invalid Date` ? new Date(timeIssued) : timeIssued}],
                     properties: {
                         areaDesc: mUgc.locations.join(`; `) || `N/A`,
                         expires: new Date(new Date(timeIssued).getTime() + 1 * 60 * 60 * 1000),
