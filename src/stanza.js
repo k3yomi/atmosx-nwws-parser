@@ -96,7 +96,9 @@ class NoaaWeatherWireServiceStanza {
 
     saveCache = function(message, attributes, type, isCap, isVtec) {
         if (!loader.settings.cacheSettings.cacheDir) return;
-        loader.packages.fs.appendFileSync(`${loader.settings.cacheSettings.cacheDir}/nwws-raw-category-${type}s-${isCap ? 'cap' : 'raw'}${isVtec ? '-vtec' : ''}.bin`, `=================================================\n${new Date().toISOString().replace(/[:.]/g, '-')}\n=================================================\n\n${message}\nISSUED TIME...${new Date(attributes.issue).toISOString()}\n\n`, 'utf8');
+        // for every $$ string, add a `\nISSUED TIME...${new Date().toISOString()} before it
+        message = message.replace(/\$\$/g, `\nISSUED TIME...${new Date().toISOString()}\n$$$\n`);
+        loader.packages.fs.appendFileSync(`${loader.settings.cacheSettings.cacheDir}/nwws-raw-category-${type}s-${isCap ? 'cap' : 'raw'}${isVtec ? '-vtec' : ''}.bin`, `=================================================\n${new Date().toISOString().replace(/[:.]/g, '-')}\n=================================================\n${message}`, 'utf8');
     }
 }
 

@@ -163,7 +163,8 @@ class NoaaWeatherWireServiceEvents {
                     let getHail = loader.packages.mText.getString(msg, `MAX HAIL SIZE...`, [`IN`]) || loader.packages.mText.getString(msg, `HAIL...`, [`IN`]);
                     let getGusts = loader.packages.mText.getString(msg, `MAX WIND GUST...`) || loader.packages.mText.getString(msg, `WIND...`);
                     let getThreat = loader.packages.mText.getString(msg, `DAMAGE THREAT...`);
-                    let getTempIssue = loader.packages.mText.getString(msg, `ISSUED TIME...`);
+                    let timeIssued = loader.packages.mText.getString(msg, `ISSUED TIME...`);
+                    if (timeIssued == null) { timeIssued = stanza.attributes.issue; }
                     let senderOffice = loader.packages.mText.getOffice(msg) || vtec.tracking.split(`-`)[0];
                     let getCoordinates = loader.packages.mText.getPolygonCoordinates(msg);
                     let getDescription = loader.packages.mText.getCleanDescription(msg, vtec);
@@ -172,11 +173,11 @@ class NoaaWeatherWireServiceEvents {
                         id: `Wire-${vtec.tracking}`,
                         tracking: vtec.tracking,
                         action: vtec.status,
-                        history: [{description: getDescription, action: vtec.status, issued: getTempIssue}],
+                        history: [{description: getDescription, action: vtec.status, issued: timeIssued}],
                         properties: {
                             areaDesc: mUgc.locations.join(`; `) || `N/A`,
                             expires: new Date(vtec.expires) == `Invalid Date` ? new Date(9999, 0, 1) : new Date(vtec.expires),
-                            sent: new Date(vtec.issued) == `Invalid Date` ? getTempIssue : new Date(vtec.issued),
+                            sent: new Date(timeIssued),
                             messageType: vtec.status, 
                             event: vtec.event || `Unknown Event`,
                             sender: senderOffice,
@@ -227,22 +228,21 @@ class NoaaWeatherWireServiceEvents {
                 let getHail = loader.packages.mText.getString(msg, `MAX HAIL SIZE...`, [`IN`]) || loader.packages.mText.getString(msg, `HAIL...`, [`IN`]);
                 let getGusts = loader.packages.mText.getString(msg, `MAX WIND GUST...`) || loader.packages.mText.getString(msg, `WIND...`);
                 let getThreat = loader.packages.mText.getString(msg, `DAMAGE THREAT...`); 
-                let getTempIssue = loader.packages.mText.getString(msg, `ISSUED TIME...`);
                 let senderOffice = loader.packages.mText.getOffice(msg) || `NWS`;
                 let getCoordinates = loader.packages.mText.getPolygonCoordinates(msg);
                 let getDescription = loader.packages.mText.getCleanDescription(msg, null);
-                let issuedDate = new Date(stanza.attributes.issue) == `Invalid Date` ? getTempIssue : new Date(stanza.attributes.issue);
+                let timeIssued = loader.packages.mText.getString(msg, `ISSUED TIME...`);
+                if (timeIssued == null) { timeIssued = stanza.attributes.issue; }
                 let alert = { 
                     hitch: `${new Date().getTime() - startTime}ms`,
                     id: `Wire-${defaultWMO ? defaultWMO[0] : `N/A`}-${mUgc.zones.join(`-`)}`,
                     tracking: `${defaultWMO ? defaultWMO[0] : `N/A`}-${mUgc.zones.join(`-`)}`,
                     action: `Issued`,
-                    history: [{description: getDescription, action: `Issued`, issued: getTempIssue}],
+                    history: [{description: getDescription, action: `Issued`, issued: timeIssued}],
                     properties: {
                         areaDesc: mUgc.locations.join(`; `) || `N/A`,
-                        // expieres is based off issuedDate
-                        expires: new Date(issuedDate.getTime() + 1 * 60 * 60 * 1000),
-                        sent: issuedDate,
+                        expires: new Date(new Date(timeIssued).getTime() + 1 * 60 * 60 * 1000),
+                        sent: new Date(timeIssued),
                         messageType: `Issued`,
                         event: `Special Weather Statement`,
                         sender: senderOffice,
