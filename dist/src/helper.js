@@ -84,11 +84,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Parser = void 0;
+exports.AtmosXWireParser = void 0;
 var loader = __importStar(require("../bootstrap"));
 var stanza_1 = __importDefault(require("./stanza"));
-var Parser = /** @class */ (function () {
-    function Parser(metadata) {
+var AtmosXWireParser = /** @class */ (function () {
+    function AtmosXWireParser(metadata) {
         var _this = this;
         /**
           * @function initalizeDatabase
@@ -464,6 +464,7 @@ var Parser = /** @class */ (function () {
             }
         }, 1 * 1000);
     }
-    return Parser;
+    return AtmosXWireParser;
 }());
-exports.Parser = Parser;
+exports.AtmosXWireParser = AtmosXWireParser;
+module.exports = AtmosXWireParser;

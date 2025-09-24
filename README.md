@@ -21,7 +21,7 @@ import * as AtmosXWireParser from `atmosx-nwws-parser`; // ESM
 There are several settings you can configure when intializing the parser. Below is the test.js example that shows some of the settings you can use:
 
 ```js
-let Client = new AtmosXWireParser.Parser({
+let Client = new AtmosXWireParser({
     alertSettings: { 
         onlyCap: false, // Set to true to only receive CAP messages only
         betterEvents: true, // Set to true to receive better event handling

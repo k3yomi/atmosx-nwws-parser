@@ -14,7 +14,7 @@
 import * as loader from '../bootstrap';
 import mStanza from './stanza';
 
-export class Parser {
+export class AtmosXWireParser {
     packages: any;
     metadata: any;
     constructor(metadata: any) {
@@ -301,3 +301,7 @@ export class Parser {
         return () => { loader.statics.events.off(event, callback); }
     }
 }
+
+
+
+module.exports = AtmosXWireParser
