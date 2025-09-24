@@ -154,7 +154,7 @@ export class Parser {
             if (stanza.is(`message`)) { 
                 const sValid = mStanza.validate(stanza);
                 if ( sValid.ignore || (sValid.isCap && !loader.settings.alertSettings.onlyCap) || (!sValid.isCap && loader.settings.alertSettings.onlyCap) || (sValid.isCap && !sValid.hasCapDescription) ) return;
-                loader.statics.events.emit(`onMessage`, sValid.message);
+                loader.statics.events.emit(`onMessage`, sValid);
                 mStanza.create(sValid);
             }
             if (stanza.is('presence') && stanza.attrs.from && stanza.attrs.from.startsWith('nwws@conference.nwws-oi.weather.gov/')) {
