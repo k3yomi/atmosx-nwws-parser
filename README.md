@@ -12,7 +12,8 @@ npm install atmosx-nwws-parser
 
 ## Usage
 ```js
-const AtmosXWireParser = require(`atmosx-nwws-parser`);
+const AtmosXWireParser = require(`atmosx-nwws-parser`); // CJS 
+import * as AtmosXWireParser from `atmosx-nwws-parser`; // ESM
 ```
 
 ## Configuration and Initialization
@@ -20,7 +21,7 @@ const AtmosXWireParser = require(`atmosx-nwws-parser`);
 There are several settings you can configure when intializing the parser. Below is the test.js example that shows some of the settings you can use:
 
 ```js
-let Client = new AtmosXWireParser({
+let Client = new AtmosXWireParser.Parser({
     alertSettings: { 
         onlyCap: false, // Set to true to only receive CAP messages only
         betterEvents: true, // Set to true to receive better event handling
@@ -64,26 +65,26 @@ Client.onEvent(`onReconnect`, (service: Object) => {});
 
 ## Functions and Methods
 You can also use various functions provided by the parser. Here are some examples:
-```js
-// Debugging function to create your own alert manually
-Client.forwardCustomStanza(stanza: String, attributes: Object);
-```
 
 ```js
 // Function to set the display name of the XMPP client (Will only set upon reconnect)
 Client.setDisplayName(displayName: String);
 ```
 
+```js
+// Function to manually trigger the cache initialization (Usually called automatically on startup if readCache is true)
+Client.initalizeCache() 
+```
+
 ## Error Handling
 The parser can emit various errors. Here are some common errors you might encounter:
 
-**not-authorized**: This error occurs when the parser is not authorized to connect to the XMPP server. Ensure that your username and password are correct.
+**error-database-not-configured**: This error occurs when the database is not configured properly. Please set the database path in the constructor.
 
-**unreachable-host**: This error indicates that the parser cannot reach the XMPP server. Check your internet connection and ensure that the server address is correct.
+**error-reconnecting-too-fast**: This error occurs when the client is attempting to reconnect too fast. Please wait a few seconds before trying again.
 
-**service-error**: This error occurs when there is an issue with the XMPP service. It could be due to server maintenance or other issues. You can try reconnecting after some time.
+**error-connection-lost**: This error occurs when the connection to the XMPP server has been lost. Please try reconnecting manually as the automatic reconnect feature is not setup for offline halt conditions.
 
-**no-database-dir**: This error occurs when the database directory does not exist. Ensure that the directory specified in the `database` setting exists or create it before running the parser.
 
 ## Credits
 This parser is developed and maintained by [K3YOMI](https://github.com/K3YOMI) and the AtmosphericX Team. It is open-source and available for contributions and improvements. If you find any issues or have suggestions, feel free to open an issue or submit a pull request in the repository.

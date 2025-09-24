@@ -11,33 +11,34 @@
     Written by: k3yomi@GitHub                        
 */
 
-let loader = require(`../bootstrap.js`);
+import * as loader from '../bootstrap';
 
-class NoaaWeatherWireServiceUGC { 
+
+export class mUgcParser {
 
     /**
       * @function getUGC
-      * @description Extracts UGC (FIPS) information from a message.
+      * @description Extracts UGC codes and associated locations from a weather alert message.
       * 
-      * @param {string} message - The message containing UGC information.
+      * @param {string} message - The full text message to search within.
       */
-    
-    getUGC = async function(message) {
-        let header = this.getHeader(message);
-        let zones = this.getZones(header);
-        let locations = await this.getLocations(zones)
-        let ugc = zones.length > 0 ? { zones, locations} : null;
-        return ugc
+
+    static async getUGC (message: string) {
+        const header = this.getHeader(message);
+        const zones = this.getZones(header);
+        const locations = await this.getLocations(zones);
+        const ugc = zones.length > 0 ? { zones, locations} : null;
+        return ugc;
     }
 
     /**
       * @function getHeader
-      * @description Extracts the UGC header from the message.
+      * @description Extracts the UGC header from a weather alert message.
       * 
-      * @param {string} message - The message containing the UGC header.
+      * @param {string} message - The full text message to search within.
       */
 
-    getHeader = function(message) {
+    static getHeader (message: string) {
         let start = message.search(new RegExp(loader.definitions.expressions.ugc1, "gimu"));
         let end = message.substring(start).search(new RegExp(loader.definitions.expressions.ugc2, "gimu"));
         let full = message.substring(start, start + end).replace(/\s+/g, '').slice(0, -1);
@@ -46,38 +47,39 @@ class NoaaWeatherWireServiceUGC {
 
     /**
       * @function getLocations
-      * @description Retrieves the locations associated with the UGC zones.
-      * If a location is not found in the database, the zone ID is returned.
+      * @description Retrieves location names from a database based on UGC zone codes.
       * 
-      * @param {Array} zones - The UGC zones to retrieve locations for.
+      * @param {Array} zones - An array of UGC zone codes.
       */
 
-    getLocations = async function(zones) {
-        let locations = [];
+    static async getLocations (zones: any) {
+        const locations: string[] = [];
         for (let i = 0; i < zones.length; i++) {
-            let id = zones[i].trim();
-            let located = await loader.static.db.prepare(`SELECT location FROM shapefiles WHERE id = ?`).get(id);
+            const id = zones[i].trim();
+            const statement = `SELECT location FROM shapefiles WHERE id = ?`;
+            const located = await loader.statics.db.prepare(statement).get(id);
             located != undefined ? locations.push(located.location) : locations.push(id);
-        }     
-        return Array.from(new Set(locations));
+        }
+        return Array.from(new Set(locations)).sort();
     }
 
     /**
       * @function getCoordinates
-      * @description Retrieves the coordinates for the UGC zones.
+      * @description Retrieves geographical coordinates from a database based on UGC zone codes.
       * 
-      * @param {Array} zones - The UGC zones to retrieve coordinates for.
+      * @param {Array} zones - An array of UGC zone codes.
       */
 
-    getCoordinates = async function(zones) {
-        let coordinates = [];
+    static getCoordinates (zones: any) {
+        let coordinates: [number, number][] = [];
         for (let i = 0; i < zones.length; i++) {
-            let id = zones[i].trim();
-            let located = await loader.static.db.prepare(`SELECT geometry FROM shapefiles WHERE id = ?`).get(id);
+            const id = zones[i].trim();
+            const statement = `SELECT geometry FROM shapefiles WHERE id = ?`;
+            let located = loader.statics.db.prepare(statement).get(id);
             if (located != undefined) {
                 let geometry = JSON.parse(located.geometry);
-                if (geometry?.type == 'Polygon') {
-                    coordinates.push(...geometry.coordinates[0].map(coord => [coord[0], coord[1]]));
+                if (geometry?.type === 'Polygon') {
+                    coordinates.push(...geometry.coordinates[0].map((coord: [number, number]) => [coord[0], coord[1]]));
                     break;
                 }
             }
@@ -87,13 +89,16 @@ class NoaaWeatherWireServiceUGC {
 
     /**
       * @function getZones
-      * @description Parses the UGC header to extract zone IDs.
+      * @description Parses the UGC header to extract individual UGC zone codes, handling ranges and formats.
       * 
       * @param {string} header - The UGC header string.
       */
 
-    getZones = function(header) {
-        let ugcSplit = header.split('-'), zones = [], state = ugcSplit[0].substring(0, 2), format = ugcSplit[0].substring(2, 3);
+    static getZones (header: string) {
+        const ugcSplit = header.split('-') 
+        const zones: string[] = [];
+        let state = ugcSplit[0].substring(0, 2)
+        let format = ugcSplit[0].substring(2, 3);
         for (let i = 0; i < ugcSplit.length; i++) {
             if (/^[A-Z]/.test(ugcSplit[i])) {
                 state = ugcSplit[i].substring(0, 2);
@@ -110,6 +115,8 @@ class NoaaWeatherWireServiceUGC {
         }
         return zones.filter(item => item !== '');
     }
+
 }
 
-module.exports = new NoaaWeatherWireServiceUGC();
+export default mUgcParser;
+

@@ -1,32 +1,69 @@
-module.exports = {
-    cache: {},
-    settings: {},
-    static: {},
-    packages: {},
-    definitions: {}
-}
+/*
+                                            _               _     __   __
+         /\  | |                           | |             (_)    \ \ / /
+        /  \ | |_ _ __ ___   ___  ___ _ __ | |__   ___ _ __ _  ___ \ V / 
+       / /\ \| __| '_ ` _ \ / _ \/ __| '_ \| '_ \ / _ \ '__| |/ __| > <  
+      / ____ \ |_| | | | | | (_) \__ \ |_) | | | |  __/ |  | | (__ / . \ 
+     /_/    \_\__|_| |_| |_|\___/|___/ .__/|_| |_|\___|_|  |_|\___/_/ \_\
+                                     | |                                 
+                                     |_|                                                                                                                
+    
+    Written by: k3yomi@GitHub                        
+*/
 
-module.exports.packages = {
-    fs: require(`fs`),
-    path: require(`path`),
-    events: require(`events`),
-    xmpp: require(`@xmpp/client`),
-    shapefile: require(`shapefile`),
-    xml2js: require(`xml2js`),
-    sqlite3: require(`better-sqlite3`),
-    mStanza: require(`./src/stanza.js`),
-    mVtec: require(`./src/vtec.js`),
-    mUGC: require(`./src/ugc.js`),
-    mText: require(`./src/text.js`),
-    mEvents: require(`./src/events.js`),
 
-}
+import * as fs from 'fs';
+import * as path from 'path';
+import * as events from 'events';
+import * as xmpp from '@xmpp/client';
+import * as shapefile from 'shapefile';
+import * as xml2js from 'xml2js';
+import sqlite3 from 'better-sqlite3';
 
-module.exports.definitions = {
+
+export const packages = {fs, path, events, xmpp, shapefile, xml2js, sqlite3 };
+
+export const statics = {
+    events: new events.EventEmitter(),
+    session: null as any,
+    db: null as any,
+};
+
+export const cache = {
+    lastStanza: Date.now(),
+    session: null as any,
+    lastConnect: null as any,
+    sigHault: false,
+    isConnected: false,
+    attemptingReconnect: false,
+    totalReconnects: 0
+};
+
+export const settings = {
+    alertSettings: {
+        ugcPolygons: false,
+        onlyCap: false,
+        betterEvents: false,
+        expiryCheck: true,
+        filteredAlerts: [],
+    },
+    xmpp: {
+        reconnect: true,
+        reconnectInterval: 60,
+    },
+    cacheSettings: {
+        readCache: false,
+        maxMegabytes: 1,
+        cacheDir: null,
+    },
+    database: path.join(process.cwd(), 'shapefiles.db'),
+};
+
+export const definitions = {
     events: { "AF": "Ashfall", "AS": "Air Stagnation", "BH": "Beach Hazard", "BW": "Brisk Wind", "BZ": "Blizzard", "CF": "Coastal Flood", "DF": "Debris Flow", "DS": "Dust Storm", "EC": "Extreme Cold", "EH": "Excessive Heat", "XH": "Extreme Heat", "EW": "Extreme Wind", "FA": "Areal Flood", "FF": "Flash Flood", "FG": "Dense Fog", "FL": "Flood", "FR": "Frost", "FW": "Fire Weather", "FZ": "Freeze", "GL": "Gale", "HF": "Hurricane Force Wind", "HT": "Heat", "HU": "Hurricane", "HW": "High Wind", "HY": "Hydrologic", "HZ": "Hard Freeze", "IS": "Ice Storm", "LE": "Lake Effect Snow", "LO": "Low Water", "LS": "Lakeshore Flood", "LW": "Lake Wind", "MA": "Special Marine", "MF": "Dense Fog", "MH": "Ashfall", "MS": "Dense Smoke", "RB": "Small Craft for Rough Bar", "RP": "Rip Current Risk", "SC": "Small Craft", "SE": "Hazardous Seas", "SI": "Small Craft for Winds", "SM": "Dense Smoke", "SQ": "Snow Squall", "SR": "Storm", "SS": "Storm Surge", "SU": "High Surf", "SV": "Severe Thunderstorm", "SW": "Small Craft for Hazardous Seas", "TO": "Tornado", "TR": "Tropical Storm", "TS": "Tsunami", "TY": "Typhoon", "UP": "Heavy Freezing Spray", "WC": "Wind Chill", "WI": "Wind", "WS": "Winter Storm", "WW": "Winter Weather", "ZF": "Freezing Fog", "ZR": "Freezing Rain", "ZY": "Freezing Spray" },
     actions: { "W": "Warning", "F": "Forecast", "A": "Watch", "O": "Outlook", "Y": "Advisory", "N": "Synopsis", "S": "Statement"},
     status: { "NEW": "Issued", "CON": "Updated", "EXT": "Extended", "EXA": "Extended", "EXB": "Extended", "UPG": "Upgraded", "COR": "Correction", "ROU": "Routine", "CAN": "Cancelled", "EXP": "Expired" },
-    awips: { SWOMCD: `mesoscale-discussion`, LSR: `local-storm-report`, SPS: `special-weather-statement`, LSR: "local-storm-report"},
+    awips: { SWOMCD: `mesoscale-discussion`, LSR: `local-storm-report`, SPS: `special-weather-statement`},
     expressions: {
         vtec: `[OTEX].(NEW|CON|EXT|EXA|EXB|UPG|CAN|EXP|COR|ROU).[A-Z]{4}.[A-Z]{2}.[WAYSFON].[0-9]{4}.[0-9]{6}T[0-9]{4}Z-[0-9]{6}T[0-9]{4}Z`,
         wmo: `[A-Z0-9]{6}\\s[A-Z]{4}\\s\\d{6}`,
@@ -74,39 +111,12 @@ module.exports.definitions = {
         "SOURCE...LAW ENFORCEMENT REPORTED.": "Confirmed by Law Enforcement"
     },
     haultingConditions: [
-        { error: "not-authorized", message: "You do not have the proper credentials to access this service.", code: "credential-error"},
-        { error: "unreachable-host", message: "The host could not be reached. Please check your internet connection or the host address.", code: "xmpp-error" },
-        { error: "service-error", message: "An error occurred while connecting to the NOAA Weather Wire Service. Please try again later.", code: "xmpp-error" },
-        { error: "no-database-dir", message: "Database directory is not set. Please set the databaseDir in the metadata.", code: "no-database" },
-        { error: "rapid-reconnect", message: "The client is reconnecting too rapidly. Please wait a moment before trying again.", code: "xmpp-error" }
-    ]
-}
-module.exports.settings = { 
-    alertSettings: {
-        ugcPolygons: false,
-        onlyCap: false,
-        betterEvents: false,
-        expiryCheck: true,
-        filteredAlerts: [],
-    },
-    xmpp: {
-        reconnect: true,
-        reconnectInterval: 60,
-    },
-    cacheSettings: {
-        readCache: false,
-        maxMegabytes: 1,
-        cacheDir: false,
-    },
-    database: module.exports.packages.path.join(process.cwd(), 'shapefiles.db'), 
+        { error: "error-database-not-configured", message: "The database is not configured properly. Please set the database path in the constructor." },
+        { error: "error-reconnecting-too-fast", message: "The client is attempting to reconnect too fast. Please wait a few seconds before trying again." },
+        { error: "error-connection-lost", message: "The connection to the XMPP server has been lost. Please try reconnecting manually as the automatic reconnect feature is not setup for offline hault conditions." },
+    ],
+    messages: {
+        shapefile_creation: `\n\n[NOTICE] DO NOT CLOSE THIS PROJECT UNTIL THE SHAPEFILES ARE DONE COMPLETING!\n\t THIS COULD TAKE A WHILE DEPENDING ON THE SPEED OF YOUR STORAGE!!\n\t IF YOU CLOSE YOUR PROJECT, THE SHAPEFILES WILL NOT BE CREATED AND YOU WILL NEED TO DELETE ${settings.database} AND RESTART TO CREATE THEM AGAIN!\n\n`,
+        shapefile_creation_finished: `\n\n[NOTICE] SHAPEFILES HAVE BEEN SUCCESSFULLY CREATED AND THE DATABASE IS READY FOR USE!\n\n`
+    }
 };
-module.exports.cache = { 
-    lastStanza: new Date().getTime(), 
-    session: null, 
-    sigHault: false,
-    isConnected: false, 
-    attemptingReconnect: false, 
-    totalReconnects: 0 
-};
-
-module.exports.static.events = new module.exports.packages.events.EventEmitter();

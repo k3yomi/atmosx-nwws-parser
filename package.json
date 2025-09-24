@@ -1,20 +1,24 @@
 {
   "name": "atmosx-nwws-parser",
-  "version": "1.0.1852",
-  "description": "NOAA Weather Wire Parser",
-  "main": "index.js",
-  "scripts": {
-    "test": "node test.js"
-  },
+  "version": "1.0.19",
+  "description": "NOAA Weather Wire Parser - Built for standalone and Project AtmosphericX Integration.",
+  "main": "dist/src/helper.js",
+  "types": "src/helper.d.ts",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/K3YOMI/atmosx-nwws-parser.git"
   },
   "keywords": [
     "NWWS",
-    "NOAA Weather Wire Service"
+    "NOAA Weather Wire Service",
+    "TypeScript",
+    "XMPP",
+    "Parser",
+    "JavaScript",
+    "CommonJS",
+    "ESM"
   ],
-  "author": "K3YOMI, Starflight",
+  "author": "k3yomi, StarflightWx",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/K3YOMI/atmosx-nwws-parser/issues"
@@ -24,6 +28,10 @@
     "@xmpp/client": "^0.7.3",
     "better-sqlite3": "^11.10.0",
     "shapefile": "^0.6.6",
+    "typescript": "^5.9.2",
     "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2"
   }
 }
