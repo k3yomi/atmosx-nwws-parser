@@ -8,6 +8,11 @@
     "type": "git",
     "url": "git+https://github.com/K3YOMI/atmosx-nwws-parser.git"
   },
+  "scripts": {
+    "build": "npx tsc",
+    "build:run": "npx tsc && cd ./test && node ./index.js",
+    "publish": "npm run build && npm publish --access public"
+  },
   "keywords": [
     "NWWS",
     "NOAA Weather Wire Service",
