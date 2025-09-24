@@ -280,7 +280,7 @@ var Parser = /** @class */ (function () {
                                 var sValid = stanza_1.default.validate(stanza);
                                 if (sValid.ignore || (sValid.isCap && !loader.settings.alertSettings.onlyCap) || (!sValid.isCap && loader.settings.alertSettings.onlyCap) || (sValid.isCap && !sValid.hasCapDescription))
                                     return;
-                                loader.statics.events.emit("onMessage", sValid.message);
+                                loader.statics.events.emit("onMessage", sValid);
                                 stanza_1.default.create(sValid);
                             }
                             if (stanza.is('presence') && stanza.attrs.from && stanza.attrs.from.startsWith('nwws@conference.nwws-oi.weather.gov/')) {
