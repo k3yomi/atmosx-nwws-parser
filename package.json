@@ -1,6 +1,6 @@
 {
   "name": "atmosx-nwws-parser",
-  "version": "1.0.191",
+  "version": "1.0.1911",
   "description": "NOAA Weather Wire Parser - Built for standalone and Project AtmosphericX Integration.",
   "main": "dist/src/helper.js",
   "types": "src/helper.d.ts",

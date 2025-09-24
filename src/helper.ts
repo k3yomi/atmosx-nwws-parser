@@ -151,15 +151,20 @@ export class Parser {
         })
         loader.statics.session.on(`stanza`, (stanza: any) => {
             loader.cache.lastStanza = new Date().getTime();
-            if (stanza.is(`message`)) { 
-                const sValid = mStanza.validate(stanza);
-                if ( sValid.ignore || (sValid.isCap && !loader.settings.alertSettings.onlyCap) || (!sValid.isCap && loader.settings.alertSettings.onlyCap) || (sValid.isCap && !sValid.hasCapDescription) ) return;
-                loader.statics.events.emit(`onMessage`, sValid);
-                mStanza.create(sValid);
-            }
-            if (stanza.is('presence') && stanza.attrs.from && stanza.attrs.from.startsWith('nwws@conference.nwws-oi.weather.gov/')) {
-                let occupant = stanza.attrs.from.split('/').slice(1).join('/');
-                loader.statics.events.emit('onOccupant', { occupant, type: stanza.attrs.type === 'unavailable' ? 'unavailable' : 'available' });
+            try {
+                if (stanza.is(`message`)) { 
+                    const sValid = mStanza.validate(stanza);
+                    if ( sValid.ignore || (sValid.isCap && !loader.settings.alertSettings.onlyCap) || (!sValid.isCap && loader.settings.alertSettings.onlyCap) || (sValid.isCap && !sValid.hasCapDescription) ) return;
+                    loader.statics.events.emit(`onMessage`, sValid);
+                    mStanza.create(sValid);
+                }
+                if (stanza.is('presence') && stanza.attrs.from && stanza.attrs.from.startsWith('nwws@conference.nwws-oi.weather.gov/')) {
+                    let occupant = stanza.attrs.from.split('/').slice(1).join('/');
+                    loader.statics.events.emit('onOccupant', { occupant, type: stanza.attrs.type === 'unavailable' ? 'unavailable' : 'available' });
+                }
+            } catch (error) {
+                loader.statics.events.emit(`onError`, { error: (error as any).message || `An unknown error occurred`, code: `stanza-parse-error` });
+                return;
             }
         })
         await loader.statics.session.start();

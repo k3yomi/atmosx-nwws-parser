@@ -276,16 +276,22 @@ var Parser = /** @class */ (function () {
                         });
                         loader.statics.session.on("stanza", function (stanza) {
                             loader.cache.lastStanza = new Date().getTime();
-                            if (stanza.is("message")) {
-                                var sValid = stanza_1.default.validate(stanza);
-                                if (sValid.ignore || (sValid.isCap && !loader.settings.alertSettings.onlyCap) || (!sValid.isCap && loader.settings.alertSettings.onlyCap) || (sValid.isCap && !sValid.hasCapDescription))
-                                    return;
-                                loader.statics.events.emit("onMessage", sValid);
-                                stanza_1.default.create(sValid);
+                            try {
+                                if (stanza.is("message")) {
+                                    var sValid = stanza_1.default.validate(stanza);
+                                    if (sValid.ignore || (sValid.isCap && !loader.settings.alertSettings.onlyCap) || (!sValid.isCap && loader.settings.alertSettings.onlyCap) || (sValid.isCap && !sValid.hasCapDescription))
+                                        return;
+                                    loader.statics.events.emit("onMessage", sValid);
+                                    stanza_1.default.create(sValid);
+                                }
+                                if (stanza.is('presence') && stanza.attrs.from && stanza.attrs.from.startsWith('nwws@conference.nwws-oi.weather.gov/')) {
+                                    var occupant = stanza.attrs.from.split('/').slice(1).join('/');
+                                    loader.statics.events.emit('onOccupant', { occupant: occupant, type: stanza.attrs.type === 'unavailable' ? 'unavailable' : 'available' });
+                                }
                             }
-                            if (stanza.is('presence') && stanza.attrs.from && stanza.attrs.from.startsWith('nwws@conference.nwws-oi.weather.gov/')) {
-                                var occupant = stanza.attrs.from.split('/').slice(1).join('/');
-                                loader.statics.events.emit('onOccupant', { occupant: occupant, type: stanza.attrs.type === 'unavailable' ? 'unavailable' : 'available' });
+                            catch (error) {
+                                loader.statics.events.emit("onError", { error: error.message || "An unknown error occurred", code: "stanza-parse-error" });
+                                return;
                             }
                         });
                         return [4 /*yield*/, loader.statics.session.start()];
