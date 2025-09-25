@@ -319,7 +319,7 @@ var mEvents = /** @class */ (function () {
                                 if (vtec.wmo) {
                                     defaultWMO = vtec.wmo;
                                 }
-                                getTornado = text_parser_1.default.getString(message, "TONRADO...") || text_parser_1.default.getString(message, "WATERSPOUT...") || "N/A";
+                                getTornado = text_parser_1.default.getString(message, "TORNADO...") || text_parser_1.default.getString(message, "WATERSPOUT...") || "N/A";
                                 getHailSize = text_parser_1.default.getString(message, "MAX HAIL SIZE...", ["IN"]) || text_parser_1.default.getString(message, "HAIL...", ["IN"]) || "N/A";
                                 getWindGusts = text_parser_1.default.getString(message, "MAX WIND GUST...") || text_parser_1.default.getString(message, "WIND...") || "N/A";
                                 getDamageThreat = text_parser_1.default.getString(message, "DAMAGE THREAT...") || "N/A";
@@ -416,7 +416,7 @@ var mEvents = /** @class */ (function () {
                     case 2:
                         mUgc = _a.sent();
                         if (mUgc != null) {
-                            getTornado = text_parser_1.default.getString(message, "TONRADO...") || text_parser_1.default.getString(message, "WATERSPOUT...") || "N/A";
+                            getTornado = text_parser_1.default.getString(message, "TORNADO...") || text_parser_1.default.getString(message, "WATERSPOUT...") || "N/A";
                             getHailSize = text_parser_1.default.getString(message, "MAX HAIL SIZE...", ["IN"]) || text_parser_1.default.getString(message, "HAIL...", ["IN"]) || "N/A";
                             getWindGusts = text_parser_1.default.getString(message, "MAX WIND GUST...") || text_parser_1.default.getString(message, "WIND...") || "N/A";
                             getDamageThreat = text_parser_1.default.getString(message, "DAMAGE THREAT...") || "N/A";
