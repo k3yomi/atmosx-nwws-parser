@@ -361,13 +361,13 @@ var mEvents = /** @class */ (function () {
                                             maxWindGust: getWindGusts,
                                             thunderstormDamageThreat: [getDamageThreat],
                                         },
-                                        geometry: { type: 'Polygon', coordinates: [getPolygonCoordinates] }
-                                    }
+                                    },
+                                    geometry: { type: 'Polygon', coordinates: [getPolygonCoordinates] }
                                 };
                                 if (loader.settings.alertSettings.ugcPolygons) {
                                     ugcCoordinates = ugc_1.default.getCoordinates(mUgc.zones);
                                     if (ugcCoordinates.length > 0) {
-                                        alert_2.properties.geometry = { type: 'Polygon', coordinates: [ugcCoordinates] };
+                                        alert_2.geometry = { type: 'Polygon', coordinates: [ugcCoordinates] };
                                     }
                                     ;
                                 }
@@ -458,13 +458,13 @@ var mEvents = /** @class */ (function () {
                                         maxWindGust: getWindGusts,
                                         thunderstormDamageThreat: [getDamageThreat],
                                     },
-                                    geometry: { type: 'Polygon', coordinates: [getPolygonCoordinates] }
-                                }
+                                },
+                                geometry: { type: 'Polygon', coordinates: [getPolygonCoordinates] }
                             };
                             if (loader.settings.alertSettings.ugcPolygons) {
                                 ugcCoordinates = ugc_1.default.getCoordinates(mUgc.zones);
                                 if (ugcCoordinates.length > 0) {
-                                    alert_3.properties.geometry = { type: 'Polygon', coordinates: [ugcCoordinates] };
+                                    alert_3.geometry = { type: 'Polygon', coordinates: [ugcCoordinates] };
                                 }
                                 ;
                             }
