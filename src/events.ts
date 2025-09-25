@@ -194,7 +194,7 @@ export class mEvents {
                 for (let v = 0; v < mVtec.length; v++) {
                     let vtec = mVtec[v];
                     if (vtec.wmo) { defaultWMO = vtec.wmo; }
-                    const getTornado = mTextParser.getString(message, `TONRADO...`) || mTextParser.getString(message, `WATERSPOUT...`) || `N/A`;
+                    const getTornado = mTextParser.getString(message, `TORNADO...`) || mTextParser.getString(message, `WATERSPOUT...`) || `N/A`;
                     const getHailSize = mTextParser.getString(message, `MAX HAIL SIZE...`, [`IN`]) || mTextParser.getString(message, `HAIL...`, [`IN`]) || `N/A`;
                     const getWindGusts = mTextParser.getString(message, `MAX WIND GUST...`) || mTextParser.getString(message, `WIND...`) || `N/A`;
                     const getDamageThreat = mTextParser.getString(message, `DAMAGE THREAT...`) || `N/A`;
@@ -266,7 +266,7 @@ export class mEvents {
             const message = messages[i];
             const mUgc = await mUgcParser.getUGC(message);
             if (mUgc != null) {
-                const getTornado = mTextParser.getString(message, `TONRADO...`) || mTextParser.getString(message, `WATERSPOUT...`) || `N/A`;
+                const getTornado = mTextParser.getString(message, `TORNADO...`) || mTextParser.getString(message, `WATERSPOUT...`) || `N/A`;
                 const getHailSize = mTextParser.getString(message, `MAX HAIL SIZE...`, [`IN`]) || mTextParser.getString(message, `HAIL...`, [`IN`]) || `N/A`;
                 const getWindGusts = mTextParser.getString(message, `MAX WIND GUST...`) || mTextParser.getString(message, `WIND...`) || `N/A`;
                 const getDamageThreat = mTextParser.getString(message, `DAMAGE THREAT...`) || `N/A`;
