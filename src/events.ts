@@ -230,12 +230,12 @@ export class mEvents {
                                 maxWindGust: getWindGusts,
                                 thunderstormDamageThreat: [getDamageThreat],
                             },
-                            geometry: { type: 'Polygon', coordinates: [getPolygonCoordinates] }
-                        }
+                        },
+                        geometry: { type: 'Polygon', coordinates: [getPolygonCoordinates] }
                     };
                     if (loader.settings.alertSettings.ugcPolygons) {
                         const ugcCoordinates = mUgcParser.getCoordinates(mUgc.zones);
-                        if (ugcCoordinates.length > 0) { alert.properties.geometry = { type: 'Polygon', coordinates: [ugcCoordinates] }; };
+                        if (ugcCoordinates.length > 0) { alert.geometry = { type: 'Polygon', coordinates: [ugcCoordinates] }; };
                     }
                     alerts.push(alert);
                 }
@@ -302,12 +302,12 @@ export class mEvents {
                             maxWindGust: getWindGusts,
                             thunderstormDamageThreat: [getDamageThreat],
                         },
-                        geometry: { type: 'Polygon', coordinates: [getPolygonCoordinates] }
-                    }
+                    },
+                    geometry: { type: 'Polygon', coordinates: [getPolygonCoordinates] }
                 };
                 if (loader.settings.alertSettings.ugcPolygons) {
                     const ugcCoordinates = mUgcParser.getCoordinates(mUgc.zones);
-                    if (ugcCoordinates.length > 0) { alert.properties.geometry = { type: 'Polygon', coordinates: [ugcCoordinates] }; };
+                    if (ugcCoordinates.length > 0) { alert.geometry = { type: 'Polygon', coordinates: [ugcCoordinates] }; };
                 }
                 alerts.push(alert);
             }
