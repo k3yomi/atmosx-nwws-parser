@@ -386,6 +386,110 @@ var mEvents = /** @class */ (function () {
         });
     };
     /**
+      * @function newUnknownAlert
+      * @description Emits the 'onAlert' event with parsed unknown alert objects. (Non-CAP, Non-VTEC)
+      * The alert objects contain various properties such as id, tracking, action, area description, expiration time,
+      * issue time, event type, sender information, description, geocode, and parameters like WMO identifier,
+      * tornado detection, max hail size, max wind gust, and thunderstorm damage threat.
+      *
+      * @param {Object} stanza - The XMPP stanza containing the raw alert message.
+      *
+      * @emits onAlert - Emitted when a new raw alert is received and parsed.
+      */
+    mEvents.newUnknownAlert = function (stanza) {
+        return __awaiter(this, void 0, void 0, function () {
+            var messages, defaultWMO, alerts, _loop_1, i;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        messages = stanza.message.split(/(?=\$\$)/g).map(function (msg) { return msg.trim(); });
+                        defaultWMO = stanza.message.match(new RegExp(loader.definitions.expressions.wmo, 'gimu'));
+                        alerts = [];
+                        _loop_1 = function (i) {
+                            var pStartTime, message, mUgc, isOffshoreEvent, getForecastOffice, getPolygonCoordinates, getDescription, getTimeIssued, alert_3, ugcCoordinates;
+                            return __generator(this, function (_b) {
+                                switch (_b.label) {
+                                    case 0:
+                                        pStartTime = new Date().getTime();
+                                        message = messages[i];
+                                        return [4 /*yield*/, ugc_1.default.getUGC(message)];
+                                    case 1:
+                                        mUgc = _b.sent();
+                                        isOffshoreEvent = Object.keys(loader.definitions.offshore).some(function (event) { return message.toLowerCase().includes(event.toLowerCase()); });
+                                        if (mUgc != null && isOffshoreEvent != false) {
+                                            getForecastOffice = text_parser_1.default.getForecastOffice(message) || "NWS";
+                                            getPolygonCoordinates = text_parser_1.default.getPolygonCoordinates(message);
+                                            getDescription = text_parser_1.default.getCleanDescription(message, null);
+                                            getTimeIssued = text_parser_1.default.getString(message, "ISSUED TIME...");
+                                            if (getTimeIssued == null) {
+                                                getTimeIssued = new Date(stanza.attributes.issue).getTime();
+                                            }
+                                            if (getTimeIssued == null) {
+                                                getTimeIssued = new Date().getTime();
+                                            }
+                                            if (getTimeIssued != null) {
+                                                getTimeIssued = new Date(getTimeIssued).toLocaleString();
+                                            }
+                                            alert_3 = {
+                                                hitch: "".concat(new Date().getTime() - pStartTime, "ms"),
+                                                id: defaultWMO ? "".concat(defaultWMO[0], "-").concat(mUgc.zones.join("-")) : "N/A",
+                                                tracking: defaultWMO ? "".concat(defaultWMO[0], "-").concat(mUgc.zones.join("-")) : "N/A",
+                                                action: "Issued",
+                                                history: [{ description: getDescription, action: "Issued", issued: getTimeIssued }],
+                                                properties: {
+                                                    areaDesc: mUgc.locations.join("; ") || 'N/A',
+                                                    expires: new Date(new Date().getTime() + 1 * 60 * 60 * 1000),
+                                                    sent: new Date(getTimeIssued),
+                                                    messageType: "Issued",
+                                                    event: Object.keys(loader.definitions.offshore).find(function (event) { return message.toLowerCase().includes(event.toLowerCase()); }) || 'Unknown Event',
+                                                    sender: getForecastOffice,
+                                                    senderName: getForecastOffice,
+                                                    description: getDescription || 'No description available.',
+                                                    geocode: {
+                                                        UGC: mUgc.zones || [],
+                                                    },
+                                                    parameters: {
+                                                        WMOidentifier: (defaultWMO === null || defaultWMO === void 0 ? void 0 : defaultWMO[0]) ? [defaultWMO[0]] : ["N/A"],
+                                                        tornadoDetection: "N/A",
+                                                        maxHailSize: "N/A",
+                                                        maxWindGust: "N/A",
+                                                        thunderstormDamageThreat: ["N/A"],
+                                                    },
+                                                },
+                                                geometry: { type: 'Polygon', coordinates: [getPolygonCoordinates] }
+                                            };
+                                            if (loader.settings.alertSettings.ugcPolygons) {
+                                                ugcCoordinates = ugc_1.default.getCoordinates(mUgc.zones);
+                                                if (ugcCoordinates.length > 0) {
+                                                    alert_3.geometry = { type: 'Polygon', coordinates: [ugcCoordinates] };
+                                                }
+                                                ;
+                                            }
+                                            alerts.push(alert_3);
+                                        }
+                                        return [2 /*return*/];
+                                }
+                            });
+                        };
+                        i = 0;
+                        _a.label = 1;
+                    case 1:
+                        if (!(i < messages.length)) return [3 /*break*/, 4];
+                        return [5 /*yield**/, _loop_1(i)];
+                    case 2:
+                        _a.sent();
+                        _a.label = 3;
+                    case 3:
+                        i++;
+                        return [3 /*break*/, 1];
+                    case 4:
+                        this.onFinished(alerts);
+                        return [2 /*return*/];
+                }
+            });
+        });
+    };
+    /**
       * @function newSpecialWeatherStatement
       * @description Emits the 'onAlert' event with parsed special weather statement alert objects.
       * The alert objects contain various properties such as id, tracking, action, area description, expiration time,
@@ -399,7 +503,7 @@ var mEvents = /** @class */ (function () {
       */
     mEvents.newSpecialWeatherStatement = function (stanza) {
         return __awaiter(this, void 0, void 0, function () {
-            var messages, defaultWMO, alerts, i, pStartTime, message, mUgc, getTornado, getHailSize, getWindGusts, getDamageThreat, getForecastOffice, getPolygonCoordinates, getDescription, getTimeIssued, alert_3, ugcCoordinates;
+            var messages, defaultWMO, alerts, i, pStartTime, message, mUgc, getTornado, getHailSize, getWindGusts, getDamageThreat, getForecastOffice, getPolygonCoordinates, getDescription, getTimeIssued, alert_4, ugcCoordinates;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -433,7 +537,7 @@ var mEvents = /** @class */ (function () {
                             if (getTimeIssued != null) {
                                 getTimeIssued = new Date(getTimeIssued).toLocaleString();
                             }
-                            alert_3 = {
+                            alert_4 = {
                                 hitch: "".concat(new Date().getTime() - pStartTime, "ms"),
                                 id: defaultWMO ? "".concat(defaultWMO[0], "-").concat(mUgc.zones.join("-")) : "N/A",
                                 tracking: defaultWMO ? "".concat(defaultWMO[0], "-").concat(mUgc.zones.join("-")) : "N/A",
@@ -464,11 +568,11 @@ var mEvents = /** @class */ (function () {
                             if (loader.settings.alertSettings.ugcPolygons) {
                                 ugcCoordinates = ugc_1.default.getCoordinates(mUgc.zones);
                                 if (ugcCoordinates.length > 0) {
-                                    alert_3.geometry = { type: 'Polygon', coordinates: [ugcCoordinates] };
+                                    alert_4.geometry = { type: 'Polygon', coordinates: [ugcCoordinates] };
                                 }
                                 ;
                             }
-                            alerts.push(alert_3);
+                            alerts.push(alert_4);
                         }
                         _a.label = 3;
                     case 3:
@@ -494,7 +598,7 @@ var mEvents = /** @class */ (function () {
       */
     mEvents.newMesoscaleDiscussion = function (stanza) {
         return __awaiter(this, void 0, void 0, function () {
-            var messages, defaultWMO, i, pStartTime, message, mUgc, getForecastOffice, getDescription, getTornadoIntensity, getPeakWindGust, getPeakHailSize, getTimeIssued, alert_4;
+            var messages, defaultWMO, i, pStartTime, message, mUgc, getForecastOffice, getDescription, getTornadoIntensity, getPeakWindGust, getPeakHailSize, getTimeIssued, alert_5;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -525,7 +629,7 @@ var mEvents = /** @class */ (function () {
                             if (getTimeIssued != null) {
                                 getTimeIssued = new Date(getTimeIssued).toLocaleString();
                             }
-                            alert_4 = {
+                            alert_5 = {
                                 hitch: "".concat(new Date().getTime() - pStartTime, "ms"),
                                 id: defaultWMO ? "".concat(defaultWMO[0], "-").concat(mUgc.zones.join("-")) : "N/A",
                                 tracking: defaultWMO ? "".concat(defaultWMO[0], "-").concat(mUgc.zones.join("-")) : "N/A",
@@ -551,7 +655,7 @@ var mEvents = /** @class */ (function () {
                                     },
                                 }
                             };
-                            loader.statics.events.emit('onMesoscaleDiscussion', alert_4);
+                            loader.statics.events.emit('onMesoscaleDiscussion', alert_5);
                         }
                         _a.label = 3;
                     case 3:

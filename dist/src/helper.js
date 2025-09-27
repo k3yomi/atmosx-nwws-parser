@@ -313,6 +313,7 @@ var AtmosXWireParser = /** @class */ (function () {
                 var dict = [
                     { file: "".concat(dir, "/category-defaults-raw-vtec.bin"), attributes: { awipsid: 'alert', isCap: false, raw: true, issue: undefined } },
                     { file: "".concat(dir, "/category-defaults-cap-vtec.bin"), attributes: { awipsid: 'alert', isCap: true, raw: false, issue: undefined } },
+                    { file: "".concat(dir, "/category-defaults-raw.bin"), attributes: { awipsid: 'alert', isCap: false, raw: true, issue: undefined } },
                     { file: "".concat(dir, "/category-special-weather-statements-raw.bin"), attributes: { awipsid: 'SPS001', isCap: false, raw: true, issue: undefined } },
                     { file: "".concat(dir, "/category-mesoscale-discussions-raw.bin"), attributes: { awipsid: 'SWOMCD001', isCap: false, raw: true, issue: undefined } },
                     { file: "".concat(dir, "/category-local-storm-reports.bin"), attributes: { awipsid: 'LSR001', isCap: false, raw: true, issue: undefined } },

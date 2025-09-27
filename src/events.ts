@@ -244,6 +244,75 @@ export class mEvents {
         this.onFinished(alerts);
     }
 
+
+    /**
+      * @function newUnknownAlert
+      * @description Emits the 'onAlert' event with parsed unknown alert objects. (Non-CAP, Non-VTEC)
+      * The alert objects contain various properties such as id, tracking, action, area description, expiration time,
+      * issue time, event type, sender information, description, geocode, and parameters like WMO identifier,
+      * tornado detection, max hail size, max wind gust, and thunderstorm damage threat.
+      * 
+      * @param {Object} stanza - The XMPP stanza containing the raw alert message.
+      * 
+      * @emits onAlert - Emitted when a new raw alert is received and parsed.
+      */
+
+    static async newUnknownAlert (stanza: any) {
+        const messages = stanza.message.split(/(?=\$\$)/g).map(msg => msg.trim());
+        let defaultWMO = stanza.message.match(new RegExp(loader.definitions.expressions.wmo, 'gimu'));
+        let alerts: any[] = [];
+        for (let i = 0; i < messages.length; i++) {
+            const pStartTime = new Date().getTime()
+            const message = messages[i];
+            const mUgc = await mUgcParser.getUGC(message);
+            const isOffshoreEvent = Object.keys(loader.definitions.offshore).some(event => message.toLowerCase().includes(event.toLowerCase()));
+            if (mUgc != null && isOffshoreEvent != false) {
+                const getForecastOffice = mTextParser.getForecastOffice(message) || `NWS`;
+                const getPolygonCoordinates = mTextParser.getPolygonCoordinates(message);
+                const getDescription = mTextParser.getCleanDescription(message, null);
+                let getTimeIssued : any = mTextParser.getString(message, `ISSUED TIME...`)
+                if (getTimeIssued == null) { getTimeIssued = new Date(stanza.attributes.issue).getTime(); }
+                if (getTimeIssued == null) { getTimeIssued = new Date().getTime(); }
+                if (getTimeIssued != null) { getTimeIssued = new Date(getTimeIssued).toLocaleString(); }
+                let alert = {
+                    hitch: `${new Date().getTime() - pStartTime}ms`,
+                    id: defaultWMO ? `${defaultWMO[0]}-${mUgc.zones.join(`-`)}` : `N/A`,
+                    tracking: defaultWMO ? `${defaultWMO[0]}-${mUgc.zones.join(`-`)}` : `N/A`,
+                    action: `Issued`,
+                    history: [{description: getDescription, action: `Issued`, issued: getTimeIssued}],
+                    properties: {
+                        areaDesc: mUgc.locations.join(`; `) || 'N/A',
+                        expires: new Date(new Date().getTime() + 1 * 60 * 60 * 1000),
+                        sent: new Date(getTimeIssued),
+                        messageType: `Issued`,
+                        event: Object.keys(loader.definitions.offshore).find(event => message.toLowerCase().includes(event.toLowerCase())) || 'Unknown Event',
+                        sender: getForecastOffice,
+                        senderName: getForecastOffice,
+                        description: getDescription || 'No description available.',
+                        geocode: {
+                            UGC: mUgc.zones || [],
+                        },
+                        parameters: {
+                            WMOidentifier: defaultWMO?.[0] ? [defaultWMO[0]] : [`N/A`],
+                            tornadoDetection: `N/A`,
+                            maxHailSize: `N/A`,
+                            maxWindGust: `N/A`,
+                            thunderstormDamageThreat: [`N/A`],
+                        },
+                    },
+                    geometry: { type: 'Polygon', coordinates: [getPolygonCoordinates] }
+                };
+                if (loader.settings.alertSettings.ugcPolygons) {
+                    const ugcCoordinates = mUgcParser.getCoordinates(mUgc.zones);
+                    if (ugcCoordinates.length > 0) { alert.geometry = { type: 'Polygon', coordinates: [ugcCoordinates] }; };
+                }
+                alerts.push(alert);
+            }
+        }
+        this.onFinished(alerts);
+    }
+
+
     /** 
       * @function newSpecialWeatherStatement
       * @description Emits the 'onAlert' event with parsed special weather statement alert objects.

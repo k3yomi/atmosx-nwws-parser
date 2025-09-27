@@ -77,11 +77,12 @@ export class mStanza {
       */
 
     static create (stanzaData: any) {
-        if (stanzaData.getAwipsType == `default` && stanzaData.hasVTEC && stanzaData.isCap) { mEvents.newCapAlerts(stanzaData) } // Default alert - CAP Only
-        if (stanzaData.getAwipsType == `default` && stanzaData.hasVTEC && !stanzaData.isCap) { mEvents.newRawAlerts(stanzaData) } // Default alert - NonCAP
-        if (stanzaData.getAwipsType == `special-weather-statement`) { mEvents.newSpecialWeatherStatement(stanzaData) } // SPW (Special Weather Statement)
-        if (stanzaData.getAwipsType == `mesoscale-discussion`) { mEvents.newMesoscaleDiscussion(stanzaData) } // MD (Mesoscale Discussion)
-        if (stanzaData.getAwipsType == `local-storm-report`) { mEvents.newLocalStormReport(stanzaData) } // LSR (Local Storm Report)
+        if (stanzaData.getAwipsType == `default` && stanzaData.hasVTEC && stanzaData.isCap) { return mEvents.newCapAlerts(stanzaData) } // Default alert - CAP Only
+        if (stanzaData.getAwipsType == `default` && stanzaData.hasVTEC && !stanzaData.isCap) { return mEvents.newRawAlerts(stanzaData) } // Default alert - NonCAP
+        if (stanzaData.getAwipsType == `default` && !stanzaData.hasVTEC && !stanzaData.isCap) { return mEvents.newUnknownAlert(stanzaData) } // Default alert - NonCAP, NonVTEC
+        if (stanzaData.getAwipsType == `special-weather-statement`) { return mEvents.newSpecialWeatherStatement(stanzaData) } // SPW (Special Weather Statement)
+        if (stanzaData.getAwipsType == `mesoscale-discussion`) { return mEvents.newMesoscaleDiscussion(stanzaData) } // MD (Mesoscale Discussion)
+        if (stanzaData.getAwipsType == `local-storm-report`) { return mEvents.newLocalStormReport(stanzaData) } // LSR (Local Storm Report)
     }
 
     /** 

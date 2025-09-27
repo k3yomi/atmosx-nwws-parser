@@ -183,6 +183,7 @@ export class AtmosXWireParser {
             let dict = [
                 { file: `${dir}/category-defaults-raw-vtec.bin`, attributes: { awipsid: 'alert', isCap: false, raw: true, issue: undefined }},
                 { file: `${dir}/category-defaults-cap-vtec.bin`, attributes: { awipsid: 'alert', isCap: true, raw: false, issue: undefined }},
+                { file: `${dir}/category-defaults-raw.bin`, attributes: { awipsid: 'alert', isCap: false, raw: true, issue: undefined }},
                 { file: `${dir}/category-special-weather-statements-raw.bin`, attributes: { awipsid: 'SPS001', isCap: false, raw: true, issue: undefined }},
                 { file: `${dir}/category-mesoscale-discussions-raw.bin`, attributes:  { awipsid: 'SWOMCD001', isCap: false, raw: true, issue: undefined }},
                 { file: `${dir}/category-local-storm-reports.bin`, attributes: { awipsid: 'LSR001', isCap: false, raw: true, issue: undefined }},

@@ -114,19 +114,22 @@ var mStanza = /** @class */ (function () {
       */
     mStanza.create = function (stanzaData) {
         if (stanzaData.getAwipsType == "default" && stanzaData.hasVTEC && stanzaData.isCap) {
-            events_1.default.newCapAlerts(stanzaData);
+            return events_1.default.newCapAlerts(stanzaData);
         } // Default alert - CAP Only
         if (stanzaData.getAwipsType == "default" && stanzaData.hasVTEC && !stanzaData.isCap) {
-            events_1.default.newRawAlerts(stanzaData);
+            return events_1.default.newRawAlerts(stanzaData);
         } // Default alert - NonCAP
+        if (stanzaData.getAwipsType == "default" && !stanzaData.hasVTEC && !stanzaData.isCap) {
+            return events_1.default.newUnknownAlert(stanzaData);
+        } // Default alert - NonCAP, NonVTEC
         if (stanzaData.getAwipsType == "special-weather-statement") {
-            events_1.default.newSpecialWeatherStatement(stanzaData);
+            return events_1.default.newSpecialWeatherStatement(stanzaData);
         } // SPW (Special Weather Statement)
         if (stanzaData.getAwipsType == "mesoscale-discussion") {
-            events_1.default.newMesoscaleDiscussion(stanzaData);
+            return events_1.default.newMesoscaleDiscussion(stanzaData);
         } // MD (Mesoscale Discussion)
         if (stanzaData.getAwipsType == "local-storm-report") {
-            events_1.default.newLocalStormReport(stanzaData);
+            return events_1.default.newLocalStormReport(stanzaData);
         } // LSR (Local Storm Report)
     };
     /**
