@@ -26,8 +26,9 @@ export class mUgcParser {
     static async getUGC (message: string) {
         const header = this.getHeader(message);
         const zones = this.getZones(header);
+        const expiry = this.getExpiry(message)
         const locations = await this.getLocations(zones);
-        const ugc = zones.length > 0 ? { zones, locations} : null;
+        const ugc = zones.length > 0 ? { zones, locations, expiry } : null;
         return ugc;
     }
 
@@ -39,10 +40,23 @@ export class mUgcParser {
       */
 
     static getHeader (message: string) {
-        let start = message.search(new RegExp(loader.definitions.expressions.ugc1, "gimu"));
-        let end = message.substring(start).search(new RegExp(loader.definitions.expressions.ugc2, "gimu"));
-        let full = message.substring(start, start + end).replace(/\s+/g, '').slice(0, -1);
+        const start = message.search(new RegExp(loader.definitions.expressions.ugc1, "gimu"));
+        const end = message.substring(start).search(new RegExp(loader.definitions.expressions.ugc2, "gimu"));
+        const full = message.substring(start, start + end).replace(/\s+/g, '').slice(0, -1);
         return full;
+    }
+
+    static getExpiry (message: string) {
+        const start = message.match(new RegExp(loader.definitions.expressions.ugc3, "gimu"));
+        if (start != null) { 
+            const day = parseInt(start[0].substring(0, 2), 10);
+            const hour = parseInt(start[0].substring(2, 4), 10);
+            const minute = parseInt(start[0].substring(4, 6), 10);
+            const now = new Date();
+            const expires = new Date(now.getUTCFullYear(), now.getUTCMonth(), day, hour, minute, 0);
+            return expires;
+        }
+        return null;
     }
 
     /**

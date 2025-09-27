@@ -438,7 +438,7 @@ var mEvents = /** @class */ (function () {
                                                 history: [{ description: getDescription, action: "Issued", issued: getTimeIssued }],
                                                 properties: {
                                                     areaDesc: mUgc.locations.join("; ") || 'N/A',
-                                                    expires: new Date(new Date().getTime() + 1 * 60 * 60 * 1000),
+                                                    expires: new Date(mUgc.expiry != null ? mUgc.expiry : new Date().getTime() + 1 * 60 * 60 * 1000),
                                                     sent: new Date(getTimeIssued),
                                                     messageType: "Issued",
                                                     event: Object.keys(loader.definitions.offshore).find(function (event) { return message.toLowerCase().includes(event.toLowerCase()); }) || 'Unknown Event',
@@ -545,7 +545,7 @@ var mEvents = /** @class */ (function () {
                                 history: [{ description: getDescription, action: "Issued", issued: getTimeIssued }],
                                 properties: {
                                     areaDesc: mUgc.locations.join("; ") || 'N/A',
-                                    expires: new Date(new Date().getTime() + 1 * 60 * 60 * 1000),
+                                    expires: new Date(mUgc.expiry != null ? mUgc.expiry : new Date().getTime() + 1 * 60 * 60 * 1000),
                                     sent: new Date(getTimeIssued),
                                     messageType: "Issued",
                                     event: "Special Weather Statement",

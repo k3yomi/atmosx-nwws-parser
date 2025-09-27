@@ -94,16 +94,17 @@ var mUgcParser = /** @class */ (function () {
       */
     mUgcParser.getUGC = function (message) {
         return __awaiter(this, void 0, void 0, function () {
-            var header, zones, locations, ugc;
+            var header, zones, expiry, locations, ugc;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
                         header = this.getHeader(message);
                         zones = this.getZones(header);
+                        expiry = this.getExpiry(message);
                         return [4 /*yield*/, this.getLocations(zones)];
                     case 1:
                         locations = _a.sent();
-                        ugc = zones.length > 0 ? { zones: zones, locations: locations } : null;
+                        ugc = zones.length > 0 ? { zones: zones, locations: locations, expiry: expiry } : null;
                         return [2 /*return*/, ugc];
                 }
             });
@@ -120,6 +121,18 @@ var mUgcParser = /** @class */ (function () {
         var end = message.substring(start).search(new RegExp(loader.definitions.expressions.ugc2, "gimu"));
         var full = message.substring(start, start + end).replace(/\s+/g, '').slice(0, -1);
         return full;
+    };
+    mUgcParser.getExpiry = function (message) {
+        var start = message.match(new RegExp(loader.definitions.expressions.ugc3, "gimu"));
+        if (start != null) {
+            var day = parseInt(start[0].substring(0, 2), 10);
+            var hour = parseInt(start[0].substring(2, 4), 10);
+            var minute = parseInt(start[0].substring(4, 6), 10);
+            var now = new Date();
+            var expires = new Date(now.getUTCFullYear(), now.getUTCMonth(), day, hour, minute, 0);
+            return expires;
+        }
+        return null;
     };
     /**
       * @function getLocations

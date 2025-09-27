@@ -112,6 +112,7 @@ exports.definitions = {
         wmo: "[A-Z0-9]{6}\\s[A-Z]{4}\\s\\d{6}",
         ugc1: "(\\w{2}[CZ](\\d{3}((-|>)\\s?(\n\n)?))+)",
         ugc2: "(\\d{6}(-|>)\\s?(\n\n)?)",
+        ugc3: "(\\d{6})(?=-|$)",
         dateline: "/d{3,4}s*(AM|PM)?s*[A-Z]{2,4}s+[A-Z]{3,}s+[A-Z]{3,}s+d{1,2}s+d{4}"
     },
     tags: {
