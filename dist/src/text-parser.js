@@ -82,6 +82,7 @@ var mTextParser = /** @class */ (function () {
       * @param {string} handle - The VTEC handle to help identify the start of the main content.
       */
     mTextParser.getCleanDescription = function (message, handle) {
+        var originalMessage = message; // Store the original message for reference
         var dateLineMatches = Array.from(message.matchAll(/\d{3,4}\s*(AM|PM)?\s*[A-Z]{2,4}\s+[A-Z]{3,}\s+[A-Z]{3,}\s+\d{1,2}\s+\d{4}/gim));
         if (dateLineMatches.length) {
             var dateLineMatch = dateLineMatches[dateLineMatches.length - 1];
@@ -110,6 +111,9 @@ var mTextParser = /** @class */ (function () {
                 var latStart = afterVtec.indexOf("&&");
                 message = latStart !== -1 ? afterVtec.substring(0, latStart).trim() : afterVtec.trim();
             }
+        }
+        if (message.replace(/\s+/g, ' ').trim().startsWith("ISSUED TIME...")) {
+            message = originalMessage;
         }
         return message;
     };

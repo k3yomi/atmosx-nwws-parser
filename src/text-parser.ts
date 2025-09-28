@@ -85,6 +85,7 @@ export class mTextParser {
       */
 
     static getCleanDescription(message: string, handle: string) {
+        let originalMessage = message; // Store the original message for reference
         let dateLineMatches = Array.from(message.matchAll(/\d{3,4}\s*(AM|PM)?\s*[A-Z]{2,4}\s+[A-Z]{3,}\s+[A-Z]{3,}\s+\d{1,2}\s+\d{4}/gim));
         if (dateLineMatches.length) {
             let dateLineMatch = dateLineMatches[dateLineMatches.length - 1];
@@ -110,6 +111,7 @@ export class mTextParser {
                 message = latStart !== -1 ? afterVtec.substring(0, latStart).trim() : afterVtec.trim();
             }
         }
+        if (message.replace(/\s+/g, ' ').trim().startsWith(`ISSUED TIME...`)) { message = originalMessage; }
         return message;
     }
 
