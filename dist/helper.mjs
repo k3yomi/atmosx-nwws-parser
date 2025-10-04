@@ -1318,7 +1318,8 @@ var AtmosXWireParser = class {
     }, 1 * 1e3);
   }
 };
-module.exports = AtmosXWireParser;
+var helper_default = AtmosXWireParser;
 export {
-  AtmosXWireParser
+  AtmosXWireParser,
+  helper_default as default
 };

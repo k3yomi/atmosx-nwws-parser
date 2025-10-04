@@ -85,4 +85,4 @@ declare class AtmosXWireParser {
     onEvent: (event: string, callback: any) => () => void;
 }
 
-export { AtmosXWireParser };
+export { AtmosXWireParser, AtmosXWireParser as default };

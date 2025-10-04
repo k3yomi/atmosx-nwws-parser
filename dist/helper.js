@@ -49,7 +49,8 @@ var __async = (__this, __arguments, generator) => {
 // src/helper.ts
 var helper_exports = {};
 __export(helper_exports, {
-  AtmosXWireParser: () => AtmosXWireParser
+  AtmosXWireParser: () => AtmosXWireParser,
+  default: () => helper_default
 });
 module.exports = __toCommonJS(helper_exports);
 
@@ -1352,7 +1353,7 @@ var AtmosXWireParser = class {
     }, 1 * 1e3);
   }
 };
-module.exports = AtmosXWireParser;
+var helper_default = AtmosXWireParser;
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   AtmosXWireParser

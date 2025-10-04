@@ -12,7 +12,7 @@ npm install atmosx-nwws-parser
 
 ## Usage
 ```js
-const AtmosXWireParser = require(`atmosx-nwws-parser`); // CJS 
+const {AtmosXWireParser} = require(`atmosx-nwws-parser`); // CJS 
 import * as AtmosXWireParser from `atmosx-nwws-parser`; // ESM
 ```
 

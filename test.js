@@ -1,4 +1,4 @@
-const AtmosXWireParser = require(`./dist/src/helper.js`)
+const {AtmosXWireParser} = require(`./dist/src/helper.js`)
 
 let Client = new AtmosXWireParser({
     database: `./database.db`,

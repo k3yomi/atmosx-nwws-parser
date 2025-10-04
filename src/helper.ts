@@ -305,4 +305,4 @@ export class AtmosXWireParser {
 
 
 
-module.exports = AtmosXWireParser
+export default AtmosXWireParser;
