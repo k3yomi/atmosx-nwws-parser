@@ -11,7 +11,7 @@
   "scripts": {
     "build:npx": "npx tsc && cd ./test && node ./index.js",
     "build:tsup": "tsup && cd ./test && node ./index.js",
-    "publish": "npm run build:tsup && npm publish --access public"
+    "publish": "npm publish --access public"
   },
   "keywords": [
     "NWWS",
