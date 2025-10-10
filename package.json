@@ -1,43 +1,46 @@
 {
-  "name": "atmosx-nwws-parser",
-  "version": "1.0.1919",
-  "description": "NOAA Weather Wire Parser - Built for standalone and Project AtmosphericX Integration.",
-  "main": "dist/helper.js",
-  "types": "src/helper.d.ts",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/K3YOMI/atmosx-nwws-parser.git"
-  },
-  "scripts": {
-    "build:npx": "npx tsc && cd ./test && node ./index.js",
-    "build:tsup": "tsup && cd ./test && node ./index.js",
-    "publish": "npm publish --access public"
-  },
-  "keywords": [
-    "NWWS",
-    "NOAA Weather Wire Service",
-    "TypeScript",
-    "XMPP",
-    "Parser",
-    "JavaScript",
-    "CommonJS",
-    "ESM"
-  ],
-  "author": "k3yomi, StarflightWx",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/K3YOMI/atmosx-nwws-parser/issues"
-  },
-  "homepage": "https://github.com/K3YOMI/atmosx-nwws-parser#readme",
-  "dependencies": {
-    "@xmpp/client": "^0.7.3",
-    "better-sqlite3": "^11.10.0",
-    "shapefile": "^0.6.6",
-    "typescript": "^5.9.2",
-    "xml2js": "^0.6.2"
-  },
-  "devDependencies": {
-    "@types/node": "^24.5.2",
-    "tsup": "^8.5.0"
-  }
+	"name": "atmosx-nwws-parser",
+	"version": "1.0.2",
+	"description": "NOAA Weather Wire Parser - Built for standalone and Project AtmosphericX Integration.",
+	"main": "dist/cjs/helper.cjs",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/K3YOMI/atmosx-nwws-parser.git",
+		"branch": "1.0.2"
+	},
+	"scripts": {
+		"start": "cd ./test && node ./index.js",
+		"build:tsup": "tsup && cd ./test && node ./index.js",
+		"publish": "npm publish --access public"
+	},
+	"keywords": [
+		"NWWS",
+		"NOAA Weather Wire Service",
+		"TypeScript",
+		"XMPP",
+		"Parser",
+		"JavaScript",
+		"CommonJS",
+		"ESM"
+	],
+	"author": "k3yomi, StarflightWx",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/K3YOMI/atmosx-nwws-parser/issues"
+	},
+	"homepage": "https://github.com/K3YOMI/atmosx-nwws-parser#readme",
+	"dependencies": {
+		"@xmpp/client": "^0.7.3",
+		"axios": "^1.12.2",
+		"better-sqlite3": "^11.10.0",
+		"node-cron": "^4.2.1",
+		"say": "^0.16.0",
+		"shapefile": "^0.6.6",
+		"typescript": "^5.9.2",
+		"xml2js": "^0.6.2"
+	},
+	"devDependencies": {
+		"@types/node": "^24.5.2",
+		"tsup": "^8.5.0"
+	}
 }
