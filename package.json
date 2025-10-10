@@ -11,7 +11,8 @@
 	"scripts": {
 		"start": "cd ./test && node ./index.js",
 		"build:tsup": "tsup && cd ./test && node ./index.js",
-		"publish": "npm publish --access public"
+		"publish": "tsup && npm publish --access public",
+		"publush-beta": "tsup && npm publish --tag beta --access public"
 	},
 	"keywords": [
 		"NWWS",
