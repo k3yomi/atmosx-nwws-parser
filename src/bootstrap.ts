@@ -98,7 +98,7 @@ export const settings = {
             filteredEvents: [],
             filteredICOAs: [],
             ignoredICOAs: [`KWNS`],
-            ignoredEvents: [`Unknown`, `Test Message`],
+            ignoredEvents: [`Xx`, `Test Message`],
             ugcFilter: [],
             stateFilter: [],
             checkExpired: true,

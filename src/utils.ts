@@ -49,9 +49,10 @@ export class Utils {
                 const cacheDir = settings.NoaaWeatherWireService.cache.directory;
                 const getAllFiles = loader.packages.fs.readdirSync(cacheDir).filter((file: string) => file.endsWith('.bin') && file.startsWith('cache-'));
                 for (const file of getAllFiles) {
-                    const start = Date.now();
                     const filepath = loader.packages.path.join(cacheDir, file);
                     const readFile = loader.packages.fs.readFileSync(filepath, { encoding: 'utf-8' });
+                    const readSize = loader.packages.fs.statSync(filepath).size;
+                    if (readSize == 0) { continue; }
                     const isCap = readFile.includes(`<?xml`);
                     if (isCap && !settings.NoaaWeatherWireService.alertPreferences.isCapOnly) continue;
                     if (!isCap && settings.NoaaWeatherWireService.alertPreferences.isCapOnly) continue;
