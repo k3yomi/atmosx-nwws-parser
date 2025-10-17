@@ -21,6 +21,18 @@ var __spreadValues = (a, b) => {
   return a;
 };
 var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+var __objRest = (source, exclude) => {
+  var target = {};
+  for (var prop in source)
+    if (__hasOwnProp.call(source, prop) && exclude.indexOf(prop) < 0)
+      target[prop] = source[prop];
+  if (source != null && __getOwnPropSymbols)
+    for (var prop of __getOwnPropSymbols(source)) {
+      if (exclude.indexOf(prop) < 0 && __propIsEnum.call(source, prop))
+        target[prop] = source[prop];
+    }
+  return target;
+};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
@@ -2350,7 +2362,8 @@ var EventParser = class {
       originalEvent.properties.is_updated = statusCorrelation ? statusCorrelation.update == true && bools.checkExpired : false;
       originalEvent.properties.is_issued = statusCorrelation ? statusCorrelation.new == true && bools.checkExpired : false;
       originalEvent.properties.is_cancelled = statusCorrelation ? statusCorrelation.cancel == true && bools.checkExpired : false;
-      originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(originalEvent)).digest("hex");
+      const _e2 = originalEvent, { performance: performance2 } = _e2, eventWithoutPerformance = __objRest(_e2, ["performance"]);
+      originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(eventWithoutPerformance)).digest("hex");
       if (props.description) {
         const detectedPhrase = definitions.cancelSignatures.find((sig) => props.description.toLowerCase().includes(sig.toLowerCase()));
         if (detectedPhrase && bools.checkExpired) {
