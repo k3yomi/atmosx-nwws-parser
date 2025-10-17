@@ -144,17 +144,17 @@ var TYPES = {
   "X": "Experimental Product (Non-Operational)"
 };
 var STATUS_CORRELATIONS = [
-  { type: "Update", forward: "Updated", cancel: false },
-  { type: "Cancel", forward: "Cancelled", cancel: true },
-  { type: "Alert", forward: "Issued", cancel: false },
-  { type: "Updated", forward: "Updated", cancel: false },
-  { type: "Expired", forward: "Expired", cancel: true },
-  { type: "Issued", forward: "Issued", cancel: false },
-  { type: "Extended", forward: "Updated", cancel: false },
-  { type: "Correction", forward: "Updated", cancel: false },
-  { type: "Upgraded", forward: "Upgraded", cancel: false },
-  { type: "Cancelled", forward: "Cancelled", cancel: true },
-  { type: "Routine", forward: "Routine", cancel: false }
+  { type: "Update", forward: "Updated", cancel: false, update: true, new: false },
+  { type: "Cancel", forward: "Cancelled", cancel: true, update: false, new: false },
+  { type: "Alert", forward: "Issued", cancel: false, update: false, new: true },
+  { type: "Updated", forward: "Updated", cancel: false, update: true, new: false },
+  { type: "Expired", forward: "Expired", cancel: true, update: false, new: false },
+  { type: "Issued", forward: "Issued", cancel: false, update: false, new: true },
+  { type: "Extended", forward: "Updated", cancel: false, update: true, new: false },
+  { type: "Correction", forward: "Updated", cancel: false, update: true, new: false },
+  { type: "Upgraded", forward: "Upgraded", cancel: false, update: true, new: false },
+  { type: "Cancelled", forward: "Cancelled", cancel: true, update: false, new: false },
+  { type: "Routine", forward: "Routine", cancel: false, update: true, new: false }
 ];
 
 // src/dictionaries/offshore.ts
@@ -2708,6 +2708,8 @@ var EventParser = class {
         if (key === "checkExpired" && setting && new Date(props == null ? void 0 : props.expires).getTime() < (/* @__PURE__ */ new Date()).getTime()) return false;
       }
       originalEvent.properties.action_type = statusCorrelation ? statusCorrelation.forward : originalEvent.properties.action_type;
+      originalEvent.properties.is_updated = statusCorrelation ? statusCorrelation.update == true && bools.checkExpired : false;
+      originalEvent.properties.is_issued = statusCorrelation ? statusCorrelation.new == true && bools.checkExpired : false;
       originalEvent.properties.is_cancelled = statusCorrelation ? statusCorrelation.cancel == true && bools.checkExpired : false;
       originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(originalEvent)).digest("hex");
       if (props.description) {
