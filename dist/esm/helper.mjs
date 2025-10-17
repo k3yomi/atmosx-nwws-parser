@@ -996,6 +996,9 @@ var definitions = {
   }
 };
 
+// src/types.ts
+var types_exports = {};
+
 // src/parsers/stanza.ts
 var StanzaParser = class {
   /**
@@ -2911,13 +2914,13 @@ var AlertManager = class {
    * @param {Record<string, string>} [metadata={}] 
    * @returns {Promise<void>} 
    */
-  start() {
-    return __async(this, arguments, function* (metadata = {}) {
+  start(metadata) {
+    return __async(this, null, function* () {
       if (!cache.isReady) {
         console.log(definitions.messages.not_ready);
         return Promise.resolve();
       }
-      Object.assign(settings, metadata);
+      this.setSettings(metadata);
       utils_default.detectUncaughtExceptions();
       const settings2 = settings;
       this.isNoaaWeatherWireService = settings.isNWWS;
@@ -2964,5 +2967,6 @@ export {
   text_default as TextParser,
   ugc_default as UGCParser,
   vtec_default as VtecParser,
-  helper_default as default
+  helper_default as default,
+  types_exports as types
 };

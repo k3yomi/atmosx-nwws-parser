@@ -74,7 +74,8 @@ __export(helper_exports, {
   TextParser: () => text_default,
   UGCParser: () => ugc_default,
   VtecParser: () => vtec_default,
-  default: () => helper_default
+  default: () => helper_default,
+  types: () => types_exports
 });
 module.exports = __toCommonJS(helper_exports);
 
@@ -1035,6 +1036,9 @@ var definitions = {
     eas_no_directory: "[WARNING] You have not set a directory for EAS audio files to be saved to, please set the 'easDirectory' setting in the global settings to enable EAS audio generation."
   }
 };
+
+// src/types.ts
+var types_exports = {};
 
 // src/parsers/stanza.ts
 var StanzaParser = class {
@@ -2951,13 +2955,13 @@ var AlertManager = class {
    * @param {Record<string, string>} [metadata={}] 
    * @returns {Promise<void>} 
    */
-  start() {
-    return __async(this, arguments, function* (metadata = {}) {
+  start(metadata) {
+    return __async(this, null, function* () {
       if (!cache.isReady) {
         console.log(definitions.messages.not_ready);
         return Promise.resolve();
       }
-      Object.assign(settings, metadata);
+      this.setSettings(metadata);
       utils_default.detectUncaughtExceptions();
       const settings2 = settings;
       this.isNoaaWeatherWireService = settings.isNWWS;
@@ -3004,5 +3008,6 @@ var helper_default = AlertManager;
   StanzaParser,
   TextParser,
   UGCParser,
-  VtecParser
+  VtecParser,
+  types
 });

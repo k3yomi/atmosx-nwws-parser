@@ -122,12 +122,12 @@ export class AlertManager {
      * @param {Record<string, string>} [metadata={}] 
      * @returns {Promise<void>} 
      */
-    public async start(metadata: Record<string, string> = {}): Promise<void>  {
+    public async start(metadata: types.ClientSettings): Promise<void>  {
         if (!loader.cache.isReady) { 
             console.log(loader.definitions.messages.not_ready);
             return Promise.resolve();
         }
-        Object.assign(loader.settings, metadata)
+        this.setSettings(metadata);
         Utils.detectUncaughtExceptions();
         const settings = loader.settings as types.ClientSettings;
         this.isNoaaWeatherWireService = loader.settings.isNWWS
@@ -164,4 +164,4 @@ export class AlertManager {
 }
 
 export default AlertManager;
-export { StanzaParser, EventParser, TextParser, VtecParser, UGCParser, EAS, Database };
+export { StanzaParser, EventParser, TextParser, VtecParser, UGCParser, EAS, Database, types };
