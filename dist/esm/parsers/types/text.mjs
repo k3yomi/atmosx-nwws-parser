@@ -2672,6 +2672,7 @@ var EventParser = class {
       }
       originalEvent.properties.action_type = statusCorrelation ? statusCorrelation.forward : originalEvent.properties.action_type;
       originalEvent.properties.is_cancelled = statusCorrelation ? statusCorrelation.cancel == true && bools.checkExpired : false;
+      originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(originalEvent)).digest("hex");
       if (props.description) {
         const detectedPhrase = definitions.cancelSignatures.find((sig) => props.description.toLowerCase().includes(sig.toLowerCase()));
         if (detectedPhrase && bools.checkExpired) {
