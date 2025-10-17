@@ -48,7 +48,7 @@ export class APIAlerts {
             const getSource = TextParser.textProductToString(getDescription, `SOURCE...`, [`.`]) || `N/A`;
             const getOffice = this.getICAO(getVTEC || ``);
             processed.push({
-                preformance: performance.now() - tick,
+                performance: performance.now() - tick,
                 tracking: this.getTracking({ vtec: getVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
                 header: getHeader,
                 vtec: getVTEC || `N/A`,

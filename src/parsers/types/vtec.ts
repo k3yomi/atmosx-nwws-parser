@@ -43,7 +43,7 @@ export class VTECAlerts {
                     const getBaseProperties = await EventParser.getBaseProperties(message, validated, getUGC, vtec) as types.BaseProperties;
                     const getHeader = EventParser.getHeader({ ...validated.attributes, ...getBaseProperties.attributes } as types.TypeAttributes, getBaseProperties, vtec);
                     processed.push({
-                        preformance: performance.now() - tick,
+                        performance: performance.now() - tick,
                         tracking: vtec.tracking,
                         header: getHeader,
                         vtec: vtec.raw,

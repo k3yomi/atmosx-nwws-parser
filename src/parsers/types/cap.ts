@@ -47,7 +47,7 @@ export class CapAlerts {
             const getHeader = EventParser.getHeader({ ...validated.attributes,} as types.TypeAttributes);
             const getSource = TextParser.textProductToString(extracted.description, `SOURCE...`, [`.`]) || `N/A`;
             processed.push({
-                preformance: performance.now() - tick,
+                performance: performance.now() - tick,
                 tracking: this.getTracking(extracted),
                 header: getHeader,
                 vtec: extracted.vtec || `N/A`,

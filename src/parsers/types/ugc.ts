@@ -69,7 +69,7 @@ export class UGCAlerts {
                 const getHeader = EventParser.getHeader({ ...validated.attributes, ...getBaseProperties.attributes } as types.TypeAttributes, getBaseProperties);
                 const getEvent = this.getEvent(message, getBaseProperties.attributes.getAwip);
                 processed.push({
-                    preformance: performance.now() - tick,
+                    performance: performance.now() - tick,
                     tracking: this.getTracking(getBaseProperties, getUGC.zones),
                     header: getHeader,
                     vtec: `N/A`,

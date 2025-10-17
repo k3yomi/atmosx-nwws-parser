@@ -1403,7 +1403,7 @@ var VTECAlerts = class {
             const getBaseProperties = yield events_default.getBaseProperties(message, validated, getUGC, vtec);
             const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, validated.attributes), getBaseProperties.attributes), getBaseProperties, vtec);
             processed.push({
-              preformance: performance.now() - tick,
+              performance: performance.now() - tick,
               tracking: vtec.tracking,
               header: getHeader,
               vtec: vtec.raw,
@@ -1471,7 +1471,7 @@ var UGCAlerts = class {
           const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, validated.attributes), getBaseProperties.attributes), getBaseProperties);
           const getEvent = this.getEvent(message, getBaseProperties.attributes.getAwip);
           processed.push({
-            preformance: performance.now() - tick,
+            performance: performance.now() - tick,
             tracking: this.getTracking(getBaseProperties, getUGC.zones),
             header: getHeader,
             vtec: `N/A`,
@@ -1530,7 +1530,7 @@ var CapAlerts = class {
         const getHeader = events_default.getHeader(__spreadValues({}, validated.attributes));
         const getSource = text_default.textProductToString(extracted.description, `SOURCE...`, [`.`]) || `N/A`;
         processed.push({
-          preformance: performance.now() - tick,
+          performance: performance.now() - tick,
           tracking: this.getTracking(extracted),
           header: getHeader,
           vtec: extracted.vtec || `N/A`,
@@ -1603,7 +1603,7 @@ var APIAlerts = class {
         const getSource = text_default.textProductToString(getDescription, `SOURCE...`, [`.`]) || `N/A`;
         const getOffice = this.getICAO(getVTEC || ``);
         processed.push({
-          preformance: performance.now() - tick,
+          performance: performance.now() - tick,
           tracking: this.getTracking({ vtec: getVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
           header: getHeader,
           vtec: getVTEC || `N/A`,
@@ -2848,7 +2848,7 @@ var UGCAlerts2 = class {
         const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, validated.attributes), getBaseProperties.attributes), getBaseProperties);
         const getEvent = this.getEvent(message, getBaseProperties.attributes.getAwip);
         processed.push({
-          preformance: performance.now() - tick,
+          performance: performance.now() - tick,
           tracking: this.getTracking(getBaseProperties),
           header: getHeader,
           vtec: `N/A`,
