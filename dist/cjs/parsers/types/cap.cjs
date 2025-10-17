@@ -2640,16 +2640,17 @@ var EventParser = class {
       }
     }
     const filtered = events2.filter((alert) => {
-      var _a2, _b2, _c2, _d2;
+      var _a2, _b2, _d2, _e2;
       const originalEvent = alert;
       const props = originalEvent == null ? void 0 : originalEvent.properties;
       const ugcs = (_b2 = (_a2 = props == null ? void 0 : props.geocode) == null ? void 0 : _a2.UGC) != null ? _b2 : [];
+      const _c2 = originalEvent, { performance: performance2, header } = _c2, eventWithoutPerformance = __objRest(_c2, ["performance", "header"]);
       if (bools == null ? void 0 : bools.betterEventParsing) {
         const { eventName, tags } = this.enhanceEvent(originalEvent);
         originalEvent.properties.event = eventName;
         originalEvent.properties.tags = tags;
       }
-      const eventCheck = (bools == null ? void 0 : bools.useParentEvents) ? (_c2 = props.parent) == null ? void 0 : _c2.toLowerCase() : (_d2 = props.event) == null ? void 0 : _d2.toLowerCase();
+      const eventCheck = (bools == null ? void 0 : bools.useParentEvents) ? (_d2 = props.parent) == null ? void 0 : _d2.toLowerCase() : (_e2 = props.event) == null ? void 0 : _e2.toLowerCase();
       const statusCorrelation = definitions.correlations.find((c) => c.type === originalEvent.properties.action_type);
       for (const key in sets) {
         const setting = sets[key];
@@ -2668,17 +2669,15 @@ var EventParser = class {
         if (key === "checkExpired" && setting && new Date(props == null ? void 0 : props.expires).getTime() < (/* @__PURE__ */ new Date()).getTime()) return false;
       }
       originalEvent.properties.action_type = statusCorrelation ? statusCorrelation.forward : originalEvent.properties.action_type;
-      originalEvent.properties.is_updated = statusCorrelation ? statusCorrelation.update == true && bools.checkExpired : false;
-      originalEvent.properties.is_issued = statusCorrelation ? statusCorrelation.new == true && bools.checkExpired : false;
-      originalEvent.properties.is_cancelled = statusCorrelation ? statusCorrelation.cancel == true && bools.checkExpired : false;
-      const _e2 = originalEvent, { performance: performance2, header } = _e2, eventWithoutPerformance = __objRest(_e2, ["performance", "header"]);
+      originalEvent.properties.is_updated = statusCorrelation ? statusCorrelation.update == true : false;
+      originalEvent.properties.is_issued = statusCorrelation ? statusCorrelation.new == true : false;
+      originalEvent.properties.is_cancelled = statusCorrelation ? statusCorrelation.cancel == true : false;
       originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(eventWithoutPerformance)).digest("hex");
       if (props.description) {
         const detectedPhrase = definitions.cancelSignatures.find((sig) => props.description.toLowerCase().includes(sig.toLowerCase()));
-        if (detectedPhrase && bools.checkExpired) {
+        if (detectedPhrase) {
           originalEvent.properties.action_type = "Cancel";
           originalEvent.properties.is_cancelled = true;
-          return false;
         }
       }
       if (originalEvent.vtec) {
@@ -2688,6 +2687,7 @@ var EventParser = class {
           return false;
         }
       }
+      if (bools.checkExpired && originalEvent.properties.is_cancelled == true) return false;
       cache.events.emit(`on${originalEvent.properties.parent.replace(/\s+/g, "")}`);
       return true;
     });

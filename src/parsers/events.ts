@@ -158,6 +158,7 @@ export class EventParser {
             const originalEvent = alert
             const props = originalEvent?.properties;
             const ugcs = props?.geocode?.UGC ?? [];
+            const { performance, header, ...eventWithoutPerformance } = originalEvent;
             if (bools?.betterEventParsing) {
                 const { eventName, tags } = this.enhanceEvent(originalEvent);
                 originalEvent.properties.event = eventName;
@@ -180,20 +181,20 @@ export class EventParser {
                 if (key === 'checkExpired' && setting && new Date(props?.expires).getTime() < new Date().getTime()) return false;   
             }
             originalEvent.properties.action_type = statusCorrelation ? statusCorrelation.forward : originalEvent.properties.action_type;
-            originalEvent.properties.is_updated = statusCorrelation ? (statusCorrelation.update == true && bools.checkExpired) : false;
-            originalEvent.properties.is_issued = statusCorrelation ? (statusCorrelation.new == true && bools.checkExpired) : false;
-            originalEvent.properties.is_cancelled = statusCorrelation ? (statusCorrelation.cancel == true && bools.checkExpired) : false;
-            const { performance, header, ...eventWithoutPerformance } = originalEvent;
+            originalEvent.properties.is_updated = statusCorrelation ? (statusCorrelation.update == true) : false;
+            originalEvent.properties.is_issued = statusCorrelation ? (statusCorrelation.new == true) : false;
+            originalEvent.properties.is_cancelled = statusCorrelation ? (statusCorrelation.cancel == true) : false;
             originalEvent.hash = loader.packages.crypto.createHash('md5').update(JSON.stringify(eventWithoutPerformance)).digest('hex');
             if (props.description) { 
                 const detectedPhrase = loader.definitions.cancelSignatures.find(sig => props.description.toLowerCase().includes(sig.toLowerCase()));
-                if (detectedPhrase && bools.checkExpired) { originalEvent.properties.action_type = 'Cancel'; originalEvent.properties.is_cancelled = true; return false; } 
+                if (detectedPhrase) { originalEvent.properties.action_type = 'Cancel'; originalEvent.properties.is_cancelled = true; } 
             }
             if (originalEvent.vtec) { 
                 const getType = originalEvent.vtec.split(`.`)[0];
                 const isTestProduct = loader.definitions.productTypes[getType] == `Test Product`
                 if (isTestProduct) { return false; }
             }
+            if (bools.checkExpired && originalEvent.properties.is_cancelled == true) return false;
             loader.cache.events.emit(`on${originalEvent.properties.parent.replace(/\s+/g, '')}`)
             return true;
         })
