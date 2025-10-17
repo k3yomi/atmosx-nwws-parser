@@ -2756,7 +2756,7 @@ var EventParser = class {
       originalEvent.properties.is_updated = statusCorrelation ? statusCorrelation.update == true && bools.checkExpired : false;
       originalEvent.properties.is_issued = statusCorrelation ? statusCorrelation.new == true && bools.checkExpired : false;
       originalEvent.properties.is_cancelled = statusCorrelation ? statusCorrelation.cancel == true && bools.checkExpired : false;
-      const _e2 = originalEvent, { performance: performance2 } = _e2, eventWithoutPerformance = __objRest(_e2, ["performance"]);
+      const _e2 = originalEvent, { performance: performance2, header } = _e2, eventWithoutPerformance = __objRest(_e2, ["performance", "header"]);
       originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(eventWithoutPerformance)).digest("hex");
       if (props.description) {
         const detectedPhrase = definitions.cancelSignatures.find((sig) => props.description.toLowerCase().includes(sig.toLowerCase()));

@@ -183,7 +183,7 @@ export class EventParser {
             originalEvent.properties.is_updated = statusCorrelation ? (statusCorrelation.update == true && bools.checkExpired) : false;
             originalEvent.properties.is_issued = statusCorrelation ? (statusCorrelation.new == true && bools.checkExpired) : false;
             originalEvent.properties.is_cancelled = statusCorrelation ? (statusCorrelation.cancel == true && bools.checkExpired) : false;
-            const { performance, ...eventWithoutPerformance } = originalEvent;
+            const { performance, header, ...eventWithoutPerformance } = originalEvent;
             originalEvent.hash = loader.packages.crypto.createHash('md5').update(JSON.stringify(eventWithoutPerformance)).digest('hex');
             if (props.description) { 
                 const detectedPhrase = loader.definitions.cancelSignatures.find(sig => props.description.toLowerCase().includes(sig.toLowerCase()));
