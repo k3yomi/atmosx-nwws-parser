@@ -26,7 +26,7 @@ import UGCParser from './parsers/ugc';
 
 export class AlertManager { 
     isNoaaWeatherWireService: boolean
-    constructor(metadata: Record<string, string> = {}) { this.start(metadata) }
+    constructor(metadata: types.ClientSettings) { this.start(metadata) }
 
     /**
      * setDisplayName allows you to set or update the nickname of the client for identification purposes.

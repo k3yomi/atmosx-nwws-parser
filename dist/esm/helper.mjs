@@ -2818,7 +2818,7 @@ var utils_default = Utils;
 
 // src/helper.ts
 var AlertManager = class {
-  constructor(metadata = {}) {
+  constructor(metadata) {
     this.start(metadata);
   }
   /**
