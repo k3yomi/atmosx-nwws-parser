@@ -81,7 +81,7 @@ export class CapAlerts {
                     geometry: extracted.polygon ? { 
                         type: `Polygon`, 
                         coordinates: extracted.polygon.split(` `).map((coord: string) => {
-                            const [lon, lat] = coord.split(`,`).map((num: string) => parseFloat(num));
+                            const [lat, lon] = coord.split(`,`).map((num: string) => parseFloat(num));
                             return [lat, lon];
                         }) 
                     } : null,

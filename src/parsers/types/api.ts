@@ -86,7 +86,7 @@ export class APIAlerts {
                     geometry: feature?.geometry?.coordinates?.[0]?.length ? {
                         type: feature?.geometry?.type || 'Polygon',
                         coordinates: feature?.geometry?.coordinates?.[0]?.map((coord: number) => {
-                            const [lon, lat] = Array.isArray(coord) ? coord : [0, 0];
+                            const [lat, lon] = Array.isArray(coord) ? coord : [0, 0];
                             return [lat, lon]; 
                         })
                     } : null

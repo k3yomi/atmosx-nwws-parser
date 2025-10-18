@@ -1198,7 +1198,7 @@ var TextParser = class {
       const lat = parseFloat(coordStrings[i]) / 100;
       const lon = -parseFloat(coordStrings[i + 1]) / 100;
       if (!isNaN(lat) && !isNaN(lon)) {
-        coordinates.push([lon, lat]);
+        coordinates.push([lat, lon]);
       }
     }
     if (coordinates.length > 2) {
@@ -1715,7 +1715,7 @@ var CapAlerts = class {
             geometry: extracted.polygon ? {
               type: `Polygon`,
               coordinates: extracted.polygon.split(` `).map((coord) => {
-                const [lon, lat] = coord.split(`,`).map((num) => parseFloat(num));
+                const [lat, lon] = coord.split(`,`).map((num) => parseFloat(num));
                 return [lat, lon];
               })
             } : null
@@ -1798,8 +1798,8 @@ var APIAlerts = class {
             geometry: ((_ea = (_da = (_ca = feature == null ? void 0 : feature.geometry) == null ? void 0 : _ca.coordinates) == null ? void 0 : _da[0]) == null ? void 0 : _ea.length) ? {
               type: ((_fa = feature == null ? void 0 : feature.geometry) == null ? void 0 : _fa.type) || "Polygon",
               coordinates: (_ia = (_ha = (_ga = feature == null ? void 0 : feature.geometry) == null ? void 0 : _ga.coordinates) == null ? void 0 : _ha[0]) == null ? void 0 : _ia.map((coord) => {
-                const [lon, lat] = Array.isArray(coord) ? coord : [0, 0];
-                return [lon, lat];
+                const [lat, lon] = Array.isArray(coord) ? coord : [0, 0];
+                return [lat, lon];
               })
             } : null
           }
