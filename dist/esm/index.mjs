@@ -1009,6 +1009,111 @@ var definitions = {
   }
 };
 
+// src/types.ts
+var types_exports = {};
+
+// src/parsers/stanza.ts
+var StanzaParser = class {
+  /**
+   * validate handles the validation of incoming XMPP stanzas to ensure they contain valid alert data.
+   * You can also feed debug / cache data directly into this function by specifying the second parameter
+   * which is the attributes object that would normally be parsed from the XMPP stanza.
+   *
+   * @public
+   * @static
+   * @param {*} stanza 
+   * @param {(boolean | types.TypeAttributes)} [isDebug=false] 
+   * @returns {{ message: any; attributes: types.TypeAttributes; isCap: any; isVtec: boolean; isCapDescription: any; awipsType: any; isApi: boolean; ignore: boolean; }} 
+   */
+  static validate(stanza, isDebug = false) {
+    var _a;
+    if (isDebug !== false) {
+      const vTypes = isDebug;
+      const message = stanza;
+      const attributes = vTypes;
+      const isCap = (_a = vTypes.isCap) != null ? _a : message.includes(`<?xml`);
+      const isCapDescription = message.includes(`<areaDesc>`);
+      const isVtec = message.match(definitions.expressions.vtec) != null;
+      const isUGC = message.match(definitions.expressions.ugc1) != null;
+      const awipsType = this.getType(attributes);
+      return { message, attributes, isCap, isVtec, isUGC, isCapDescription, awipsType, isApi: false, ignore: false };
+    }
+    if (stanza.is(`message`)) {
+      let cb = stanza.getChild(`x`);
+      if (cb && cb.children) {
+        let message = unescape(cb.children[0]);
+        let attributes = cb.attrs;
+        if (attributes.awipsid && attributes.awipsid.length > 1) {
+          const isCap = message.includes(`<?xml`);
+          const isCapDescription = message.includes(`<areaDesc>`);
+          const isVtec = message.match(definitions.expressions.vtec) != null;
+          const isUGC = message.match(definitions.expressions.ugc1) != null;
+          const awipsType = this.getType(attributes);
+          const isApi = false;
+          this.cache({ message, attributes, isCap, isVtec, awipsType: awipsType.type, awipsPrefix: awipsType.prefix });
+          return { message, attributes, isCap, isApi, isVtec, isUGC, isCapDescription, awipsType, ignore: false };
+        }
+      }
+    }
+    return { message: null, attributes: null, isApi: null, isCap: null, isVtec: null, isUGC: null, isCapDescription: null, awipsType: null, ignore: true };
+  }
+  /**
+   * getType determines the AWIPS type of the alert based on its attributes, specifically the awipsid.
+   * If no matching type is found, it defaults to 'default'.
+   *
+   * @private
+   * @static
+   * @param {unknown} attributes 
+   * @returns {*} 
+   */
+  static getType(attributes) {
+    const attrs = attributes;
+    if (!attrs || !attrs.awipsid) return { type: `XX`, prefix: `XX` };
+    for (const [prefix, type] of Object.entries(definitions.awips)) {
+      if (attrs.awipsid.startsWith(prefix)) {
+        return { type, prefix };
+      }
+    }
+    return { type: `XX`, prefix: `XX` };
+  }
+  /**
+   * cache stores the compiled alert data into a cache file if caching is enabled in the settings.
+   *
+   * @private
+   * @static
+   * @param {unknown} compiled 
+   */
+  static cache(compiled) {
+    const data = compiled;
+    const settings2 = settings;
+    if (!settings2.NoaaWeatherWireService.cache.directory) return;
+    if (!packages.fs.existsSync(settings2.NoaaWeatherWireService.cache.directory)) {
+      packages.fs.mkdirSync(settings2.NoaaWeatherWireService.cache.directory, { recursive: true });
+    }
+    data.message = data.message.replace(/\$\$/g, `
+STANZA ATTRIBUTES...${JSON.stringify(data.attributes)}
+ISSUED TIME...${(/* @__PURE__ */ new Date()).toISOString()}
+$$$
+`);
+    if (!data.message.includes(`STANZA ATTRIBUTES...`)) {
+      data.message += `
+STANZA ATTRIBUTES...${JSON.stringify(data.attributes)}
+ISSUED TIME...${(/* @__PURE__ */ new Date()).toISOString()}
+$$
+`;
+    }
+    packages.fs.appendFileSync(`${settings2.NoaaWeatherWireService.cache.directory}/category-${data.awipsPrefix}-${data.awipsType}s-${data.isCap ? `cap` : `raw`}${data.isVtec ? `-vtec` : ``}.bin`, `=================================================
+${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}
+=================================================
+${data.message}`, "utf8");
+    packages.fs.appendFileSync(`${settings2.NoaaWeatherWireService.cache.directory}/cache-${data.isCap ? `cap` : `raw`}${data.isVtec ? `-vtec` : ``}.bin`, `=================================================
+${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}
+=================================================
+${data.message}`, "utf8");
+  }
+};
+var stanza_default = StanzaParser;
+
 // src/parsers/text.ts
 var TextParser = class {
   /**
@@ -1454,6 +1559,43 @@ var UGCAlerts = class {
 };
 var ugc_default2 = UGCAlerts;
 
+// src/parsers/types/text.ts
+var UGCAlerts2 = class {
+  static getTracking(baseProperties) {
+    return `${baseProperties.sender_icao}`;
+  }
+  static getEvent(message, attributes) {
+    const offshoreEvent = Object.keys(definitions.offshore).find((event) => message.toLowerCase().includes(event.toLowerCase()));
+    if (offshoreEvent) return Object.keys(definitions.offshore).find((event) => message.toLowerCase().includes(event.toLowerCase()));
+    return attributes.type.split(`-`).map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(` `);
+  }
+  static event(validated) {
+    return __async(this, null, function* () {
+      var _a;
+      let processed = [];
+      const messages = (_a = validated.message.split(/(?=\$\$|ISSUED TIME...|=================================================)/g)) == null ? void 0 : _a.map((msg) => msg.trim());
+      if (!messages || messages.length == 0) return;
+      for (let i = 0; i < messages.length; i++) {
+        const tick = performance.now();
+        const message = messages[i];
+        const getBaseProperties = yield events_default.getBaseProperties(message, validated);
+        const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, validated.attributes), getBaseProperties.attributes), getBaseProperties);
+        const getEvent = this.getEvent(message, getBaseProperties.attributes.getAwip);
+        processed.push({
+          performance: performance.now() - tick,
+          tracking: this.getTracking(getBaseProperties),
+          header: getHeader,
+          vtec: `N/A`,
+          history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: `Issued` }],
+          properties: __spreadValues({ event: getEvent, parent: getEvent, action_type: `Issued` }, getBaseProperties)
+        });
+      }
+      events_default.validateEvents(processed);
+    });
+  }
+};
+var text_default2 = UGCAlerts2;
+
 // src/parsers/types/cap.ts
 var CapAlerts = class {
   static getTracking(extracted) {
@@ -1616,7 +1758,7 @@ var APIAlerts = class {
               type: ((_fa = feature == null ? void 0 : feature.geometry) == null ? void 0 : _fa.type) || "Polygon",
               coordinates: (_ia = (_ha = (_ga = feature == null ? void 0 : feature.geometry) == null ? void 0 : _ga.coordinates) == null ? void 0 : _ha[0]) == null ? void 0 : _ia.map((coord) => {
                 const [lon, lat] = Array.isArray(coord) ? coord : [0, 0];
-                return [lat, lon];
+                return [lon, lat];
               })
             } : null
           }
@@ -1627,502 +1769,6 @@ var APIAlerts = class {
   }
 };
 var api_default = APIAlerts;
-
-// src/parsers/stanza.ts
-var StanzaParser = class {
-  /**
-   * validate handles the validation of incoming XMPP stanzas to ensure they contain valid alert data.
-   * You can also feed debug / cache data directly into this function by specifying the second parameter
-   * which is the attributes object that would normally be parsed from the XMPP stanza.
-   *
-   * @public
-   * @static
-   * @param {*} stanza 
-   * @param {(boolean | types.TypeAttributes)} [isDebug=false] 
-   * @returns {{ message: any; attributes: types.TypeAttributes; isCap: any; isVtec: boolean; isCapDescription: any; awipsType: any; isApi: boolean; ignore: boolean; }} 
-   */
-  static validate(stanza, isDebug = false) {
-    var _a;
-    if (isDebug !== false) {
-      const vTypes = isDebug;
-      const message = stanza;
-      const attributes = vTypes;
-      const isCap = (_a = vTypes.isCap) != null ? _a : message.includes(`<?xml`);
-      const isCapDescription = message.includes(`<areaDesc>`);
-      const isVtec = message.match(definitions.expressions.vtec) != null;
-      const isUGC = message.match(definitions.expressions.ugc1) != null;
-      const awipsType = this.getType(attributes);
-      return { message, attributes, isCap, isVtec, isUGC, isCapDescription, awipsType, isApi: false, ignore: false };
-    }
-    if (stanza.is(`message`)) {
-      let cb = stanza.getChild(`x`);
-      if (cb && cb.children) {
-        let message = unescape(cb.children[0]);
-        let attributes = cb.attrs;
-        if (attributes.awipsid && attributes.awipsid.length > 1) {
-          const isCap = message.includes(`<?xml`);
-          const isCapDescription = message.includes(`<areaDesc>`);
-          const isVtec = message.match(definitions.expressions.vtec) != null;
-          const isUGC = message.match(definitions.expressions.ugc1) != null;
-          const awipsType = this.getType(attributes);
-          const isApi = false;
-          this.cache({ message, attributes, isCap, isVtec, awipsType: awipsType.type, awipsPrefix: awipsType.prefix });
-          return { message, attributes, isCap, isApi, isVtec, isUGC, isCapDescription, awipsType, ignore: false };
-        }
-      }
-    }
-    return { message: null, attributes: null, isApi: null, isCap: null, isVtec: null, isUGC: null, isCapDescription: null, awipsType: null, ignore: true };
-  }
-  /**
-   * getType determines the AWIPS type of the alert based on its attributes, specifically the awipsid.
-   * If no matching type is found, it defaults to 'default'.
-   *
-   * @private
-   * @static
-   * @param {unknown} attributes 
-   * @returns {*} 
-   */
-  static getType(attributes) {
-    const attrs = attributes;
-    if (!attrs || !attrs.awipsid) return { type: `XX`, prefix: `XX` };
-    for (const [prefix, type] of Object.entries(definitions.awips)) {
-      if (attrs.awipsid.startsWith(prefix)) {
-        return { type, prefix };
-      }
-    }
-    return { type: `XX`, prefix: `XX` };
-  }
-  /**
-   * cache stores the compiled alert data into a cache file if caching is enabled in the settings.
-   *
-   * @private
-   * @static
-   * @param {unknown} compiled 
-   */
-  static cache(compiled) {
-    const data = compiled;
-    const settings2 = settings;
-    if (!settings2.NoaaWeatherWireService.cache.directory) return;
-    if (!packages.fs.existsSync(settings2.NoaaWeatherWireService.cache.directory)) {
-      packages.fs.mkdirSync(settings2.NoaaWeatherWireService.cache.directory, { recursive: true });
-    }
-    data.message = data.message.replace(/\$\$/g, `
-STANZA ATTRIBUTES...${JSON.stringify(data.attributes)}
-ISSUED TIME...${(/* @__PURE__ */ new Date()).toISOString()}
-$$$
-`);
-    if (!data.message.includes(`STANZA ATTRIBUTES...`)) {
-      data.message += `
-STANZA ATTRIBUTES...${JSON.stringify(data.attributes)}
-ISSUED TIME...${(/* @__PURE__ */ new Date()).toISOString()}
-$$
-`;
-    }
-    packages.fs.appendFileSync(`${settings2.NoaaWeatherWireService.cache.directory}/category-${data.awipsPrefix}-${data.awipsType}s-${data.isCap ? `cap` : `raw`}${data.isVtec ? `-vtec` : ``}.bin`, `=================================================
-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}
-=================================================
-${data.message}`, "utf8");
-    packages.fs.appendFileSync(`${settings2.NoaaWeatherWireService.cache.directory}/cache-${data.isCap ? `cap` : `raw`}${data.isVtec ? `-vtec` : ``}.bin`, `=================================================
-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}
-=================================================
-${data.message}`, "utf8");
-  }
-};
-var stanza_default = StanzaParser;
-
-// src/database.ts
-var Database = class {
-  /**
-   * handleAlertCache stores a unique alert in the SQLite database and ensures the total number of alerts does not exceed 5000.
-   *
-   * @public
-   * @static
-   * @async
-   * @param {*} alert 
-   * @returns {*} 
-   */
-  static stanzaCacheImport(stanza) {
-    return __async(this, null, function* () {
-      const settings2 = settings;
-      cache.db.prepare(`INSERT OR IGNORE INTO stanzas (stanza) VALUES (?)`).run(stanza);
-      const count = cache.db.prepare(`SELECT COUNT(*) as total FROM stanzas`).get();
-      if (count.total > settings2.NoaaWeatherWireService.cache.maxHistory) {
-        cache.db.prepare(`DELETE FROM stanzas WHERE rowid IN (SELECT rowid FROM stanzas ORDER BY rowid ASC LIMIT ?)`).run(count.total - settings2.NoaaWeatherWireService.cache.maxHistory / 2);
-      }
-    });
-  }
-  /**
-   * loadDatabase initializes the SQLite database and imports shapefile data if the database or table does not exist.
-   *
-   * @public
-   * @static
-   * @async
-   * @returns {Promise<void>} 
-   */
-  static loadDatabase() {
-    return __async(this, null, function* () {
-      const settings2 = settings;
-      try {
-        if (!packages.fs.existsSync(settings2.database)) {
-          packages.fs.writeFileSync(settings2.database, "");
-        }
-        cache.db = new packages.sqlite3(settings2.database);
-        const shapfileTable = cache.db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='shapefiles'`).get();
-        const stanzaTable = cache.db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='stanzas'`).get();
-        if (!stanzaTable) {
-          cache.db.prepare(`CREATE TABLE stanzas (id INTEGER PRIMARY KEY AUTOINCREMENT, stanza TEXT)`).run();
-        }
-        if (!shapfileTable) {
-          cache.db.prepare(`CREATE TABLE shapefiles (id TEXT PRIMARY KEY, location TEXT, geometry TEXT)`).run();
-          console.log(definitions.messages.shapefile_creation);
-          for (const shape of definitions.shapefiles) {
-            const { id, file } = shape;
-            const filepath = packages.path.join(__dirname, `../../shapefiles`, file);
-            const { features } = yield packages.shapefile.read(filepath, filepath);
-            console.log(`Importing ${features.length} entries from ${file}...`);
-            const insertStmt = cache.db.prepare(`INSERT OR REPLACE INTO shapefiles (id, location, geometry)VALUES (?, ?, ?)`);
-            const insertTransaction = cache.db.transaction((entries) => {
-              for (const feature of entries) {
-                const { properties, geometry } = feature;
-                let final, location;
-                switch (true) {
-                  case !!properties.FIPS:
-                    final = `${properties.STATE}${id}${properties.FIPS.substring(2)}`;
-                    location = `${properties.COUNTYNAME}, ${properties.STATE}`;
-                    break;
-                  case !!properties.FULLSTAID:
-                    final = `${properties.ST}${id}${properties.WFO}`;
-                    location = `${properties.CITY}, ${properties.STATE}`;
-                    break;
-                  case !!properties.STATE:
-                    final = `${properties.STATE}${id}${properties.ZONE}`;
-                    location = `${properties.NAME}, ${properties.STATE}`;
-                    break;
-                  default:
-                    final = properties.ID;
-                    location = properties.NAME;
-                    break;
-                }
-                insertStmt.run(final, location, JSON.stringify(geometry));
-              }
-            });
-            yield insertTransaction(features);
-          }
-          console.log(definitions.messages.shapefile_creation_finished);
-        }
-      } catch (error) {
-        cache.events.emit("onError", { code: "error-load-database", message: `Failed to load database: ${error.message}` });
-      }
-    });
-  }
-};
-var database_default = Database;
-
-// src/xmpp.ts
-var Xmpp = class {
-  /**
-   * isSessionReconnectionEligible checks if the XMPP session is eligible for reconnection based on the last 
-   * received stanza time and current interval.
-   *
-   * @public
-   * @static
-   * @async
-   * @param {number} currentInterval 
-   * @returns {Promise<void>} 
-   */
-  static isSessionReconnectionEligible(currentInterval) {
-    return __async(this, null, function* () {
-      const settings2 = settings;
-      if ((cache.isConnected || cache.sigHalt) && cache.session) {
-        const lastStanza = Date.now() - cache.lastStanza;
-        if (lastStanza >= currentInterval * 1e3) {
-          if (!cache.attemptingReconnect) {
-            cache.attemptingReconnect = true;
-            cache.isConnected = false;
-            cache.totalReconnects += 1;
-            cache.events.emit(`onReconnect`, { reconnects: cache.totalReconnects, lastStanza, lastName: settings2.NoaaWeatherWireService.clientCredentials.nickname });
-            yield cache.session.stop().catch(() => {
-            });
-            yield cache.session.start().catch(() => {
-            });
-          }
-        }
-      }
-    });
-  }
-  /**
-   * deploySession initializes and starts the XMPP client session, setting up event listeners for 
-   * connection management and message handling. This function is specifically tailored for
-   * NoaaWeatherWireService and connects to their XMPP server.
-   *
-   * @public
-   * @static
-   * @async
-   * @returns {Promise<void>} 
-   */
-  static deploySession() {
-    return __async(this, null, function* () {
-      var _a, _b;
-      const settings2 = settings;
-      cache.session = packages.xmpp.client({
-        service: `xmpp://nwws-oi.weather.gov`,
-        domain: `nwws-oi.weather.gov`,
-        username: settings2.NoaaWeatherWireService.clientCredentials.username,
-        password: settings2.NoaaWeatherWireService.clientCredentials.password
-      });
-      (_b = (_a = settings2.NoaaWeatherWireService.clientCredentials).nickname) != null ? _b : _a.nickname = settings2.NoaaWeatherWireService.clientCredentials.username;
-      cache.session.on(`online`, (address) => __async(null, null, function* () {
-        if (cache.lastConnect && Date.now() - cache.lastConnect < 10 * 1e3) {
-          cache.sigHalt = true;
-          utils_default.sleep(2 * 1e3).then(() => __async(null, null, function* () {
-            yield cache.session.stop();
-          }));
-          cache.events.emit(`onError`, { code: `error-reconnecting-too-fast`, message: `The client is attempting to reconnect too fast. Please wait a few seconds before trying again.` });
-          return;
-        }
-        cache.isConnected = true;
-        cache.sigHalt = false;
-        cache.lastConnect = Date.now();
-        cache.session.send(packages.xmpp.xml("presence", { to: `nwws@conference.nwws-oi.weather.gov/${settings2.NoaaWeatherWireService.clientCredentials.nickname}`, xmlns: "http://jabber.org/protocol/muc" }));
-        cache.session.send(packages.xmpp.xml("presence", { to: `nwws@conference.nwws-oi.weather.gov`, type: "available" }));
-        cache.events.emit(`onConnection`, settings2.NoaaWeatherWireService.clientCredentials.nickname);
-        if (cache.attemptingReconnect) {
-          utils_default.sleep(15 * 1e3).then(() => {
-            cache.attemptingReconnect = false;
-          });
-        }
-      }));
-      cache.session.on(`offline`, () => __async(null, null, function* () {
-        cache.isConnected = false;
-        cache.sigHalt = true;
-        cache.events.emit(`onError`, { code: `connection-lost`, message: `XMPP connection went offline` });
-      }));
-      cache.session.on(`error`, (error) => __async(null, null, function* () {
-        cache.isConnected = false;
-        cache.sigHalt = true;
-        cache.events.emit(`onError`, { code: `connection-error`, message: error.message });
-      }));
-      cache.session.on(`stanza`, (stanza) => __async(null, null, function* () {
-        try {
-          cache.lastStanza = Date.now();
-          if (stanza.is(`message`)) {
-            const validate = stanza_default.validate(stanza);
-            if (validate.ignore || validate.isCap && !settings2.NoaaWeatherWireService.alertPreferences.isCapOnly || !validate.isCap && settings2.NoaaWeatherWireService.alertPreferences.isCapOnly || validate.isCap && !validate.isCapDescription) return;
-            events_default.eventHandler(validate);
-            cache.events.emit(`onMessage`, validate);
-            database_default.stanzaCacheImport(JSON.stringify(validate));
-          }
-          if (stanza.is(`presence`) && stanza.attrs.from && stanza.attrs.from.startsWith("nwws@conference.nwws-oi.weather.gov/")) {
-            const occupant = stanza.attrs.from.split("/").slice(1).join("/");
-            cache.events.emit("onOccupant", { occupant, type: stanza.attrs.type === "unavailable" ? "unavailable" : "available" });
-          }
-        } catch (e) {
-          cache.events.emit(`onError`, { code: `error-processing-stanza`, message: e.message });
-        }
-      }));
-      yield cache.session.start();
-    });
-  }
-};
-var xmpp_default = Xmpp;
-
-// src/utils.ts
-var Utils = class {
-  /**
-   * Zzzzzzz... yeah not much to explain here. Simple sleep function that returns a promise after the specified milliseconds.
-   *
-   * @public
-   * @static
-   * @async
-   * @param {number} ms 
-   * @returns {Promise<void>} 
-   */
-  static sleep(ms) {
-    return __async(this, null, function* () {
-      return new Promise((resolve) => setTimeout(resolve, ms));
-    });
-  }
-  /**
-   * loadCollectionCache reads cached alert files from the specified cache directory and processes them.
-   *
-   * @public
-   * @static
-   * @async
-   * @returns {Promise<void>} 
-   */
-  static loadCollectionCache() {
-    return __async(this, null, function* () {
-      try {
-        const settings2 = settings;
-        if (settings2.NoaaWeatherWireService.cache.read && settings2.NoaaWeatherWireService.cache.directory) {
-          if (!packages.fs.existsSync(settings2.NoaaWeatherWireService.cache.directory)) return;
-          const cacheDir = settings2.NoaaWeatherWireService.cache.directory;
-          const getAllFiles = packages.fs.readdirSync(cacheDir).filter((file) => file.endsWith(".bin") && file.startsWith("cache-"));
-          for (const file of getAllFiles) {
-            const filepath = packages.path.join(cacheDir, file);
-            const readFile = packages.fs.readFileSync(filepath, { encoding: "utf-8" });
-            const readSize = packages.fs.statSync(filepath).size;
-            if (readSize == 0) {
-              continue;
-            }
-            const isCap = readFile.includes(`<?xml`);
-            if (isCap && !settings2.NoaaWeatherWireService.alertPreferences.isCapOnly) continue;
-            if (!isCap && settings2.NoaaWeatherWireService.alertPreferences.isCapOnly) continue;
-            const validate = stanza_default.validate(readFile, { awipsid: file, isCap, raw: true, issue: void 0 });
-            yield events_default.eventHandler(validate);
-          }
-        }
-      } catch (error) {
-        cache.events.emit("onError", { code: "error-load-cache", message: `Failed to load cache: ${error.message}` });
-      }
-    });
-  }
-  /**
-   * loadGeoJsonData fetches GeoJSON data from the National Weather Service endpoint and processes each alert.
-   *
-   * @public
-   * @static
-   * @async
-   * @returns {Promise<void>} 
-   */
-  static loadGeoJsonData() {
-    return __async(this, null, function* () {
-      try {
-        const settings2 = settings;
-        const response = yield this.createHttpRequest(settings2.NationalWeatherService.endpoint);
-        if (!response.error) {
-          events_default.eventHandler({ message: JSON.stringify(response.message), attributes: {}, isCap: true, isApi: true, isVtec: false, isUGC: false, isCapDescription: false, awipsType: { type: "api", prefix: "AP" }, ignore: false });
-        }
-      } catch (error) {
-        cache.events.emit("onError", { code: "error-fetching-nws-data", message: `Failed to fetch NWS data: ${error.message}` });
-      }
-    });
-  }
-  /**
-   * detectUncaughtExceptions sets up a global handler for uncaught exceptions in the Node.js process,
-   *
-   * @public
-   * @static
-   */
-  static detectUncaughtExceptions() {
-    if (cache.events.listenerCount("uncaughtException") > 0) return;
-    cache.events.on("uncaughtException", (error) => {
-      cache.events.emit(`onError`, { message: `Uncaught Exception: ${error.message}`, code: `error-uncaught-exception`, stack: error.stack });
-    });
-  }
-  /**
-   * createHttpRequest performs an HTTP GET request to the specified URL with optional settings.
-   *
-   * @public
-   * @static
-   * @async
-   * @param {string} url 
-   * @param {?types.HTTPSettings} [options] 
-   * @returns {unknown} 
-   */
-  static createHttpRequest(url, options) {
-    return __async(this, null, function* () {
-      var _a, _b;
-      const defaultOptions = {
-        timeout: 1e4,
-        headers: {
-          "User-Agent": "AtmosphericX",
-          "Accept": "application/geo+json, text/plain, */*; q=0.9",
-          "Accept-Language": "en-US,en;q=0.9"
-        }
-      };
-      const requestOptions = __spreadProps(__spreadValues(__spreadValues({}, defaultOptions), options), {
-        headers: __spreadValues(__spreadValues({}, defaultOptions.headers), (_a = options == null ? void 0 : options.headers) != null ? _a : {})
-      });
-      try {
-        const resp = yield packages.axios.get(url, {
-          headers: requestOptions.headers,
-          timeout: requestOptions.timeout,
-          maxRedirects: 0,
-          validateStatus: (status) => status === 200 || status === 500
-        });
-        return { error: false, message: resp.data };
-      } catch (err) {
-        return { error: true, message: (_b = err == null ? void 0 : err.message) != null ? _b : String(err) };
-      }
-    });
-  }
-  /**
-   * garbageCollectionCache removes files from the cache directory that exceed the specified maximum file size in megabytes.
-   *
-   * @public
-   * @static
-   * @param {number} maxFileMegabytes 
-   */
-  static garbageCollectionCache(maxFileMegabytes) {
-    try {
-      const settings2 = settings;
-      if (!settings2.NoaaWeatherWireService.cache.directory) return;
-      if (!packages.fs.existsSync(settings2.NoaaWeatherWireService.cache.directory)) return;
-      const maxBytes = maxFileMegabytes * 1024 * 1024;
-      const cacheDirectory = settings2.NoaaWeatherWireService.cache.directory;
-      const stackFiles = [cacheDirectory], files = [];
-      while (stackFiles.length) {
-        const currentDirectory = stackFiles.pop();
-        packages.fs.readdirSync(currentDirectory).forEach((file) => {
-          const fullPath = packages.path.join(currentDirectory, file);
-          const stat = packages.fs.statSync(fullPath);
-          if (stat.isDirectory()) stackFiles.push(fullPath);
-          else files.push({ file: fullPath, size: stat.size });
-        });
-      }
-      if (!files.length) return;
-      files.forEach((f) => {
-        if (f.size > maxBytes) packages.fs.unlinkSync(f.file);
-      });
-    } catch (error) {
-      cache.events.emit("onError", { code: "error-garbage-collection", message: `Failed to perform garbage collection: ${error.message}` });
-    }
-  }
-  /**
-   * handleCronJob performs periodic tasks based on whether the client is connected to NWWS or fetching data from NWS.
-   *
-   * @public
-   * @static
-   * @param {boolean} isNwws 
-   */
-  static handleCronJob(isNwws) {
-    try {
-      const settings2 = settings;
-      if (isNwws) {
-        if (settings2.NoaaWeatherWireService.cache.read) void this.garbageCollectionCache(settings2.NoaaWeatherWireService.cache.maxSizeMB);
-        if (settings2.NoaaWeatherWireService.clientReconnections.canReconnect) void xmpp_default.isSessionReconnectionEligible(settings2.NoaaWeatherWireService.clientReconnections.currentInterval);
-      } else {
-        void this.loadGeoJsonData();
-      }
-    } catch (error) {
-      cache.events.emit("onError", { code: "error-cron-job", message: `Failed to perform scheduled tasks: ${error.message}` });
-    }
-  }
-  /**
-   * mergeClientSettings merges user-provided settings into the existing client settings, allowing for nested objects to be merged correctly.
-   *
-   * @public
-   * @static
-   * @param {Record<string, any>} target 
-   * @param {Record<string, any>} settings 
-   */
-  static mergeClientSettings(target, settings2) {
-    for (const key in settings2) {
-      if (settings2.hasOwnProperty(key)) {
-        if (typeof settings2[key] === "object" && settings2[key] !== null && !Array.isArray(settings2[key])) {
-          if (!target[key] || typeof target[key] !== "object") {
-            target[key] = {};
-          }
-          this.mergeClientSettings(target[key], settings2[key]);
-        } else {
-          target[key] = settings2[key];
-        }
-      }
-    }
-  }
-};
-var utils_default = Utils;
 
 // src/eas.ts
 var EAS = class {
@@ -2805,43 +2451,553 @@ var EventParser = class {
 };
 var events_default = EventParser;
 
-// src/parsers/types/text.ts
-var UGCAlerts2 = class {
-  static getTracking(baseProperties) {
-    return `${baseProperties.sender_icao}`;
-  }
-  static getEvent(message, attributes) {
-    const offshoreEvent = Object.keys(definitions.offshore).find((event) => message.toLowerCase().includes(event.toLowerCase()));
-    if (offshoreEvent) return Object.keys(definitions.offshore).find((event) => message.toLowerCase().includes(event.toLowerCase()));
-    return attributes.type.split(`-`).map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(` `);
-  }
-  static event(validated) {
+// src/database.ts
+var Database = class {
+  /**
+   * handleAlertCache stores a unique alert in the SQLite database and ensures the total number of alerts does not exceed 5000.
+   *
+   * @public
+   * @static
+   * @async
+   * @param {*} alert 
+   * @returns {*} 
+   */
+  static stanzaCacheImport(stanza) {
     return __async(this, null, function* () {
-      var _a;
-      let processed = [];
-      const messages = (_a = validated.message.split(/(?=\$\$|ISSUED TIME...|=================================================)/g)) == null ? void 0 : _a.map((msg) => msg.trim());
-      if (!messages || messages.length == 0) return;
-      for (let i = 0; i < messages.length; i++) {
-        const tick = performance.now();
-        const message = messages[i];
-        const getBaseProperties = yield events_default.getBaseProperties(message, validated);
-        const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, validated.attributes), getBaseProperties.attributes), getBaseProperties);
-        const getEvent = this.getEvent(message, getBaseProperties.attributes.getAwip);
-        processed.push({
-          performance: performance.now() - tick,
-          tracking: this.getTracking(getBaseProperties),
-          header: getHeader,
-          vtec: `N/A`,
-          history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: `Issued` }],
-          properties: __spreadValues({ event: getEvent, parent: getEvent, action_type: `Issued` }, getBaseProperties)
-        });
+      const settings2 = settings;
+      cache.db.prepare(`INSERT OR IGNORE INTO stanzas (stanza) VALUES (?)`).run(stanza);
+      const count = cache.db.prepare(`SELECT COUNT(*) as total FROM stanzas`).get();
+      if (count.total > settings2.NoaaWeatherWireService.cache.maxHistory) {
+        cache.db.prepare(`DELETE FROM stanzas WHERE rowid IN (SELECT rowid FROM stanzas ORDER BY rowid ASC LIMIT ?)`).run(count.total - settings2.NoaaWeatherWireService.cache.maxHistory / 2);
       }
-      events_default.validateEvents(processed);
+    });
+  }
+  /**
+   * loadDatabase initializes the SQLite database and imports shapefile data if the database or table does not exist.
+   *
+   * @public
+   * @static
+   * @async
+   * @returns {Promise<void>} 
+   */
+  static loadDatabase() {
+    return __async(this, null, function* () {
+      const settings2 = settings;
+      try {
+        if (!packages.fs.existsSync(settings2.database)) {
+          packages.fs.writeFileSync(settings2.database, "");
+        }
+        cache.db = new packages.sqlite3(settings2.database);
+        const shapfileTable = cache.db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='shapefiles'`).get();
+        const stanzaTable = cache.db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='stanzas'`).get();
+        if (!stanzaTable) {
+          cache.db.prepare(`CREATE TABLE stanzas (id INTEGER PRIMARY KEY AUTOINCREMENT, stanza TEXT)`).run();
+        }
+        if (!shapfileTable) {
+          cache.db.prepare(`CREATE TABLE shapefiles (id TEXT PRIMARY KEY, location TEXT, geometry TEXT)`).run();
+          console.log(definitions.messages.shapefile_creation);
+          for (const shape of definitions.shapefiles) {
+            const { id, file } = shape;
+            const filepath = packages.path.join(__dirname, `../../shapefiles`, file);
+            const { features } = yield packages.shapefile.read(filepath, filepath);
+            console.log(`Importing ${features.length} entries from ${file}...`);
+            const insertStmt = cache.db.prepare(`INSERT OR REPLACE INTO shapefiles (id, location, geometry)VALUES (?, ?, ?)`);
+            const insertTransaction = cache.db.transaction((entries) => {
+              for (const feature of entries) {
+                const { properties, geometry } = feature;
+                let final, location;
+                switch (true) {
+                  case !!properties.FIPS:
+                    final = `${properties.STATE}${id}${properties.FIPS.substring(2)}`;
+                    location = `${properties.COUNTYNAME}, ${properties.STATE}`;
+                    break;
+                  case !!properties.FULLSTAID:
+                    final = `${properties.ST}${id}${properties.WFO}`;
+                    location = `${properties.CITY}, ${properties.STATE}`;
+                    break;
+                  case !!properties.STATE:
+                    final = `${properties.STATE}${id}${properties.ZONE}`;
+                    location = `${properties.NAME}, ${properties.STATE}`;
+                    break;
+                  default:
+                    final = properties.ID;
+                    location = properties.NAME;
+                    break;
+                }
+                insertStmt.run(final, location, JSON.stringify(geometry));
+              }
+            });
+            yield insertTransaction(features);
+          }
+          console.log(definitions.messages.shapefile_creation_finished);
+        }
+      } catch (error) {
+        cache.events.emit("onError", { code: "error-load-database", message: `Failed to load database: ${error.message}` });
+      }
     });
   }
 };
-var text_default2 = UGCAlerts2;
+var database_default = Database;
+
+// src/xmpp.ts
+var Xmpp = class {
+  /**
+   * isSessionReconnectionEligible checks if the XMPP session is eligible for reconnection based on the last 
+   * received stanza time and current interval.
+   *
+   * @public
+   * @static
+   * @async
+   * @param {number} currentInterval 
+   * @returns {Promise<void>} 
+   */
+  static isSessionReconnectionEligible(currentInterval) {
+    return __async(this, null, function* () {
+      const settings2 = settings;
+      if ((cache.isConnected || cache.sigHalt) && cache.session) {
+        const lastStanza = Date.now() - cache.lastStanza;
+        if (lastStanza >= currentInterval * 1e3) {
+          if (!cache.attemptingReconnect) {
+            cache.attemptingReconnect = true;
+            cache.isConnected = false;
+            cache.totalReconnects += 1;
+            cache.events.emit(`onReconnect`, { reconnects: cache.totalReconnects, lastStanza, lastName: settings2.NoaaWeatherWireService.clientCredentials.nickname });
+            yield cache.session.stop().catch(() => {
+            });
+            yield cache.session.start().catch(() => {
+            });
+          }
+        }
+      }
+    });
+  }
+  /**
+   * deploySession initializes and starts the XMPP client session, setting up event listeners for 
+   * connection management and message handling. This function is specifically tailored for
+   * NoaaWeatherWireService and connects to their XMPP server.
+   *
+   * @public
+   * @static
+   * @async
+   * @returns {Promise<void>} 
+   */
+  static deploySession() {
+    return __async(this, null, function* () {
+      var _a, _b;
+      const settings2 = settings;
+      cache.session = packages.xmpp.client({
+        service: `xmpp://nwws-oi.weather.gov`,
+        domain: `nwws-oi.weather.gov`,
+        username: settings2.NoaaWeatherWireService.clientCredentials.username,
+        password: settings2.NoaaWeatherWireService.clientCredentials.password
+      });
+      (_b = (_a = settings2.NoaaWeatherWireService.clientCredentials).nickname) != null ? _b : _a.nickname = settings2.NoaaWeatherWireService.clientCredentials.username;
+      cache.session.on(`online`, (address) => __async(null, null, function* () {
+        if (cache.lastConnect && Date.now() - cache.lastConnect < 10 * 1e3) {
+          cache.sigHalt = true;
+          utils_default.sleep(2 * 1e3).then(() => __async(null, null, function* () {
+            yield cache.session.stop();
+          }));
+          cache.events.emit(`onError`, { code: `error-reconnecting-too-fast`, message: `The client is attempting to reconnect too fast. Please wait a few seconds before trying again.` });
+          return;
+        }
+        cache.isConnected = true;
+        cache.sigHalt = false;
+        cache.lastConnect = Date.now();
+        cache.session.send(packages.xmpp.xml("presence", { to: `nwws@conference.nwws-oi.weather.gov/${settings2.NoaaWeatherWireService.clientCredentials.nickname}`, xmlns: "http://jabber.org/protocol/muc" }));
+        cache.session.send(packages.xmpp.xml("presence", { to: `nwws@conference.nwws-oi.weather.gov`, type: "available" }));
+        cache.events.emit(`onConnection`, settings2.NoaaWeatherWireService.clientCredentials.nickname);
+        if (cache.attemptingReconnect) {
+          utils_default.sleep(15 * 1e3).then(() => {
+            cache.attemptingReconnect = false;
+          });
+        }
+      }));
+      cache.session.on(`offline`, () => __async(null, null, function* () {
+        cache.isConnected = false;
+        cache.sigHalt = true;
+        cache.events.emit(`onError`, { code: `connection-lost`, message: `XMPP connection went offline` });
+      }));
+      cache.session.on(`error`, (error) => __async(null, null, function* () {
+        cache.isConnected = false;
+        cache.sigHalt = true;
+        cache.events.emit(`onError`, { code: `connection-error`, message: error.message });
+      }));
+      cache.session.on(`stanza`, (stanza) => __async(null, null, function* () {
+        try {
+          cache.lastStanza = Date.now();
+          if (stanza.is(`message`)) {
+            const validate = stanza_default.validate(stanza);
+            if (validate.ignore || validate.isCap && !settings2.NoaaWeatherWireService.alertPreferences.isCapOnly || !validate.isCap && settings2.NoaaWeatherWireService.alertPreferences.isCapOnly || validate.isCap && !validate.isCapDescription) return;
+            events_default.eventHandler(validate);
+            cache.events.emit(`onMessage`, validate);
+            database_default.stanzaCacheImport(JSON.stringify(validate));
+          }
+          if (stanza.is(`presence`) && stanza.attrs.from && stanza.attrs.from.startsWith("nwws@conference.nwws-oi.weather.gov/")) {
+            const occupant = stanza.attrs.from.split("/").slice(1).join("/");
+            cache.events.emit("onOccupant", { occupant, type: stanza.attrs.type === "unavailable" ? "unavailable" : "available" });
+          }
+        } catch (e) {
+          cache.events.emit(`onError`, { code: `error-processing-stanza`, message: e.message });
+        }
+      }));
+      yield cache.session.start();
+    });
+  }
+};
+var xmpp_default = Xmpp;
+
+// src/utils.ts
+var Utils = class {
+  /**
+   * Zzzzzzz... yeah not much to explain here. Simple sleep function that returns a promise after the specified milliseconds.
+   *
+   * @public
+   * @static
+   * @async
+   * @param {number} ms 
+   * @returns {Promise<void>} 
+   */
+  static sleep(ms) {
+    return __async(this, null, function* () {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    });
+  }
+  /**
+   * loadCollectionCache reads cached alert files from the specified cache directory and processes them.
+   *
+   * @public
+   * @static
+   * @async
+   * @returns {Promise<void>} 
+   */
+  static loadCollectionCache() {
+    return __async(this, null, function* () {
+      try {
+        const settings2 = settings;
+        if (settings2.NoaaWeatherWireService.cache.read && settings2.NoaaWeatherWireService.cache.directory) {
+          if (!packages.fs.existsSync(settings2.NoaaWeatherWireService.cache.directory)) return;
+          const cacheDir = settings2.NoaaWeatherWireService.cache.directory;
+          const getAllFiles = packages.fs.readdirSync(cacheDir).filter((file) => file.endsWith(".bin") && file.startsWith("cache-"));
+          for (const file of getAllFiles) {
+            const filepath = packages.path.join(cacheDir, file);
+            const readFile = packages.fs.readFileSync(filepath, { encoding: "utf-8" });
+            const readSize = packages.fs.statSync(filepath).size;
+            if (readSize == 0) {
+              continue;
+            }
+            const isCap = readFile.includes(`<?xml`);
+            if (isCap && !settings2.NoaaWeatherWireService.alertPreferences.isCapOnly) continue;
+            if (!isCap && settings2.NoaaWeatherWireService.alertPreferences.isCapOnly) continue;
+            const validate = stanza_default.validate(readFile, { awipsid: file, isCap, raw: true, issue: void 0 });
+            yield events_default.eventHandler(validate);
+          }
+        }
+      } catch (error) {
+        cache.events.emit("onError", { code: "error-load-cache", message: `Failed to load cache: ${error.message}` });
+      }
+    });
+  }
+  /**
+   * loadGeoJsonData fetches GeoJSON data from the National Weather Service endpoint and processes each alert.
+   *
+   * @public
+   * @static
+   * @async
+   * @returns {Promise<void>} 
+   */
+  static loadGeoJsonData() {
+    return __async(this, null, function* () {
+      try {
+        const settings2 = settings;
+        const response = yield this.createHttpRequest(settings2.NationalWeatherService.endpoint);
+        if (!response.error) {
+          events_default.eventHandler({ message: JSON.stringify(response.message), attributes: {}, isCap: true, isApi: true, isVtec: false, isUGC: false, isCapDescription: false, awipsType: { type: "api", prefix: "AP" }, ignore: false });
+        }
+      } catch (error) {
+        cache.events.emit("onError", { code: "error-fetching-nws-data", message: `Failed to fetch NWS data: ${error.message}` });
+      }
+    });
+  }
+  /**
+   * detectUncaughtExceptions sets up a global handler for uncaught exceptions in the Node.js process,
+   *
+   * @public
+   * @static
+   */
+  static detectUncaughtExceptions() {
+    if (cache.events.listenerCount("uncaughtException") > 0) return;
+    cache.events.on("uncaughtException", (error) => {
+      cache.events.emit(`onError`, { message: `Uncaught Exception: ${error.message}`, code: `error-uncaught-exception`, stack: error.stack });
+    });
+  }
+  /**
+   * createHttpRequest performs an HTTP GET request to the specified URL with optional settings.
+   *
+   * @public
+   * @static
+   * @async
+   * @param {string} url 
+   * @param {?types.HTTPSettings} [options] 
+   * @returns {unknown} 
+   */
+  static createHttpRequest(url, options) {
+    return __async(this, null, function* () {
+      var _a, _b;
+      const defaultOptions = {
+        timeout: 1e4,
+        headers: {
+          "User-Agent": "AtmosphericX",
+          "Accept": "application/geo+json, text/plain, */*; q=0.9",
+          "Accept-Language": "en-US,en;q=0.9"
+        }
+      };
+      const requestOptions = __spreadProps(__spreadValues(__spreadValues({}, defaultOptions), options), {
+        headers: __spreadValues(__spreadValues({}, defaultOptions.headers), (_a = options == null ? void 0 : options.headers) != null ? _a : {})
+      });
+      try {
+        const resp = yield packages.axios.get(url, {
+          headers: requestOptions.headers,
+          timeout: requestOptions.timeout,
+          maxRedirects: 0,
+          validateStatus: (status) => status === 200 || status === 500
+        });
+        return { error: false, message: resp.data };
+      } catch (err) {
+        return { error: true, message: (_b = err == null ? void 0 : err.message) != null ? _b : String(err) };
+      }
+    });
+  }
+  /**
+   * garbageCollectionCache removes files from the cache directory that exceed the specified maximum file size in megabytes.
+   *
+   * @public
+   * @static
+   * @param {number} maxFileMegabytes 
+   */
+  static garbageCollectionCache(maxFileMegabytes) {
+    try {
+      const settings2 = settings;
+      if (!settings2.NoaaWeatherWireService.cache.directory) return;
+      if (!packages.fs.existsSync(settings2.NoaaWeatherWireService.cache.directory)) return;
+      const maxBytes = maxFileMegabytes * 1024 * 1024;
+      const cacheDirectory = settings2.NoaaWeatherWireService.cache.directory;
+      const stackFiles = [cacheDirectory], files = [];
+      while (stackFiles.length) {
+        const currentDirectory = stackFiles.pop();
+        packages.fs.readdirSync(currentDirectory).forEach((file) => {
+          const fullPath = packages.path.join(currentDirectory, file);
+          const stat = packages.fs.statSync(fullPath);
+          if (stat.isDirectory()) stackFiles.push(fullPath);
+          else files.push({ file: fullPath, size: stat.size });
+        });
+      }
+      if (!files.length) return;
+      files.forEach((f) => {
+        if (f.size > maxBytes) packages.fs.unlinkSync(f.file);
+      });
+    } catch (error) {
+      cache.events.emit("onError", { code: "error-garbage-collection", message: `Failed to perform garbage collection: ${error.message}` });
+    }
+  }
+  /**
+   * handleCronJob performs periodic tasks based on whether the client is connected to NWWS or fetching data from NWS.
+   *
+   * @public
+   * @static
+   * @param {boolean} isNwws 
+   */
+  static handleCronJob(isNwws) {
+    try {
+      const settings2 = settings;
+      if (isNwws) {
+        if (settings2.NoaaWeatherWireService.cache.read) void this.garbageCollectionCache(settings2.NoaaWeatherWireService.cache.maxSizeMB);
+        if (settings2.NoaaWeatherWireService.clientReconnections.canReconnect) void xmpp_default.isSessionReconnectionEligible(settings2.NoaaWeatherWireService.clientReconnections.currentInterval);
+      } else {
+        void this.loadGeoJsonData();
+      }
+    } catch (error) {
+      cache.events.emit("onError", { code: "error-cron-job", message: `Failed to perform scheduled tasks: ${error.message}` });
+    }
+  }
+  /**
+   * mergeClientSettings merges user-provided settings into the existing client settings, allowing for nested objects to be merged correctly.
+   *
+   * @public
+   * @static
+   * @param {Record<string, any>} target 
+   * @param {Record<string, any>} settings 
+   */
+  static mergeClientSettings(target, settings2) {
+    for (const key in settings2) {
+      if (settings2.hasOwnProperty(key)) {
+        if (typeof settings2[key] === "object" && settings2[key] !== null && !Array.isArray(settings2[key])) {
+          if (!target[key] || typeof target[key] !== "object") {
+            target[key] = {};
+          }
+          this.mergeClientSettings(target[key], settings2[key]);
+        } else {
+          target[key] = settings2[key];
+        }
+      }
+    }
+  }
+};
+var utils_default = Utils;
+
+// src/index.ts
+var AlertManager = class {
+  constructor(metadata) {
+    this.start(metadata);
+  }
+  /**
+   * setDisplayName allows you to set or update the nickname of the client for identification purposes.
+   * This does require you to restart the XMPP client if you are using NoaaWeatherWireService for primary data.
+   * Changing this setting does not affect the username used for authentication.
+   * 
+   * @public
+   * @param {?string} [name] 
+   */
+  setDisplayName(name) {
+    const settings2 = settings;
+    const trimmed = name == null ? void 0 : name.trim();
+    if (!trimmed) {
+      cache.events.emit(`onError`, { code: `error-invalid-nickname`, message: definitions.messages.invalid_nickname });
+      return;
+    }
+    settings2.NoaaWeatherWireService.clientCredentials.nickname = trimmed;
+  }
+  /**
+   * getAllAlertTypes provides a comprehensive list of all possible alert event and action combinations
+   *
+   * @public
+   * @returns {{}} 
+   */
+  getAllAlertTypes() {
+    const events2 = /* @__PURE__ */ new Set();
+    const actions = /* @__PURE__ */ new Set();
+    const combinations = [];
+    Object.values(definitions.events).forEach((event) => events2.add(event));
+    Object.values(definitions.actions).forEach((action) => actions.add(action));
+    Array.from(events2).forEach((event) => {
+      Array.from(actions).forEach((action) => {
+        combinations.push(`${event} ${action}`);
+      });
+    });
+    return combinations;
+  }
+  /**
+   * searchAlertDatbase allows you to search the internal alert database for previously received alerts up to 50,000 records.
+   *
+   * @public
+   * @async
+   * @param {string} query 
+   * @returns {unknown} 
+   */
+  searchStanzaDatabase(query) {
+    return __async(this, null, function* () {
+      return yield cache.db.prepare(`SELECT * FROM stanzas WHERE stanza LIKE ? ORDER BY id DESC LIMIT 250`).all(`%${query}%`);
+    });
+  }
+  /**
+   * setSettings allow you to dynamically update the settings of the AlertManager instance. This doesn't
+   * require a refresh of the instance. However, if you are switching to NWWS->NWS or vice versa,
+   * you will need to call stop() and then start() for changes to take effect.
+   *
+   * @public
+   * @async
+   * @param {types.ClientSettings} settings 
+   * @returns {Promise<void>} 
+   */
+  setSettings(settings2) {
+    return __async(this, null, function* () {
+      utils_default.mergeClientSettings(settings, settings2);
+    });
+  }
+  /**
+   * onEvent allows the client to listen for specific events emitted by the parser.
+   * Events include:
+   * - onAlerts: Emitted when a batch of new alerts have been fully parsed
+   * - onMessage: Emitted when a raw CAP/XML has been parsed by the StanzaParser
+   * - onError: Emitted when an error occurs within the parser
+   * - onConnection: Emitted when the XMPP client connects successfully
+   * - onReconnect: Emitted when the XMPP client is attempting to reconnect
+   * - onOccupant: Emitted when an occupant joins or leaves the XMPP MUC room (NWWS only)
+   * - onAnyEventType (Ex. onTornadoWarning) Emitted when a specific alert event type is received
+   * 
+   * @public
+   * @param {string} event 
+   * @param {(...args: any[]) => void} callback 
+   * @returns {() => void} 
+   */
+  onEvent(event, callback) {
+    cache.events.on(event, callback);
+    return () => cache.events.off(event, callback);
+  }
+  /**
+   * start initializes the AlertManager instance, setting up necessary configurations and connections.
+   * This method must be called before the instance can begin processing alerts.
+   *
+   * @public
+   * @async
+   * @param {Record<string, string>} [metadata={}] 
+   * @returns {Promise<void>} 
+   */
+  start(metadata) {
+    return __async(this, null, function* () {
+      if (!cache.isReady) {
+        console.log(definitions.messages.not_ready);
+        return Promise.resolve();
+      }
+      this.setSettings(metadata);
+      if (settings.catchUnhandledExceptions) {
+        utils_default.detectUncaughtExceptions();
+      }
+      const settings2 = settings;
+      this.isNoaaWeatherWireService = settings.isNWWS;
+      cache.isReady = false;
+      if (this.isNoaaWeatherWireService) {
+        yield database_default.loadDatabase();
+        yield xmpp_default.deploySession();
+        yield utils_default.loadCollectionCache();
+      }
+      utils_default.handleCronJob(this.isNoaaWeatherWireService);
+      packages.cron.schedule(`*/${!this.isNoaaWeatherWireService ? settings2.NationalWeatherService.checkInterval : 5} * * * * *`, () => {
+        utils_default.handleCronJob(this.isNoaaWeatherWireService);
+      });
+    });
+  }
+  /**
+   * stop terminates the AlertManager instance, closing any active connections and cleaning up resources.
+   *
+   * @public
+   * @async
+   * @returns {Promise<void>} 
+   */
+  stop() {
+    return __async(this, null, function* () {
+      cache.isReady = true;
+      packages.cron.getTasks().forEach((task) => task.stop());
+      if (cache.session && this.isNoaaWeatherWireService) {
+        yield cache.session.stop();
+        cache.sigHalt = true;
+        cache.isConnected = false;
+        cache.session = null;
+        this.isNoaaWeatherWireService = false;
+      }
+    });
+  }
+};
+var index_default = AlertManager;
 export {
-  UGCAlerts2 as UGCAlerts,
-  text_default2 as default
+  AlertManager,
+  database_default as Database,
+  eas_default as EAS,
+  events_default as EventParser,
+  stanza_default as StanzaParser,
+  text_default as TextParser,
+  ugc_default as UGCParser,
+  vtec_default as VtecParser,
+  index_default as default,
+  types_exports as types
 };

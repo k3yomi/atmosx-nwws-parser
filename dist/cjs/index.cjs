@@ -75,13 +75,21 @@ var __async = (__this, __arguments, generator) => {
   });
 };
 
-// src/utils.ts
-var utils_exports = {};
-__export(utils_exports, {
-  Utils: () => Utils,
-  default: () => utils_default
+// src/index.ts
+var index_exports = {};
+__export(index_exports, {
+  AlertManager: () => AlertManager,
+  Database: () => database_default,
+  EAS: () => eas_default,
+  EventParser: () => events_default,
+  StanzaParser: () => stanza_default,
+  TextParser: () => text_default,
+  UGCParser: () => ugc_default,
+  VtecParser: () => vtec_default,
+  default: () => index_default,
+  types: () => types_exports
 });
-module.exports = __toCommonJS(utils_exports);
+module.exports = __toCommonJS(index_exports);
 
 // src/bootstrap.ts
 var fs = __toESM(require("fs"));
@@ -1042,6 +1050,9 @@ var definitions = {
   }
 };
 
+// src/types.ts
+var types_exports = {};
+
 // src/parsers/stanza.ts
 var StanzaParser = class {
   /**
@@ -1788,7 +1799,7 @@ var APIAlerts = class {
               type: ((_fa = feature == null ? void 0 : feature.geometry) == null ? void 0 : _fa.type) || "Polygon",
               coordinates: (_ia = (_ha = (_ga = feature == null ? void 0 : feature.geometry) == null ? void 0 : _ga.coordinates) == null ? void 0 : _ha[0]) == null ? void 0 : _ia.map((coord) => {
                 const [lon, lat] = Array.isArray(coord) ? coord : [0, 0];
-                return [lat, lon];
+                return [lon, lat];
               })
             } : null
           }
@@ -2874,7 +2885,160 @@ var Utils = class {
   }
 };
 var utils_default = Utils;
+
+// src/index.ts
+var AlertManager = class {
+  constructor(metadata) {
+    this.start(metadata);
+  }
+  /**
+   * setDisplayName allows you to set or update the nickname of the client for identification purposes.
+   * This does require you to restart the XMPP client if you are using NoaaWeatherWireService for primary data.
+   * Changing this setting does not affect the username used for authentication.
+   * 
+   * @public
+   * @param {?string} [name] 
+   */
+  setDisplayName(name) {
+    const settings2 = settings;
+    const trimmed = name == null ? void 0 : name.trim();
+    if (!trimmed) {
+      cache.events.emit(`onError`, { code: `error-invalid-nickname`, message: definitions.messages.invalid_nickname });
+      return;
+    }
+    settings2.NoaaWeatherWireService.clientCredentials.nickname = trimmed;
+  }
+  /**
+   * getAllAlertTypes provides a comprehensive list of all possible alert event and action combinations
+   *
+   * @public
+   * @returns {{}} 
+   */
+  getAllAlertTypes() {
+    const events2 = /* @__PURE__ */ new Set();
+    const actions = /* @__PURE__ */ new Set();
+    const combinations = [];
+    Object.values(definitions.events).forEach((event) => events2.add(event));
+    Object.values(definitions.actions).forEach((action) => actions.add(action));
+    Array.from(events2).forEach((event) => {
+      Array.from(actions).forEach((action) => {
+        combinations.push(`${event} ${action}`);
+      });
+    });
+    return combinations;
+  }
+  /**
+   * searchAlertDatbase allows you to search the internal alert database for previously received alerts up to 50,000 records.
+   *
+   * @public
+   * @async
+   * @param {string} query 
+   * @returns {unknown} 
+   */
+  searchStanzaDatabase(query) {
+    return __async(this, null, function* () {
+      return yield cache.db.prepare(`SELECT * FROM stanzas WHERE stanza LIKE ? ORDER BY id DESC LIMIT 250`).all(`%${query}%`);
+    });
+  }
+  /**
+   * setSettings allow you to dynamically update the settings of the AlertManager instance. This doesn't
+   * require a refresh of the instance. However, if you are switching to NWWS->NWS or vice versa,
+   * you will need to call stop() and then start() for changes to take effect.
+   *
+   * @public
+   * @async
+   * @param {types.ClientSettings} settings 
+   * @returns {Promise<void>} 
+   */
+  setSettings(settings2) {
+    return __async(this, null, function* () {
+      utils_default.mergeClientSettings(settings, settings2);
+    });
+  }
+  /**
+   * onEvent allows the client to listen for specific events emitted by the parser.
+   * Events include:
+   * - onAlerts: Emitted when a batch of new alerts have been fully parsed
+   * - onMessage: Emitted when a raw CAP/XML has been parsed by the StanzaParser
+   * - onError: Emitted when an error occurs within the parser
+   * - onConnection: Emitted when the XMPP client connects successfully
+   * - onReconnect: Emitted when the XMPP client is attempting to reconnect
+   * - onOccupant: Emitted when an occupant joins or leaves the XMPP MUC room (NWWS only)
+   * - onAnyEventType (Ex. onTornadoWarning) Emitted when a specific alert event type is received
+   * 
+   * @public
+   * @param {string} event 
+   * @param {(...args: any[]) => void} callback 
+   * @returns {() => void} 
+   */
+  onEvent(event, callback) {
+    cache.events.on(event, callback);
+    return () => cache.events.off(event, callback);
+  }
+  /**
+   * start initializes the AlertManager instance, setting up necessary configurations and connections.
+   * This method must be called before the instance can begin processing alerts.
+   *
+   * @public
+   * @async
+   * @param {Record<string, string>} [metadata={}] 
+   * @returns {Promise<void>} 
+   */
+  start(metadata) {
+    return __async(this, null, function* () {
+      if (!cache.isReady) {
+        console.log(definitions.messages.not_ready);
+        return Promise.resolve();
+      }
+      this.setSettings(metadata);
+      if (settings.catchUnhandledExceptions) {
+        utils_default.detectUncaughtExceptions();
+      }
+      const settings2 = settings;
+      this.isNoaaWeatherWireService = settings.isNWWS;
+      cache.isReady = false;
+      if (this.isNoaaWeatherWireService) {
+        yield database_default.loadDatabase();
+        yield xmpp_default.deploySession();
+        yield utils_default.loadCollectionCache();
+      }
+      utils_default.handleCronJob(this.isNoaaWeatherWireService);
+      packages.cron.schedule(`*/${!this.isNoaaWeatherWireService ? settings2.NationalWeatherService.checkInterval : 5} * * * * *`, () => {
+        utils_default.handleCronJob(this.isNoaaWeatherWireService);
+      });
+    });
+  }
+  /**
+   * stop terminates the AlertManager instance, closing any active connections and cleaning up resources.
+   *
+   * @public
+   * @async
+   * @returns {Promise<void>} 
+   */
+  stop() {
+    return __async(this, null, function* () {
+      cache.isReady = true;
+      packages.cron.getTasks().forEach((task) => task.stop());
+      if (cache.session && this.isNoaaWeatherWireService) {
+        yield cache.session.stop();
+        cache.sigHalt = true;
+        cache.isConnected = false;
+        cache.session = null;
+        this.isNoaaWeatherWireService = false;
+      }
+    });
+  }
+};
+var index_default = AlertManager;
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  Utils
+  AlertManager,
+  Database,
+  EAS,
+  EventParser,
+  StanzaParser,
+  TextParser,
+  UGCParser,
+  VtecParser,
+  types
 });
