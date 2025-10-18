@@ -622,53 +622,51 @@ var CANCEL_SIGNATURES = [
   "has weakened below severe"
 ];
 var MESSAGE_SIGNATURES = [
-  { regex: /\r?\n/g, replacement: " " },
-  { regex: /\s+/g, replacement: " " },
   { regex: /\*/g, replacement: "." },
   { regex: /\bUTC\b/g, replacement: "Coordinated Universal Time" },
   { regex: /\bGMT\b/g, replacement: "Greenwich Mean Time" },
-  { regex: /\bEST\b/g, replacement: "Eastern Standard Time" },
-  { regex: /\bEDT\b/g, replacement: "Eastern Daylight Time" },
-  { regex: /\bCST\b/g, replacement: "Central Standard Time" },
-  { regex: /\bCDT\b/g, replacement: "Central Daylight Time" },
-  { regex: /\bMST\b/g, replacement: "Mountain Standard Time" },
-  { regex: /\bMDT\b/g, replacement: "Mountain Daylight Time" },
-  { regex: /\bPST\b/g, replacement: "Pacific Standard Time" },
-  { regex: /\bPDT\b/g, replacement: "Pacific Daylight Time" },
-  { regex: /\bAKST\b/g, replacement: "Alaska Standard Time" },
-  { regex: /\bAKDT\b/g, replacement: "Alaska Daylight Time" },
-  { regex: /\bHST\b/g, replacement: "Hawaii Standard Time" },
-  { regex: /\bHDT\b/g, replacement: "Hawaii Daylight Time" },
-  { regex: /\bmph\b/g, replacement: "miles per hour" },
-  { regex: /\bkm\/h\b/g, replacement: "kilometers per hour" },
-  { regex: /\bkmh\b/g, replacement: "kilometers per hour" },
-  { regex: /\bkt\b/g, replacement: "knots" },
-  { regex: /\bNE\b/g, replacement: "northeast" },
-  { regex: /\bNW\b/g, replacement: "northwest" },
-  { regex: /\bSE\b/g, replacement: "southeast" },
-  { regex: /\bSW\b/g, replacement: "southwest" },
-  { regex: /\bNM\b/g, replacement: "nautical miles" },
-  { regex: /\bdeg\b/g, replacement: "degrees" },
-  { regex: /\btstm\b/g, replacement: "thunderstorm" },
-  { regex: /\bmm\b/g, replacement: "millimeters" },
-  { regex: /\bcm\b/g, replacement: "centimeters" },
-  { regex: /\bin\b/g, replacement: "inches" },
-  { regex: /\bft\b/g, replacement: "feet" },
-  { regex: /\bmi\b/g, replacement: "miles" },
-  { regex: /\bhr\b/g, replacement: "hour" },
-  { regex: /\bhourly\b/g, replacement: "per hour" },
-  { regex: /\bkg\b/g, replacement: "kilograms" },
-  { regex: /\bg\/kg\b/g, replacement: "grams per kilogram" },
-  { regex: /\bmb\b/g, replacement: "millibars" },
-  { regex: /\bhPa\b/g, replacement: "hectopascals" },
-  { regex: /\bPa\b/g, replacement: "pascals" },
-  { regex: /\bKPa\b/g, replacement: "kilopascals" },
-  { regex: /\bC\/hr\b/g, replacement: "degrees Celsius per hour" },
-  { regex: /\bF\/hr\b/g, replacement: "degrees Fahrenheit per hour" },
-  { regex: /\bC\/min\b/g, replacement: "degrees Celsius per minute" },
-  { regex: /\bF\/min\b/g, replacement: "degrees Fahrenheit per minute" },
-  { regex: /\bC\b/g, replacement: "degrees Celsius" },
-  { regex: /\bF\b/g, replacement: "degrees Fahrenheit" }
+  { regex: /\bEST\b(?!\w)/g, replacement: "Eastern Standard Time" },
+  { regex: /\bEDT\b(?!\w)/g, replacement: "Eastern Daylight Time" },
+  { regex: /\bCST\b(?!\w)/g, replacement: "Central Standard Time" },
+  { regex: /\bCDT\b(?!\w)/g, replacement: "Central Daylight Time" },
+  { regex: /\bMST\b(?!\w)/g, replacement: "Mountain Standard Time" },
+  { regex: /\bMDT\b(?!\w)/g, replacement: "Mountain Daylight Time" },
+  { regex: /\bPST\b(?!\w)/g, replacement: "Pacific Standard Time" },
+  { regex: /\bPDT\b(?!\w)/g, replacement: "Pacific Daylight Time" },
+  { regex: /\bAKST\b(?!\w)/g, replacement: "Alaska Standard Time" },
+  { regex: /\bAKDT\b(?!\w)/g, replacement: "Alaska Daylight Time" },
+  { regex: /\bHST\b(?!\w)/g, replacement: "Hawaii Standard Time" },
+  { regex: /\bHDT\b(?!\w)/g, replacement: "Hawaii Daylight Time" },
+  { regex: /\bmph\b(?!\w)/g, replacement: "miles per hour" },
+  { regex: /\bkm\/h\b(?!\w)/g, replacement: "kilometers per hour" },
+  { regex: /\bkmh\b(?!\w)/g, replacement: "kilometers per hour" },
+  { regex: /\bkt\b(?!\w)/g, replacement: "knots" },
+  { regex: /\bNE\b(?!\w)/g, replacement: "northeast" },
+  { regex: /\bNW\b(?!\w)/g, replacement: "northwest" },
+  { regex: /\bSE\b(?!\w)/g, replacement: "southeast" },
+  { regex: /\bSW\b(?!\w)/g, replacement: "southwest" },
+  { regex: /\bNM\b(?!\w)/g, replacement: "nautical miles" },
+  { regex: /\bdeg\b(?!\w)/g, replacement: "degrees" },
+  { regex: /\btstm\b(?!\w)/g, replacement: "thunderstorm" },
+  { regex: /\bmm\b(?!\w)/g, replacement: "millimeters" },
+  { regex: /\bcm\b(?!\w)/g, replacement: "centimeters" },
+  { regex: /\bin.\b(?!\w)/g, replacement: "inches" },
+  { regex: /\bft\b(?!\w)/g, replacement: "feet" },
+  { regex: /\bmi\b(?!\w)/g, replacement: "miles" },
+  { regex: /\bhr\b(?!\w)/g, replacement: "hour" },
+  { regex: /\bhourly\b(?!\w)/g, replacement: "per hour" },
+  { regex: /\bkg\b(?!\w)/g, replacement: "kilograms" },
+  { regex: /\bg\/kg\b(?!\w)/g, replacement: "grams per kilogram" },
+  { regex: /\bmb\b(?!\w)/g, replacement: "millibars" },
+  { regex: /\bhPa\b(?!\w)/g, replacement: "hectopascals" },
+  { regex: /\bPa\b(?!\w)/g, replacement: "pascals" },
+  { regex: /\bKPa\b(?!\w)/g, replacement: "kilopascals" },
+  { regex: /\bC\/hr\b(?!\w)/g, replacement: "degrees Celsius per hour" },
+  { regex: /\bF\/hr\b(?!\w)/g, replacement: "degrees Fahrenheit per hour" },
+  { regex: /\bC\/min\b(?!\w)/g, replacement: "degrees Celsius per minute" },
+  { regex: /\bF\/min\b(?!\w)/g, replacement: "degrees Fahrenheit per minute" },
+  { regex: /\bC\b(?!\w)/g, replacement: "degrees Celsius" },
+  { regex: /\bF\b(?!\w)/g, replacement: "degrees Fahrenheit" }
 ];
 
 // src/dictionaries/icao.ts
@@ -980,6 +978,7 @@ var settings = {
       ugcFilter: [],
       stateFilter: [],
       checkExpired: true,
+      ignoreTestProducts: true,
       locationFiltering: {
         maxDistance: 100,
         unit: `miles`,
@@ -987,7 +986,6 @@ var settings = {
       }
     },
     easSettings: {
-      easAlerts: [],
       easDirectory: null,
       easIntroWav: null
     }
@@ -1246,7 +1244,7 @@ var TextParser = class {
         message = latEnd !== -1 ? afterHandle.substring(0, latEnd).trim() : afterHandle.trim();
       }
     }
-    return message.replace(/\s+/g, " ").trim().startsWith("ISSUED TIME...") ? original : message.trim();
+    return message.replace(/\s+/g, " ").trim().startsWith("STANZA ATTRIBUTES...") ? original : message.split("STANZA ATTRIBUTES...")[0].trim();
   }
   /**
    * awipTextToEvent converts an AWIPS ID prefix from a text-based weather product message to its corresponding event type and prefix.
@@ -1889,423 +1887,6 @@ var APIAlerts = class {
 };
 var api_default = APIAlerts;
 
-// src/eas.ts
-var EAS = class {
-  /**
-   * generateEASAudio creates an EAS-compliant audio file in WAV format containing the provided message and VTEC header.
-   *
-   * @public
-   * @static
-   * @param {string} message 
-   * @param {string} vtec 
-   * @returns {*} 
-   */
-  static generateEASAudio(message, vtec) {
-    return new Promise((resolve) => __async(this, null, function* () {
-      const settings2 = settings;
-      for (const { regex, replacement } of definitions.messageSignatures) {
-        message = message.replace(regex, replacement);
-      }
-      const assetsDir = settings2.global.easSettings.easDirectory;
-      if (!assetsDir) {
-        console.warn(definitions.messages.eas_no_directory);
-        return resolve(null);
-      }
-      const rngFile = `${vtec.replace(/[^a-zA-Z0-9]/g, `_`)}`.substring(0, 32).replace(/^_+|_+$/g, "");
-      if (!packages.fs.existsSync(assetsDir)) {
-        packages.fs.mkdirSync(assetsDir);
-      }
-      const tmpTTS = packages.path.join(assetsDir, `/tmp/${rngFile}.wav`);
-      const outTTS = packages.path.join(assetsDir, `/output/${rngFile}.wav`);
-      const voice = process.platform === "win32" ? "Microsoft David Desktop" : "en-US-GuyNeural";
-      if (!packages.fs.existsSync(packages.path.join(assetsDir, `/tmp`))) {
-        packages.fs.mkdirSync(packages.path.join(assetsDir, `/tmp`), { recursive: true });
-      }
-      if (!packages.fs.existsSync(packages.path.join(assetsDir, `/output`))) {
-        packages.fs.mkdirSync(packages.path.join(assetsDir, `/output`), { recursive: true });
-      }
-      packages.say.export(message, voice, 1, tmpTTS);
-      yield utils_default.sleep(2500);
-      let ttsBuffer = null;
-      while (!packages.fs.existsSync(tmpTTS) || (ttsBuffer = packages.fs.readFileSync(tmpTTS)).length === 0) {
-        yield utils_default.sleep(500);
-      }
-      const ttsWav = this.parseWavPCM16(ttsBuffer);
-      const ttsSamples = this.resamplePCM16(ttsWav.samples, ttsWav.sampleRate, 8e3);
-      const ttsRadio = this.applyNWREffect(ttsSamples, 8e3);
-      let toneRadio = null;
-      if (packages.fs.existsSync(settings2.global.easSettings.easIntroWav)) {
-        const toneBuffer = packages.fs.readFileSync(settings2.global.easSettings.easIntroWav);
-        const toneWav = this.parseWavPCM16(toneBuffer);
-        if (toneWav == null) {
-          console.log(`[EAS] Intro tone WAV file is not valid PCM 16-bit format.`);
-          return resolve(null);
-        }
-        const toneSamples = toneWav.sampleRate !== 8e3 ? this.resamplePCM16(toneWav.samples, toneWav.sampleRate, 8e3) : toneWav.samples;
-        toneRadio = this.applyNWREffect(toneSamples, 8e3);
-      }
-      let build = toneRadio != null ? [toneRadio, this.generateSilence(0.5, 8e3)] : [];
-      build.push(this.generateSAMEHeader(vtec, 3, 8e3, { preMarkSec: 1.1, gapSec: 0.5 }), this.generateSilence(0.5, 8e3), this.generateAttentionTone(8, 8e3), this.generateSilence(0.5, 8e3), ttsRadio);
-      for (let i = 0; i < 3; i++) {
-        build.push(this.generateSAMEHeader(vtec, 1, 8e3, { preMarkSec: 0.5, gapSec: 0.1 }));
-        build.push(this.generateSilence(0.5, 8e3));
-      }
-      const allSamples = this.concatPCM16(build);
-      const finalSamples = this.addNoise(allSamples, 2e-3);
-      const outBuffer = this.encodeWavPCM16(Array.from(finalSamples).map((v) => ({ value: v })), 8e3);
-      packages.fs.writeFileSync(outTTS, outBuffer);
-      try {
-        packages.fs.unlinkSync(tmpTTS);
-      } catch (error) {
-        if (error.code !== "EBUSY") {
-          throw error;
-        }
-      }
-      return Promise.resolve(outTTS);
-    }));
-  }
-  /**
-   * encodeWavPCM16 encodes an array of samples into a WAV PCM 16-bit Buffer.
-   *
-   * @private
-   * @static
-   * @param {Record<string, number>[]} samples 
-   * @param {number} [sampleRate=8000] 
-   * @returns {Buffer} 
-   */
-  static encodeWavPCM16(samples, sampleRate = 8e3) {
-    const bytesPerSample = 2;
-    const blockAlign = 1 * bytesPerSample;
-    const byteRate = sampleRate * blockAlign;
-    const subchunk2Size = samples.length * bytesPerSample;
-    const chunkSize = 36 + subchunk2Size;
-    const buffer = Buffer.alloc(44 + subchunk2Size);
-    let o = 0;
-    buffer.write("RIFF", o);
-    o += 4;
-    buffer.writeUInt32LE(chunkSize, o);
-    o += 4;
-    buffer.write("WAVE", o);
-    o += 4;
-    buffer.write("fmt ", o);
-    o += 4;
-    buffer.writeUInt32LE(16, o);
-    o += 4;
-    buffer.writeUInt16LE(1, o);
-    o += 2;
-    buffer.writeUInt16LE(1, o);
-    o += 2;
-    buffer.writeUInt32LE(sampleRate, o);
-    o += 4;
-    buffer.writeUInt32LE(byteRate, o);
-    o += 4;
-    buffer.writeUInt16LE(blockAlign, o);
-    o += 2;
-    buffer.writeUInt16LE(16, o);
-    o += 2;
-    buffer.write("data", o);
-    o += 4;
-    buffer.writeUInt32LE(subchunk2Size, o);
-    o += 4;
-    for (let i = 0; i < samples.length; i++, o += 2) {
-      buffer.writeInt16LE(samples[i].value, o);
-    }
-    return buffer;
-  }
-  /**
-   * parseWavPCM16 decodes a WAV PCM 16-bit Buffer into its sample data and format information.
-   *
-   * @private
-   * @static
-   * @param {Buffer} buffer 
-   * @returns {{ samples: any; sampleRate: any; channels: any; bitsPerSample: any; }} 
-   */
-  static parseWavPCM16(buffer) {
-    if (buffer.toString("ascii", 0, 4) !== "RIFF" || buffer.toString("ascii", 8, 12) !== "WAVE") {
-      return null;
-    }
-    let fmt = null;
-    let data = null;
-    let i = 12;
-    while (i + 8 <= buffer.length) {
-      const id = buffer.toString("ascii", i, i + 4);
-      const size = buffer.readUInt32LE(i + 4);
-      const start = i + 8;
-      const end = start + size;
-      if (id === "fmt ") fmt = buffer.slice(start, end);
-      if (id === "data") data = buffer.slice(start, end);
-      i = end + size % 2;
-    }
-    if (!fmt || !data) return null;
-    const audioFormat = fmt.readUInt16LE(0);
-    const channels = fmt.readUInt16LE(2);
-    const sampleRate = fmt.readUInt32LE(4);
-    const bitsPerSample = fmt.readUInt16LE(14);
-    if (audioFormat !== 1 || bitsPerSample !== 16 || channels !== 1) {
-      return null;
-    }
-    const samples = new Int16Array(data.buffer, data.byteOffset, data.length / 2);
-    return { samples: new Int16Array(samples), sampleRate, channels, bitsPerSample };
-  }
-  /**
-   * concatPCM16 concatenates multiple Int16Array buffers into a single Int16Array buffer.
-   *
-   * @private
-   * @static
-   * @param {Int16Array[]} arrays 
-   * @returns {*} 
-   */
-  static concatPCM16(arrays) {
-    let total = 0;
-    for (const a of arrays) total += a.length;
-    const out = new Int16Array(total);
-    let o = 0;
-    for (const a of arrays) {
-      out.set(a, o);
-      o += a.length;
-    }
-    return out;
-  }
-  /**
-   * pcm16toFloat converts an Int16Array of PCM 16-bit samples to a Float32Array of normalized float samples.
-   *
-   * @private
-   * @static
-   * @param {Int16Array} int16 
-   * @returns {*} 
-   */
-  static pcm16toFloat(int16) {
-    const out = new Float32Array(int16.length);
-    for (let i = 0; i < int16.length; i++) out[i] = int16[i] / 32768;
-    return out;
-  }
-  /**
-   * floatToPcm16 converts a Float32Array of normalized float samples to an Int16Array of PCM 16-bit samples.
-   *
-   * @private
-   * @static
-   * @param {Float32Array} float32 
-   * @returns {*} 
-   */
-  static floatToPcm16(float32) {
-    const out = new Int16Array(float32.length);
-    for (let i = 0; i < float32.length; i++) {
-      let v = Math.max(-1, Math.min(1, float32[i]));
-      out[i] = Math.round(v * 32767);
-    }
-    return out;
-  }
-  /**
-   * resamplePCM16 resamples an Int16Array of PCM 16-bit samples from the original sample rate to the target sample rate using linear interpolation.
-   *
-   * @private
-   * @static
-   * @param {Int16Array} int16 
-   * @param {number} originalRate 
-   * @param {number} targetRate 
-   * @returns {*} 
-   */
-  static resamplePCM16(int16, originalRate, targetRate) {
-    if (originalRate === targetRate) return int16;
-    const ratio = targetRate / originalRate;
-    const outLen = Math.max(1, Math.round(int16.length * ratio));
-    const out = new Int16Array(outLen);
-    for (let i = 0; i < outLen; i++) {
-      const pos = i / ratio;
-      const i0 = Math.floor(pos);
-      const i1 = Math.min(i0 + 1, int16.length - 1);
-      const frac = pos - i0;
-      const v = int16[i0] * (1 - frac) + int16[i1] * frac;
-      out[i] = Math.round(v);
-    }
-    return out;
-  }
-  /**
-   * generateSilence creates an Int16Array of PCM 16-bit samples representing silence for the specified duration in milliseconds.
-   *
-   * @private
-   * @static
-   * @param {number} ms 
-   * @param {number} [sampleRate=8000] 
-   * @returns {*} 
-   */
-  static generateSilence(ms, sampleRate = 8e3) {
-    return new Int16Array(Math.floor(ms * sampleRate));
-  }
-  /**
-   * generateAttentionTone creates an Int16Array of PCM 16-bit samples representing the EAS attention tone for the specified duration in milliseconds.
-   *
-   * @private
-   * @static
-   * @param {*} ms 
-   * @param {number} [sampleRate=8000] 
-   * @returns {*} 
-   */
-  static generateAttentionTone(ms, sampleRate = 8e3) {
-    const len = Math.floor(ms * sampleRate);
-    const out = new Int16Array(len);
-    const f1 = 853;
-    const f2 = 960;
-    const twoPi = Math.PI * 2;
-    const amp = 0.1;
-    const fadeLen = Math.floor(sampleRate * 0);
-    for (let i = 0; i < len; i++) {
-      const t = i / sampleRate;
-      const s = Math.sin(twoPi * f1 * t) + Math.sin(twoPi * f2 * t);
-      let gain = 1;
-      if (i < fadeLen) gain = i / fadeLen;
-      else if (i > len - fadeLen) gain = (len - i) / fadeLen;
-      const v = Math.max(-1, Math.min(1, s / 2 * amp * gain));
-      out[i] = Math.round(v * 32767);
-    }
-    return out;
-  }
-  /**
-   * applyNWREffect applies a series of audio processing effects to simulate the sound characteristics of NOAA Weather Radio broadcasts.
-   *
-   * @private
-   * @static
-   * @param {Int16Array} int16 
-   * @param {number} [sampleRate=8000] 
-   * @returns {*} 
-   */
-  static applyNWREffect(int16, sampleRate = 8e3) {
-    const hpCut = 3555;
-    const lpCut = 1600;
-    const noiseLevel = 0;
-    const crushBits = 8;
-    const x = this.pcm16toFloat(int16);
-    const dt = 1 / sampleRate;
-    const rcHP = 1 / (2 * Math.PI * hpCut);
-    const aHP = rcHP / (rcHP + dt);
-    let yHP = 0, xPrev = 0;
-    for (let i = 0; i < x.length; i++) {
-      const xi = x[i];
-      yHP = aHP * (yHP + xi - xPrev);
-      xPrev = xi;
-      x[i] = yHP;
-    }
-    const rcLP = 1 / (2 * Math.PI * lpCut);
-    const aLP = dt / (rcLP + dt);
-    let yLP = 0;
-    for (let i = 0; i < x.length; i++) {
-      yLP = yLP + aLP * (x[i] - yLP);
-      x[i] = yLP;
-    }
-    const compGain = 2;
-    const norm = Math.tanh(compGain);
-    for (let i = 0; i < x.length; i++) x[i] = Math.tanh(x[i] * compGain) / norm;
-    const levels = Math.pow(2, crushBits) - 1;
-    return this.floatToPcm16(x);
-  }
-  /**
-   * addNoise adds low-level white noise to an Int16Array of PCM 16-bit samples to simulate analog broadcast imperfections.
-   *
-   * @private
-   * @static
-   * @param {Int16Array} int16 
-   * @param {number} [noiseLevel=0.02] 
-   * @returns {*} 
-   */
-  static addNoise(int16, noiseLevel = 0.02) {
-    const x = this.pcm16toFloat(int16);
-    for (let i = 0; i < x.length; i++) x[i] += (Math.random() * 2 - 1) * noiseLevel;
-    let peak = 0;
-    for (let i = 0; i < x.length; i++) peak = Math.max(peak, Math.abs(x[i]));
-    if (peak > 1) for (let i = 0; i < x.length; i++) x[i] *= 0.98 / peak;
-    return this.floatToPcm16(x);
-  }
-  /**
-   * asciiTo8N1Bits converts an ASCII string to a sequence of bits using 8-N-1 encoding (8 data bits, no parity, 1 stop bit).
-   *
-   * @private
-   * @static
-   * @param {string} str 
-   * @returns {{}} 
-   */
-  static asciiTo8N1Bits(str) {
-    const bits = [];
-    for (let i = 0; i < str.length; i++) {
-      const c = str.charCodeAt(i) & 255;
-      bits.push(0);
-      for (let b = 0; b < 8; b++) bits.push(c >> b & 1);
-      bits.push(1, 1);
-    }
-    return bits;
-  }
-  /**
-   * generateAFSK generates an Int16Array of PCM 16-bit samples representing AFSK modulation of the provided bit sequence.
-   *
-   * @private
-   * @static
-   * @param {number[]} bits 
-   * @param {number} [sampleRate=8000] 
-   * @returns {*} 
-   */
-  static generateAFSK(bits, sampleRate = 8e3) {
-    const baud = 520.83;
-    const markFreq = 2083.3;
-    const spaceFreq = 1562.5;
-    const amplitude = 0.6;
-    const twoPi = Math.PI * 2;
-    const result = [];
-    let phase = 0;
-    let frac = 0;
-    for (let b = 0; b < bits.length; b++) {
-      const bit = bits[b];
-      const freq = bit ? markFreq : spaceFreq;
-      const samplesPerBit = sampleRate / baud + frac;
-      const n = Math.round(samplesPerBit);
-      frac = samplesPerBit - n;
-      const inc = twoPi * freq / sampleRate;
-      for (let i = 0; i < n; i++) {
-        result.push(Math.round(Math.sin(phase) * amplitude * 32767));
-        phase += inc;
-        if (phase > twoPi) phase -= twoPi;
-      }
-    }
-    const fadeSamples = Math.floor(sampleRate * 2e-3);
-    for (let i = 0; i < fadeSamples; i++) {
-      const gain = i / fadeSamples;
-      result[i] = Math.round(result[i] * gain);
-      result[result.length - 1 - i] = Math.round(result[result.length - 1 - i] * gain);
-    }
-    return Int16Array.from(result);
-  }
-  /**
-   * generateSAMEHeader generates an Int16Array of PCM 16-bit samples representing the SAME header repeated the specified number of times.
-   *
-   * @private
-   * @static
-   * @param {string} vtec 
-   * @param {number} repeats 
-   * @param {number} [sampleRate=8000] 
-   * @param {{preMarkSec?: number, gapSec?: number}} [options={}] 
-   * @returns {*} 
-   */
-  static generateSAMEHeader(vtec, repeats, sampleRate = 8e3, options = {}) {
-    var _a, _b;
-    const preMarkSec = (_a = options.preMarkSec) != null ? _a : 0.3;
-    const gapSec = (_b = options.gapSec) != null ? _b : 0.1;
-    const bursts = [];
-    const gap = this.generateSilence(gapSec, sampleRate);
-    for (let i = 0; i < repeats; i++) {
-      const bodyBits = this.asciiTo8N1Bits(vtec);
-      const body = this.generateAFSK(bodyBits, sampleRate);
-      const extendedBodyDuration = Math.round(preMarkSec * sampleRate);
-      const extendedBody = new Int16Array(extendedBodyDuration + gap.length);
-      for (let j = 0; j < extendedBodyDuration; j++) {
-        extendedBody[j] = Math.round(body[j % body.length] * 0.2);
-      }
-      extendedBody.set(gap, extendedBodyDuration);
-      bursts.push(extendedBody);
-      if (i !== repeats - 1) bursts.push(gap);
-    }
-    return this.concatPCM16(bursts);
-  }
-};
-var eas_default = EAS;
-
 // src/parsers/events.ts
 var EventParser = class {
   /**
@@ -2442,7 +2023,7 @@ var EventParser = class {
     }
     const filtered = events2.filter((alert) => {
       var _a2, _b2, _d2;
-      const originalEvent = this.buildDefaultSignature(alert, bools == null ? void 0 : bools.checkExpired);
+      const originalEvent = this.buildDefaultSignature(alert);
       const props = originalEvent == null ? void 0 : originalEvent.properties;
       const ugcs = (_b2 = (_a2 = props == null ? void 0 : props.geocode) == null ? void 0 : _a2.UGC) != null ? _b2 : [];
       const _c2 = originalEvent, { performance: performance2, header } = _c2, eventWithoutPerformance = __objRest(_c2, ["performance", "header"]);
@@ -2453,6 +2034,7 @@ var EventParser = class {
       if (!((_d2 = originalEvent.properties.distance) == null ? void 0 : _d2.in_range)) {
         return false;
       }
+      if (originalEvent.properties.is_test == true && (bools == null ? void 0 : bools.ignoreTestProducts)) return false;
       if ((bools == null ? void 0 : bools.checkExpired) && originalEvent.properties.is_cancelled == true) return false;
       for (const key in sets) {
         const setting = sets[key];
@@ -2462,9 +2044,6 @@ var EventParser = class {
         if (key === "ignoredICOAs" && setting.size > 0 && props.sender_icao != null && setting.has(props.sender_icao.toLowerCase())) return false;
         if (key === "ugcFilter" && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc) => setting.has(ugc.toLowerCase()))) return false;
         if (key === "stateFilter" && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc) => setting.has(ugc.substring(0, 2).toLowerCase()))) return false;
-        if (key === "easAlerts" && setting.size > 0 && setting.has(originalEvent.properties.event.toLowerCase()) && settings2.isNWWS) {
-          eas_default.generateEASAudio(props.description, alert.header);
-        }
       }
       cache.events.emit(`on${originalEvent.properties.parent.replace(/\s+/g, "")}`);
       return true;
@@ -2596,10 +2175,9 @@ var EventParser = class {
    * @private
    * @static
    * @param {*} event The event object to process.
-   * @param {boolean} checkExpiry Whether to check if the event has expired.
    * @returns {*} The processed event with updated properties.
    */
-  static buildDefaultSignature(event, checkExpiry) {
+  static buildDefaultSignature(event) {
     var _a;
     const statusCorrelation = definitions.correlations.find((c) => c.type === event.properties.action_type);
     const defEventTags = definitions.tags;
@@ -2625,7 +2203,7 @@ var EventParser = class {
         event.properties.is_test = true;
       }
     }
-    if (checkExpiry && new Date((_a = event.properties) == null ? void 0 : _a.expires).getTime() < (/* @__PURE__ */ new Date()).getTime()) {
+    if (new Date((_a = event.properties) == null ? void 0 : _a.expires).getTime() < (/* @__PURE__ */ new Date()).getTime()) {
       event.properties.is_cancelled = true;
       event.properties.action_type = "Cancel";
     }
@@ -3053,6 +2631,423 @@ var Utils = class {
 };
 var utils_default = Utils;
 
+// src/eas.ts
+var EAS = class {
+  /**
+   * generateEASAudio creates an EAS-compliant audio file in WAV format containing the provided message and VTEC header.
+   *
+   * @public
+   * @static
+   * @param {string} message 
+   * @param {string} vtec 
+   * @returns {*} 
+   */
+  static generateEASAudio(message, vtec) {
+    return new Promise((resolve) => __async(this, null, function* () {
+      const settings2 = settings;
+      for (const { regex, replacement } of definitions.messageSignatures) {
+        message = message.replace(regex, replacement);
+      }
+      const assetsDir = settings2.global.easSettings.easDirectory;
+      if (!assetsDir) {
+        console.warn(definitions.messages.eas_no_directory);
+        return resolve(null);
+      }
+      const rngFile = `${vtec.replace(/[^a-zA-Z0-9]/g, `_`)}`.substring(0, 32).replace(/^_+|_+$/g, "");
+      if (!packages.fs.existsSync(assetsDir)) {
+        packages.fs.mkdirSync(assetsDir);
+      }
+      const tmpTTS = packages.path.join(assetsDir, `/tmp/${rngFile}.wav`);
+      const outTTS = packages.path.join(assetsDir, `/output/${rngFile}.wav`);
+      const voice = process.platform === "win32" ? "Microsoft David Desktop" : "en-US-GuyNeural";
+      if (!packages.fs.existsSync(packages.path.join(assetsDir, `/tmp`))) {
+        packages.fs.mkdirSync(packages.path.join(assetsDir, `/tmp`), { recursive: true });
+      }
+      if (!packages.fs.existsSync(packages.path.join(assetsDir, `/output`))) {
+        packages.fs.mkdirSync(packages.path.join(assetsDir, `/output`), { recursive: true });
+      }
+      packages.say.export(message, voice, 1, tmpTTS);
+      yield utils_default.sleep(2500);
+      let ttsBuffer = null;
+      while (!packages.fs.existsSync(tmpTTS) || (ttsBuffer = packages.fs.readFileSync(tmpTTS)).length === 0) {
+        yield utils_default.sleep(500);
+      }
+      const ttsWav = this.parseWavPCM16(ttsBuffer);
+      const ttsSamples = this.resamplePCM16(ttsWav.samples, ttsWav.sampleRate, 8e3);
+      const ttsRadio = this.applyNWREffect(ttsSamples, 8e3);
+      let toneRadio = null;
+      if (packages.fs.existsSync(settings2.global.easSettings.easIntroWav)) {
+        const toneBuffer = packages.fs.readFileSync(settings2.global.easSettings.easIntroWav);
+        const toneWav = this.parseWavPCM16(toneBuffer);
+        if (toneWav == null) {
+          console.log(`[EAS] Intro tone WAV file is not valid PCM 16-bit format.`);
+          return resolve(null);
+        }
+        const toneSamples = toneWav.sampleRate !== 8e3 ? this.resamplePCM16(toneWav.samples, toneWav.sampleRate, 8e3) : toneWav.samples;
+        toneRadio = this.applyNWREffect(toneSamples, 8e3);
+      }
+      let build = toneRadio != null ? [toneRadio, this.generateSilence(0.5, 8e3)] : [];
+      build.push(this.generateSAMEHeader(vtec, 3, 8e3, { preMarkSec: 1.1, gapSec: 0.5 }), this.generateSilence(0.5, 8e3), this.generateAttentionTone(8, 8e3), this.generateSilence(0.5, 8e3), ttsRadio);
+      for (let i = 0; i < 3; i++) {
+        build.push(this.generateSAMEHeader(vtec, 1, 8e3, { preMarkSec: 0.5, gapSec: 0.1 }));
+        build.push(this.generateSilence(0.5, 8e3));
+      }
+      const allSamples = this.concatPCM16(build);
+      const finalSamples = this.addNoise(allSamples, 2e-3);
+      const outBuffer = this.encodeWavPCM16(Array.from(finalSamples).map((v) => ({ value: v })), 8e3);
+      packages.fs.writeFileSync(outTTS, outBuffer);
+      try {
+        packages.fs.unlinkSync(tmpTTS);
+      } catch (error) {
+        if (error.code !== "EBUSY") {
+          throw error;
+        }
+      }
+      return resolve(outTTS);
+    }));
+  }
+  /**
+   * encodeWavPCM16 encodes an array of samples into a WAV PCM 16-bit Buffer.
+   *
+   * @private
+   * @static
+   * @param {Record<string, number>[]} samples 
+   * @param {number} [sampleRate=8000] 
+   * @returns {Buffer} 
+   */
+  static encodeWavPCM16(samples, sampleRate = 8e3) {
+    const bytesPerSample = 2;
+    const blockAlign = 1 * bytesPerSample;
+    const byteRate = sampleRate * blockAlign;
+    const subchunk2Size = samples.length * bytesPerSample;
+    const chunkSize = 36 + subchunk2Size;
+    const buffer = Buffer.alloc(44 + subchunk2Size);
+    let o = 0;
+    buffer.write("RIFF", o);
+    o += 4;
+    buffer.writeUInt32LE(chunkSize, o);
+    o += 4;
+    buffer.write("WAVE", o);
+    o += 4;
+    buffer.write("fmt ", o);
+    o += 4;
+    buffer.writeUInt32LE(16, o);
+    o += 4;
+    buffer.writeUInt16LE(1, o);
+    o += 2;
+    buffer.writeUInt16LE(1, o);
+    o += 2;
+    buffer.writeUInt32LE(sampleRate, o);
+    o += 4;
+    buffer.writeUInt32LE(byteRate, o);
+    o += 4;
+    buffer.writeUInt16LE(blockAlign, o);
+    o += 2;
+    buffer.writeUInt16LE(16, o);
+    o += 2;
+    buffer.write("data", o);
+    o += 4;
+    buffer.writeUInt32LE(subchunk2Size, o);
+    o += 4;
+    for (let i = 0; i < samples.length; i++, o += 2) {
+      buffer.writeInt16LE(samples[i].value, o);
+    }
+    return buffer;
+  }
+  /**
+   * parseWavPCM16 decodes a WAV PCM 16-bit Buffer into its sample data and format information.
+   *
+   * @private
+   * @static
+   * @param {Buffer} buffer 
+   * @returns {{ samples: any; sampleRate: any; channels: any; bitsPerSample: any; }} 
+   */
+  static parseWavPCM16(buffer) {
+    if (buffer.toString("ascii", 0, 4) !== "RIFF" || buffer.toString("ascii", 8, 12) !== "WAVE") {
+      return null;
+    }
+    let fmt = null;
+    let data = null;
+    let i = 12;
+    while (i + 8 <= buffer.length) {
+      const id = buffer.toString("ascii", i, i + 4);
+      const size = buffer.readUInt32LE(i + 4);
+      const start = i + 8;
+      const end = start + size;
+      if (id === "fmt ") fmt = buffer.slice(start, end);
+      if (id === "data") data = buffer.slice(start, end);
+      i = end + size % 2;
+    }
+    if (!fmt || !data) return null;
+    const audioFormat = fmt.readUInt16LE(0);
+    const channels = fmt.readUInt16LE(2);
+    const sampleRate = fmt.readUInt32LE(4);
+    const bitsPerSample = fmt.readUInt16LE(14);
+    if (audioFormat !== 1 || bitsPerSample !== 16 || channels !== 1) {
+      return null;
+    }
+    const samples = new Int16Array(data.buffer, data.byteOffset, data.length / 2);
+    return { samples: new Int16Array(samples), sampleRate, channels, bitsPerSample };
+  }
+  /**
+   * concatPCM16 concatenates multiple Int16Array buffers into a single Int16Array buffer.
+   *
+   * @private
+   * @static
+   * @param {Int16Array[]} arrays 
+   * @returns {*} 
+   */
+  static concatPCM16(arrays) {
+    let total = 0;
+    for (const a of arrays) total += a.length;
+    const out = new Int16Array(total);
+    let o = 0;
+    for (const a of arrays) {
+      out.set(a, o);
+      o += a.length;
+    }
+    return out;
+  }
+  /**
+   * pcm16toFloat converts an Int16Array of PCM 16-bit samples to a Float32Array of normalized float samples.
+   *
+   * @private
+   * @static
+   * @param {Int16Array} int16 
+   * @returns {*} 
+   */
+  static pcm16toFloat(int16) {
+    const out = new Float32Array(int16.length);
+    for (let i = 0; i < int16.length; i++) out[i] = int16[i] / 32768;
+    return out;
+  }
+  /**
+   * floatToPcm16 converts a Float32Array of normalized float samples to an Int16Array of PCM 16-bit samples.
+   *
+   * @private
+   * @static
+   * @param {Float32Array} float32 
+   * @returns {*} 
+   */
+  static floatToPcm16(float32) {
+    const out = new Int16Array(float32.length);
+    for (let i = 0; i < float32.length; i++) {
+      let v = Math.max(-1, Math.min(1, float32[i]));
+      out[i] = Math.round(v * 32767);
+    }
+    return out;
+  }
+  /**
+   * resamplePCM16 resamples an Int16Array of PCM 16-bit samples from the original sample rate to the target sample rate using linear interpolation.
+   *
+   * @private
+   * @static
+   * @param {Int16Array} int16 
+   * @param {number} originalRate 
+   * @param {number} targetRate 
+   * @returns {*} 
+   */
+  static resamplePCM16(int16, originalRate, targetRate) {
+    if (originalRate === targetRate) return int16;
+    const ratio = targetRate / originalRate;
+    const outLen = Math.max(1, Math.round(int16.length * ratio));
+    const out = new Int16Array(outLen);
+    for (let i = 0; i < outLen; i++) {
+      const pos = i / ratio;
+      const i0 = Math.floor(pos);
+      const i1 = Math.min(i0 + 1, int16.length - 1);
+      const frac = pos - i0;
+      const v = int16[i0] * (1 - frac) + int16[i1] * frac;
+      out[i] = Math.round(v);
+    }
+    return out;
+  }
+  /**
+   * generateSilence creates an Int16Array of PCM 16-bit samples representing silence for the specified duration in milliseconds.
+   *
+   * @private
+   * @static
+   * @param {number} ms 
+   * @param {number} [sampleRate=8000] 
+   * @returns {*} 
+   */
+  static generateSilence(ms, sampleRate = 8e3) {
+    return new Int16Array(Math.floor(ms * sampleRate));
+  }
+  /**
+   * generateAttentionTone creates an Int16Array of PCM 16-bit samples representing the EAS attention tone for the specified duration in milliseconds.
+   *
+   * @private
+   * @static
+   * @param {*} ms 
+   * @param {number} [sampleRate=8000] 
+   * @returns {*} 
+   */
+  static generateAttentionTone(ms, sampleRate = 8e3) {
+    const len = Math.floor(ms * sampleRate);
+    const out = new Int16Array(len);
+    const f1 = 853;
+    const f2 = 960;
+    const twoPi = Math.PI * 2;
+    const amp = 0.1;
+    const fadeLen = Math.floor(sampleRate * 0);
+    for (let i = 0; i < len; i++) {
+      const t = i / sampleRate;
+      const s = Math.sin(twoPi * f1 * t) + Math.sin(twoPi * f2 * t);
+      let gain = 1;
+      if (i < fadeLen) gain = i / fadeLen;
+      else if (i > len - fadeLen) gain = (len - i) / fadeLen;
+      const v = Math.max(-1, Math.min(1, s / 2 * amp * gain));
+      out[i] = Math.round(v * 32767);
+    }
+    return out;
+  }
+  /**
+   * applyNWREffect applies a series of audio processing effects to simulate the sound characteristics of NOAA Weather Radio broadcasts.
+   *
+   * @private
+   * @static
+   * @param {Int16Array} int16 
+   * @param {number} [sampleRate=8000] 
+   * @returns {*} 
+   */
+  static applyNWREffect(int16, sampleRate = 8e3) {
+    const hpCut = 3555;
+    const lpCut = 1600;
+    const noiseLevel = 0;
+    const crushBits = 8;
+    const x = this.pcm16toFloat(int16);
+    const dt = 1 / sampleRate;
+    const rcHP = 1 / (2 * Math.PI * hpCut);
+    const aHP = rcHP / (rcHP + dt);
+    let yHP = 0, xPrev = 0;
+    for (let i = 0; i < x.length; i++) {
+      const xi = x[i];
+      yHP = aHP * (yHP + xi - xPrev);
+      xPrev = xi;
+      x[i] = yHP;
+    }
+    const rcLP = 1 / (2 * Math.PI * lpCut);
+    const aLP = dt / (rcLP + dt);
+    let yLP = 0;
+    for (let i = 0; i < x.length; i++) {
+      yLP = yLP + aLP * (x[i] - yLP);
+      x[i] = yLP;
+    }
+    const compGain = 2;
+    const norm = Math.tanh(compGain);
+    for (let i = 0; i < x.length; i++) x[i] = Math.tanh(x[i] * compGain) / norm;
+    const levels = Math.pow(2, crushBits) - 1;
+    return this.floatToPcm16(x);
+  }
+  /**
+   * addNoise adds low-level white noise to an Int16Array of PCM 16-bit samples to simulate analog broadcast imperfections.
+   *
+   * @private
+   * @static
+   * @param {Int16Array} int16 
+   * @param {number} [noiseLevel=0.02] 
+   * @returns {*} 
+   */
+  static addNoise(int16, noiseLevel = 0.02) {
+    const x = this.pcm16toFloat(int16);
+    for (let i = 0; i < x.length; i++) x[i] += (Math.random() * 2 - 1) * noiseLevel;
+    let peak = 0;
+    for (let i = 0; i < x.length; i++) peak = Math.max(peak, Math.abs(x[i]));
+    if (peak > 1) for (let i = 0; i < x.length; i++) x[i] *= 0.98 / peak;
+    return this.floatToPcm16(x);
+  }
+  /**
+   * asciiTo8N1Bits converts an ASCII string to a sequence of bits using 8-N-1 encoding (8 data bits, no parity, 1 stop bit).
+   *
+   * @private
+   * @static
+   * @param {string} str 
+   * @returns {{}} 
+   */
+  static asciiTo8N1Bits(str) {
+    const bits = [];
+    for (let i = 0; i < str.length; i++) {
+      const c = str.charCodeAt(i) & 255;
+      bits.push(0);
+      for (let b = 0; b < 8; b++) bits.push(c >> b & 1);
+      bits.push(1, 1);
+    }
+    return bits;
+  }
+  /**
+   * generateAFSK generates an Int16Array of PCM 16-bit samples representing AFSK modulation of the provided bit sequence.
+   *
+   * @private
+   * @static
+   * @param {number[]} bits 
+   * @param {number} [sampleRate=8000] 
+   * @returns {*} 
+   */
+  static generateAFSK(bits, sampleRate = 8e3) {
+    const baud = 520.83;
+    const markFreq = 2083.3;
+    const spaceFreq = 1562.5;
+    const amplitude = 0.6;
+    const twoPi = Math.PI * 2;
+    const result = [];
+    let phase = 0;
+    let frac = 0;
+    for (let b = 0; b < bits.length; b++) {
+      const bit = bits[b];
+      const freq = bit ? markFreq : spaceFreq;
+      const samplesPerBit = sampleRate / baud + frac;
+      const n = Math.round(samplesPerBit);
+      frac = samplesPerBit - n;
+      const inc = twoPi * freq / sampleRate;
+      for (let i = 0; i < n; i++) {
+        result.push(Math.round(Math.sin(phase) * amplitude * 32767));
+        phase += inc;
+        if (phase > twoPi) phase -= twoPi;
+      }
+    }
+    const fadeSamples = Math.floor(sampleRate * 2e-3);
+    for (let i = 0; i < fadeSamples; i++) {
+      const gain = i / fadeSamples;
+      result[i] = Math.round(result[i] * gain);
+      result[result.length - 1 - i] = Math.round(result[result.length - 1 - i] * gain);
+    }
+    return Int16Array.from(result);
+  }
+  /**
+   * generateSAMEHeader generates an Int16Array of PCM 16-bit samples representing the SAME header repeated the specified number of times.
+   *
+   * @private
+   * @static
+   * @param {string} vtec 
+   * @param {number} repeats 
+   * @param {number} [sampleRate=8000] 
+   * @param {{preMarkSec?: number, gapSec?: number}} [options={}] 
+   * @returns {*} 
+   */
+  static generateSAMEHeader(vtec, repeats, sampleRate = 8e3, options = {}) {
+    var _a, _b;
+    const preMarkSec = (_a = options.preMarkSec) != null ? _a : 0.3;
+    const gapSec = (_b = options.gapSec) != null ? _b : 0.1;
+    const bursts = [];
+    const gap = this.generateSilence(gapSec, sampleRate);
+    for (let i = 0; i < repeats; i++) {
+      const bodyBits = this.asciiTo8N1Bits(vtec);
+      const body = this.generateAFSK(bodyBits, sampleRate);
+      const extendedBodyDuration = Math.round(preMarkSec * sampleRate);
+      const extendedBody = new Int16Array(extendedBodyDuration + gap.length);
+      for (let j = 0; j < extendedBodyDuration; j++) {
+        extendedBody[j] = Math.round(body[j % body.length] * 0.2);
+      }
+      extendedBody.set(gap, extendedBodyDuration);
+      bursts.push(extendedBody);
+      if (i !== repeats - 1) bursts.push(gap);
+    }
+    return this.concatPCM16(bursts);
+  }
+};
+var eas_default = EAS;
+
 // src/index.ts
 var AlertManager = class {
   constructor(metadata) {
@@ -3091,6 +3086,11 @@ var AlertManager = class {
       return;
     }
     cache.currentLocations[locationName] = coordinates;
+  }
+  createEasAudio(description, header) {
+    return __async(this, null, function* () {
+      return yield eas_default.generateEASAudio(description, header);
+    });
   }
   /**
    * getAllAlertTypes provides a comprehensive list of all possible alert event and action combinations

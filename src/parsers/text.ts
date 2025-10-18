@@ -91,11 +91,11 @@ export class TextParser {
             if (handleIdx !== -1) {
                 let afterHandle = message.substring(handleIdx + handle.length).trimStart();
                 if (afterHandle.startsWith('/')) afterHandle = afterHandle.slice(1).trimStart();
-                const latEnd = afterHandle.indexOf('&&');
+                const latEnd = afterHandle.indexOf('&&')
                 message = latEnd !== -1 ? afterHandle.substring(0, latEnd).trim() : afterHandle.trim();
             }
         }
-        return message.replace(/\s+/g, ' ').trim().startsWith('ISSUED TIME...') ? original : message.trim();
+        return message.replace(/\s+/g, ' ').trim().startsWith('STANZA ATTRIBUTES...') ? original : message.split('STANZA ATTRIBUTES...')[0].trim();
     }
 
     /**

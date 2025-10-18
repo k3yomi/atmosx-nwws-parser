@@ -82,7 +82,7 @@ export class EAS {
             } catch (error) {
                 if (error.code !== 'EBUSY') { throw error; }
             }
-            return Promise.resolve(outTTS);
+            return resolve(outTTS);
         });
     }
 

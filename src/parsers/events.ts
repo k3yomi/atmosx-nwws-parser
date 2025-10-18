@@ -148,16 +148,17 @@ export class EventParser {
             if (Array.isArray(setting)) { sets[key] = new Set(setting.map(item => item.toLowerCase())); }
             if (typeof setting === 'boolean') { bools[key] = setting; }
         }
-        const filtered = events.filter((alert: any) => {
-            const originalEvent = this.buildDefaultSignature(alert, bools?.checkExpired);
+        const filtered = events.filter((alert: types.TypeAlert) => {
+            const originalEvent = this.buildDefaultSignature(alert);
             const props = originalEvent?.properties;
             const ugcs = props?.geocode?.UGC ?? [];
             const { performance, header, ...eventWithoutPerformance } = originalEvent;
-            originalEvent.properties.parent = originalEvent.properties.event;           
+            originalEvent.properties.parent = originalEvent.properties.event;          
             originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools?.betterEventParsing, bools?.useParentEvents);
             originalEvent.properties.distance = this.getLocationDistances(props, bools?.filterByCurrentLocation, locationSettings?.maxDistance, locationSettings?.unit);
             originalEvent.hash = loader.packages.crypto.createHash('md5').update(JSON.stringify(eventWithoutPerformance)).digest('hex');
             if (!originalEvent.properties.distance?.in_range) { return false; }
+            if (originalEvent.properties.is_test == true && bools?.ignoreTestProducts) return false;
             if (bools?.checkExpired && originalEvent.properties.is_cancelled == true) return false;
             for (const key in sets) {
                 const setting = sets[key];
@@ -167,7 +168,6 @@ export class EventParser {
                 if (key === 'ignoredICOAs' && setting.size > 0 && props.sender_icao != null && setting.has(props.sender_icao.toLowerCase())) return false;
                 if (key === 'ugcFilter' && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc: string) => setting.has(ugc.toLowerCase()))) return false;
                 if (key === 'stateFilter' && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc: string) => setting.has(ugc.substring(0, 2).toLowerCase()))) return false;
-                if (key === 'easAlerts' && setting.size > 0 && setting.has(originalEvent.properties.event.toLowerCase()) && settings.isNWWS) { EAS.generateEASAudio(props.description, alert.header) }
             }
             loader.cache.events.emit(`on${originalEvent.properties.parent.replace(/\s+/g, '')}`)
             return true;
@@ -304,10 +304,9 @@ export class EventParser {
      * @private
      * @static
      * @param {*} event The event object to process.
-     * @param {boolean} checkExpiry Whether to check if the event has expired.
      * @returns {*} The processed event with updated properties.
      */
-    private static buildDefaultSignature(event: any, checkExpiry: boolean) {
+    private static buildDefaultSignature(event: any) {
         const statusCorrelation = loader.definitions.correlations.find((c: { type: string }) => c.type === event.properties.action_type);
         const defEventTags = loader.definitions.tags;
         const tags = Object.entries(defEventTags).filter(([key]) => event.properties.description.includes(key.toLowerCase())).map(([, value]) => value)
@@ -325,7 +324,7 @@ export class EventParser {
             const isTestProduct = loader.definitions.productTypes[getType] == `Test Product`
             if (isTestProduct) { event.properties.action_type = 'Cancel'; event.properties.is_cancelled = true; event.properties.is_test = true; }
         }
-        if (checkExpiry && new Date(event.properties?.expires).getTime() < new Date().getTime()) {
+        if (new Date(event.properties?.expires).getTime() < new Date().getTime()) {
            event.properties.is_cancelled = true;
            event.properties.action_type = 'Cancel';
         }

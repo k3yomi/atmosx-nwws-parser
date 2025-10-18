@@ -15,7 +15,6 @@ interface GlobalSettings {
     useParentEvents: boolean,
     betterEventParsing: boolean 
     easSettings: { 
-        easAlerts: string[], 
         easDirectory: string, 
         easIntroWav: string | null 
     },  

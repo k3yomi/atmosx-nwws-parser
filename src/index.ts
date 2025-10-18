@@ -66,6 +66,10 @@ export class AlertManager {
         loader.cache.currentLocations[locationName] = coordinates;
     }
 
+    public async createEasAudio(description: string, header: string) {
+        return await EAS.generateEASAudio(description, header);
+    }
+
     /**
      * getAllAlertTypes provides a comprehensive list of all possible alert event and action combinations
      *

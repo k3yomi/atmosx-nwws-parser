@@ -104,6 +104,7 @@ export const settings = {
             ugcFilter: [],
             stateFilter: [],
             checkExpired: true,
+            ignoreTestProducts: true,
             locationFiltering: {
                 maxDistance: 100,
                 unit: `miles`,
@@ -111,7 +112,6 @@ export const settings = {
             },
         },
         easSettings: {
-            easAlerts: [],
             easDirectory: null,
             easIntroWav: null,
         }
