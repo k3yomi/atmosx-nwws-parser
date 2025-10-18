@@ -2609,7 +2609,6 @@ var Xmpp = class {
         cache.sigHalt = false;
         cache.lastConnect = Date.now();
         cache.session.send(packages.xmpp.xml("presence", { to: `nwws@conference.nwws-oi.weather.gov/${settings2.NoaaWeatherWireService.clientCredentials.nickname}`, xmlns: "http://jabber.org/protocol/muc" }));
-        cache.session.send(packages.xmpp.xml("presence", { to: `nwws@conference.nwws-oi.weather.gov`, type: "available" }));
         cache.events.emit(`onConnection`, settings2.NoaaWeatherWireService.clientCredentials.nickname);
         if (cache.attemptingReconnect) {
           utils_default.sleep(15 * 1e3).then(() => {
@@ -2639,6 +2638,7 @@ var Xmpp = class {
           }
           if (stanza.is(`presence`) && stanza.attrs.from && stanza.attrs.from.startsWith("nwws@conference.nwws-oi.weather.gov/")) {
             const occupant = stanza.attrs.from.split("/").slice(1).join("/");
+            console.log(occupant);
             cache.events.emit("onOccupant", { occupant, type: stanza.attrs.type === "unavailable" ? "unavailable" : "available" });
           }
         } catch (e) {
