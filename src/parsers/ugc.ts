@@ -105,7 +105,7 @@ export class UGCParser {
             if (located != undefined) {
                 let geometry = JSON.parse(located.geometry);
                 if (geometry?.type === 'Polygon') {
-                    coordinates.push(...geometry.coordinates[0].map((coord: [number, number]) => [coord[0], coord[1]]));
+                    coordinates.push(...geometry.coordinates[0].map((coord: [number, number]) => [coord[1], coord[0]]));
                     break;
                 }
             }

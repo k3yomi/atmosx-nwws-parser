@@ -1399,7 +1399,7 @@ var UGCParser = class {
       if (located != void 0) {
         let geometry = JSON.parse(located.geometry);
         if ((geometry == null ? void 0 : geometry.type) === "Polygon") {
-          coordinates.push(...geometry.coordinates[0].map((coord) => [coord[0], coord[1]]));
+          coordinates.push(...geometry.coordinates[0].map((coord) => [coord[1], coord[0]]));
           break;
         }
       }
@@ -1799,7 +1799,7 @@ var APIAlerts = class {
               type: ((_fa = feature == null ? void 0 : feature.geometry) == null ? void 0 : _fa.type) || "Polygon",
               coordinates: (_ia = (_ha = (_ga = feature == null ? void 0 : feature.geometry) == null ? void 0 : _ga.coordinates) == null ? void 0 : _ha[0]) == null ? void 0 : _ia.map((coord) => {
                 const [lat, lon] = Array.isArray(coord) ? coord : [0, 0];
-                return [lat, lon];
+                return [lon, lat];
               })
             } : null
           }
