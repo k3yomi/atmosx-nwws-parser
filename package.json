@@ -1,8 +1,8 @@
 {
 	"name": "atmosx-nwws-parser",
-	"version": "1.0.203",
+	"version": "1.0.2031",
 	"description": "NOAA Weather Wire Parser - Built for standalone and Project AtmosphericX Integration.",
-	"main": "dist/cjs/helper.cjs",
+	"main": "dist/cjs/index.cjs",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/K3YOMI/atmosx-nwws-parser.git",
