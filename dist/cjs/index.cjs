@@ -1859,6 +1859,10 @@ var EAS = class {
       if (packages.fs.existsSync(settings2.global.easSettings.easIntroWav)) {
         const toneBuffer = packages.fs.readFileSync(settings2.global.easSettings.easIntroWav);
         const toneWav = this.parseWavPCM16(toneBuffer);
+        if (toneWav == null) {
+          console.log(`[EAS] Intro tone WAV file is not valid PCM 16-bit format.`);
+          return resolve(null);
+        }
         const toneSamples = toneWav.sampleRate !== 8e3 ? this.resamplePCM16(toneWav.samples, toneWav.sampleRate, 8e3) : toneWav.samples;
         toneRadio = this.applyNWREffect(toneSamples, 8e3);
       }
@@ -2768,7 +2772,7 @@ var Utils = class {
    */
   static detectUncaughtExceptions() {
     if (cache.events.listenerCount("uncaughtException") > 0) return;
-    cache.events.on("uncaughtException", (error) => {
+    process.on("uncaughtException", (error) => {
       cache.events.emit(`onError`, { message: `Uncaught Exception: ${error.message}`, code: `error-uncaught-exception`, stack: error.stack });
     });
   }
