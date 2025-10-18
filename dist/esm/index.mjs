@@ -1504,7 +1504,7 @@ var UGCAlerts = class {
    * @returns {string} 
    */
   static getTracking(baseProperties, zones) {
-    return `${baseProperties.sender_icao} (${packages.crypto.createHash("md5").update(zones.join(``)).digest("hex")}})`;
+    return `${baseProperties.sender_icao} (${packages.crypto.createHash("md5").update(zones.join(``)).digest("hex")})`;
   }
   /**
    * getEvent determines the event name based on offshore definitions or formats it from the attributes.

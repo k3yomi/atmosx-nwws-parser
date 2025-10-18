@@ -29,7 +29,7 @@ export class UGCAlerts {
      * @returns {string} 
      */
     private static getTracking(baseProperties: types.BaseProperties, zones: string[]) {
-        return `${baseProperties.sender_icao} (${loader.packages.crypto.createHash('md5').update(zones.join(``)).digest('hex')}})`
+        return `${baseProperties.sender_icao} (${loader.packages.crypto.createHash('md5').update(zones.join(``)).digest('hex')})`
     }
     
     /**
