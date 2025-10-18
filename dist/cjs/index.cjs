@@ -8,6 +8,7 @@ var __getOwnPropSymbols = Object.getOwnPropertySymbols;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __propIsEnum = Object.prototype.propertyIsEnumerable;
+var __pow = Math.pow;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __spreadValues = (a, b) => {
   for (var prop in b || (b = {}))
@@ -85,9 +86,9 @@ __export(index_exports, {
   StanzaParser: () => stanza_default,
   TextParser: () => text_default,
   UGCParser: () => ugc_default,
+  Utils: () => utils_default,
   VtecParser: () => vtec_default,
-  default: () => index_default,
-  types: () => types_exports
+  default: () => index_default
 });
 module.exports = __toCommonJS(index_exports);
 
@@ -98,7 +99,7 @@ var events = __toESM(require("events"));
 var xmpp = __toESM(require("@xmpp/client"));
 var shapefile = __toESM(require("shapefile"));
 var xml2js = __toESM(require("xml2js"));
-var cron = __toESM(require("node-cron"));
+var jobs = __toESM(require("croner"));
 var import_better_sqlite3 = __toESM(require("better-sqlite3"));
 var import_axios = __toESM(require("axios"));
 var import_crypto = __toESM(require("crypto"));
@@ -918,7 +919,7 @@ var packages = {
   shapefile,
   xml2js,
   sqlite3: import_better_sqlite3.default,
-  cron,
+  jobs,
   axios: import_axios.default,
   crypto: import_crypto.default,
   os: import_os.default,
@@ -936,7 +937,8 @@ var cache = {
   db: null,
   events: new events.EventEmitter(),
   isProcessingAudioQueue: false,
-  audioQueue: []
+  audioQueue: [],
+  currentLocations: {}
 };
 var settings = {
   database: path.join(process.cwd(), "shapefiles.db"),
@@ -977,7 +979,12 @@ var settings = {
       ignoredEvents: [`Xx`, `Test Message`],
       ugcFilter: [],
       stateFilter: [],
-      checkExpired: true
+      checkExpired: true,
+      locationFiltering: {
+        maxDistance: 100,
+        unit: `miles`,
+        filterByCurrentLocation: true
+      }
     },
     easSettings: {
       easAlerts: [],
@@ -1046,12 +1053,10 @@ var definitions = {
     shapefile_creation_finished: `[NOTICE] SHAPEFILES HAVE BEEN SUCCESSFULLY CREATED AND THE DATABASE IS READY FOR USE!`,
     not_ready: "[ERROR] You can NOT create another instance without shutting down the current one first, please make sure to call the stop() method first!",
     invalid_nickname: "[WARNING] The nickname you provided is invalid, please provide a valid nickname to continue.",
-    eas_no_directory: "[WARNING] You have not set a directory for EAS audio files to be saved to, please set the 'easDirectory' setting in the global settings to enable EAS audio generation."
+    eas_no_directory: "[WARNING] You have not set a directory for EAS audio files to be saved to, please set the 'easDirectory' setting in the global settings to enable EAS audio generation.",
+    invalid_coordinates: "[WARNING] The coordinates you provided are invalid, please provide valid latitude and longitude values."
   }
 };
-
-// src/types.ts
-var types_exports = {};
 
 // src/parsers/stanza.ts
 var StanzaParser = class {
@@ -1518,6 +1523,7 @@ var VTECAlerts = class {
             const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, validated.attributes), getBaseProperties.attributes), getBaseProperties, vtec);
             processed.push({
               performance: performance.now() - tick,
+              source: `vtec-parser`,
               tracking: vtec.tracking,
               header: getHeader,
               vtec: vtec.raw,
@@ -1586,6 +1592,7 @@ var UGCAlerts = class {
           const getEvent = this.getEvent(message, getBaseProperties.attributes.getAwip);
           processed.push({
             performance: performance.now() - tick,
+            source: `ugc-parser`,
             tracking: this.getTracking(getBaseProperties, getUGC.zones),
             header: getHeader,
             vtec: `N/A`,
@@ -1602,14 +1609,40 @@ var ugc_default2 = UGCAlerts;
 
 // src/parsers/types/text.ts
 var UGCAlerts2 = class {
+  /**
+   * Generates a tracking identifier based on the sender's ICAO code.
+   *
+   * @private
+   * @static
+   * @param {types.BaseProperties} baseProperties
+   * @returns {string}
+   */
   static getTracking(baseProperties) {
     return `${baseProperties.sender_icao}`;
   }
+  /**
+   * Determines the event type based on the message content and provided attributes.
+   *
+   * @private
+   * @static
+   * @param {string} message
+   * @param {Record<string, any>} attributes
+   * @returns {*}
+   */
   static getEvent(message, attributes) {
     const offshoreEvent = Object.keys(definitions.offshore).find((event) => message.toLowerCase().includes(event.toLowerCase()));
     if (offshoreEvent) return Object.keys(definitions.offshore).find((event) => message.toLowerCase().includes(event.toLowerCase()));
     return attributes.type.split(`-`).map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(` `);
   }
+  /**
+   * event processes validated UGC alert messages, extracting relevant information and compiling it into structured event objects.
+   *
+   * @public
+   * @static
+   * @async
+   * @param {types.TypeCompiled} validated 
+   * @returns {*} 
+   */
   static event(validated) {
     return __async(this, null, function* () {
       var _a;
@@ -1624,6 +1657,7 @@ var UGCAlerts2 = class {
         const getEvent = this.getEvent(message, getBaseProperties.attributes.getAwip);
         processed.push({
           performance: performance.now() - tick,
+          source: `text-parser`,
           tracking: this.getTracking(getBaseProperties),
           header: getHeader,
           vtec: `N/A`,
@@ -1639,6 +1673,14 @@ var text_default2 = UGCAlerts2;
 
 // src/parsers/types/cap.ts
 var CapAlerts = class {
+  /**
+   * getTracking generates a unique tracking identifier for a CAP alert based on extracted XML values.
+   * 
+   * @private
+   * @static
+   * @param {Record<string, string>} extracted 
+   * @returns {string} 
+   */
   static getTracking(extracted) {
     return extracted.vtec ? (() => {
       const vtecValue = Array.isArray(extracted.vtec) ? extracted.vtec[0] : extracted.vtec;
@@ -1646,6 +1688,15 @@ var CapAlerts = class {
       return `${splitVTEC[2]}-${splitVTEC[3]}-${splitVTEC[4]}-${splitVTEC[5]}`;
     })() : `${extracted.wmoidentifier} (${extracted.ugc})`;
   }
+  /**
+   * event processes validated CAP alert messages, extracting relevant information and compiling it into structured event objects.
+   *
+   * @public
+   * @static
+   * @async
+   * @param {types.TypeCompiled} validated 
+   * @returns {*} 
+   */
   static event(validated) {
     return __async(this, null, function* () {
       var _a;
@@ -1682,6 +1733,7 @@ var CapAlerts = class {
         const getSource = text_default.textProductToString(extracted.description, `SOURCE...`, [`.`]) || `N/A`;
         processed.push({
           performance: performance.now() - tick,
+          source: `cap-parser`,
           tracking: this.getTracking(extracted),
           header: getHeader,
           vtec: extracted.vtec || `N/A`,
@@ -1730,6 +1782,14 @@ var cap_default = CapAlerts;
 
 // src/parsers/types/api.ts
 var APIAlerts = class {
+  /**
+   * getTracking generates a unique tracking identifier for an API alert based on extracted JSON values.
+   *
+   * @private
+   * @static
+   * @param {Record<string, string>} extracted 
+   * @returns {string} 
+   */
   static getTracking(extracted) {
     return extracted.vtec ? (() => {
       const vtecValue = Array.isArray(extracted.vtec) ? extracted.vtec[0] : extracted.vtec;
@@ -1737,12 +1797,29 @@ var APIAlerts = class {
       return `${splitVTEC[2]}-${splitVTEC[3]}-${splitVTEC[4]}-${splitVTEC[5]}`;
     })() : `${extracted.wmoidentifier} (${extracted.ugc})`;
   }
+  /**
+   * getICAO extracts the ICAO code and corresponding name from a VTEC string.
+   *
+   * @private
+   * @static
+   * @param {string} vtec 
+   * @returns {{ icao: any; name: any; }} 
+   */
   static getICAO(vtec) {
     var _a, _b;
     const icao = vtec ? vtec.split(`.`)[2] : `N/A`;
     const name = (_b = (_a = definitions.ICAO) == null ? void 0 : _a[icao]) != null ? _b : `N/A`;
     return { icao, name };
   }
+  /**
+   * event processes validated API alert messages, extracting relevant information and compiling it into structured event objects.
+   *
+   * @public
+   * @static
+   * @async
+   * @param {types.TypeCompiled} validated 
+   * @returns {*} 
+   */
   static event(validated) {
     return __async(this, null, function* () {
       var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia;
@@ -1761,6 +1838,7 @@ var APIAlerts = class {
         const getOffice = this.getICAO(getVTEC || ``);
         processed.push({
           performance: performance.now() - tick,
+          source: `api-parser`,
           tracking: this.getTracking({ vtec: getVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
           header: getHeader,
           vtec: getVTEC || `N/A`,
@@ -2298,23 +2376,27 @@ var EventParser = class {
     });
   }
   /**
-   * enhanceEvent refines the event name based on specific conditions and tags found in the event's description and parameters.
+   * betterParsedEventName refines the event name based on specific conditions and tags found in the event's description and parameters.
    *
    * @public
    * @static
    * @param {types.TypeAlert} event 
-   * @returns {{ eventName: any; tags: any; }} 
+   * @param {boolean} [betterParsing=false]
+   * @param {boolean} [useParentEvents=false]
+   * @returns {{ eventName: any }}
    */
-  static enhanceEvent(event) {
-    var _a, _b, _c, _d, _e;
+  static betterParsedEventName(event, betterParsing, useParentEvents) {
+    var _a, _b, _c, _d, _e, _f;
     let eventName = (_b = (_a = event == null ? void 0 : event.properties) == null ? void 0 : _a.event) != null ? _b : `Unknown Event`;
     const defEventTable = definitions.enhancedEvents;
-    const defEventTags = definitions.tags;
     const properties = event == null ? void 0 : event.properties;
     const parameters = properties == null ? void 0 : properties.parameters;
     const description = (_c = properties == null ? void 0 : properties.description) != null ? _c : `Unknown Description`;
     const damageThreatTag = (_d = parameters == null ? void 0 : parameters.damage_threat) != null ? _d : `N/A`;
     const tornadoThreatTag = (_e = parameters == null ? void 0 : parameters.tornado_detection) != null ? _e : `N/A`;
+    if (!betterParsing) {
+      return eventName;
+    }
     for (const eventGroup of defEventTable) {
       const [baseEvent, conditions] = Object.entries(eventGroup)[0];
       if (eventName === baseEvent) {
@@ -2329,8 +2411,7 @@ var EventParser = class {
         break;
       }
     }
-    const tags = Object.entries(defEventTags).filter(([key]) => description.includes(key.toLowerCase())).map(([, value]) => value);
-    return { eventName, tags: tags.length > 0 ? tags : [`N/A`] };
+    return useParentEvents ? (_f = event == null ? void 0 : event.properties) == null ? void 0 : _f.event : eventName;
   }
   /**
    * getCorrectExpiryDate determines the correct expiration date for an alert based on VTEC information or UGC zones.
@@ -2344,11 +2425,12 @@ var EventParser = class {
     if (events2.length == 0) return;
     const settings2 = settings;
     const filteringSettings = (_b = (_a = settings) == null ? void 0 : _a.global) == null ? void 0 : _b.alertFiltering;
+    const locationSettings = filteringSettings == null ? void 0 : filteringSettings.locationFiltering;
     const easSettings = (_d = (_c = settings) == null ? void 0 : _c.global) == null ? void 0 : _d.easSettings;
     const globalSettings = (_e = settings) == null ? void 0 : _e.global;
     const sets = {};
     const bools = {};
-    const megered = __spreadValues(__spreadValues(__spreadValues({}, filteringSettings), easSettings), globalSettings);
+    const megered = __spreadValues(__spreadValues(__spreadValues(__spreadValues({}, filteringSettings), easSettings), globalSettings), locationSettings);
     for (const key in megered) {
       const setting = megered[key];
       if (Array.isArray(setting)) {
@@ -2359,54 +2441,31 @@ var EventParser = class {
       }
     }
     const filtered = events2.filter((alert) => {
-      var _a2, _b2, _d2, _e2;
-      const originalEvent = alert;
+      var _a2, _b2, _d2;
+      const originalEvent = this.buildDefaultSignature(alert, bools == null ? void 0 : bools.checkExpired);
       const props = originalEvent == null ? void 0 : originalEvent.properties;
       const ugcs = (_b2 = (_a2 = props == null ? void 0 : props.geocode) == null ? void 0 : _a2.UGC) != null ? _b2 : [];
       const _c2 = originalEvent, { performance: performance2, header } = _c2, eventWithoutPerformance = __objRest(_c2, ["performance", "header"]);
-      if (bools == null ? void 0 : bools.betterEventParsing) {
-        const { eventName, tags } = this.enhanceEvent(originalEvent);
-        originalEvent.properties.event = eventName;
-        originalEvent.properties.tags = tags;
+      originalEvent.properties.parent = originalEvent.properties.event;
+      originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools == null ? void 0 : bools.betterEventParsing, bools == null ? void 0 : bools.useParentEvents);
+      originalEvent.properties.distance = this.getLocationDistances(props, bools == null ? void 0 : bools.filterByCurrentLocation, locationSettings == null ? void 0 : locationSettings.maxDistance, locationSettings == null ? void 0 : locationSettings.unit);
+      originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(eventWithoutPerformance)).digest("hex");
+      if (!((_d2 = originalEvent.properties.distance) == null ? void 0 : _d2.in_range)) {
+        return false;
       }
-      const eventCheck = (bools == null ? void 0 : bools.useParentEvents) ? (_d2 = props.parent) == null ? void 0 : _d2.toLowerCase() : (_e2 = props.event) == null ? void 0 : _e2.toLowerCase();
-      const statusCorrelation = definitions.correlations.find((c) => c.type === originalEvent.properties.action_type);
+      if ((bools == null ? void 0 : bools.checkExpired) && originalEvent.properties.is_cancelled == true) return false;
       for (const key in sets) {
         const setting = sets[key];
-        if (key === "filteredEvents" && setting.size > 0 && eventCheck != null && !setting.has(eventCheck)) return false;
-        if (key === "ignoredEvents" && setting.size > 0 && eventCheck != null && setting.has(eventCheck)) return false;
+        if (key === "filteredEvents" && setting.size > 0 && !setting.has(originalEvent.properties.event.toLowerCase())) return false;
+        if (key === "ignoredEvents" && setting.size > 0 && setting.has(originalEvent.properties.event.toLowerCase())) return false;
         if (key === "filteredICOAs" && setting.size > 0 && props.sender_icao != null && !setting.has(props.sender_icao.toLowerCase())) return false;
         if (key === "ignoredICOAs" && setting.size > 0 && props.sender_icao != null && setting.has(props.sender_icao.toLowerCase())) return false;
         if (key === "ugcFilter" && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc) => setting.has(ugc.toLowerCase()))) return false;
         if (key === "stateFilter" && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc) => setting.has(ugc.substring(0, 2).toLowerCase()))) return false;
-        if (key === "easAlerts" && setting.size > 0 && eventCheck != null && setting.has(eventCheck) && settings2.isNWWS) {
+        if (key === "easAlerts" && setting.size > 0 && setting.has(originalEvent.properties.event.toLowerCase()) && settings2.isNWWS) {
           eas_default.generateEASAudio(props.description, alert.header);
         }
       }
-      for (const key in bools) {
-        const setting = bools[key];
-        if (key === "checkExpired" && setting && new Date(props == null ? void 0 : props.expires).getTime() < (/* @__PURE__ */ new Date()).getTime()) return false;
-      }
-      originalEvent.properties.action_type = statusCorrelation ? statusCorrelation.forward : originalEvent.properties.action_type;
-      originalEvent.properties.is_updated = statusCorrelation ? statusCorrelation.update == true : false;
-      originalEvent.properties.is_issued = statusCorrelation ? statusCorrelation.new == true : false;
-      originalEvent.properties.is_cancelled = statusCorrelation ? statusCorrelation.cancel == true : false;
-      originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(eventWithoutPerformance)).digest("hex");
-      if (props.description) {
-        const detectedPhrase = definitions.cancelSignatures.find((sig) => props.description.toLowerCase().includes(sig.toLowerCase()));
-        if (detectedPhrase) {
-          originalEvent.properties.action_type = "Cancel";
-          originalEvent.properties.is_cancelled = true;
-        }
-      }
-      if (originalEvent.vtec) {
-        const getType = originalEvent.vtec.split(`.`)[0];
-        const isTestProduct = definitions.productTypes[getType] == `Test Product`;
-        if (isTestProduct) {
-          return false;
-        }
-      }
-      if (bools.checkExpired && originalEvent.properties.is_cancelled == true) return false;
       cache.events.emit(`on${originalEvent.properties.parent.replace(/\s+/g, "")}`);
       return true;
     });
@@ -2492,6 +2551,85 @@ var EventParser = class {
     const time = (vtec == null ? void 0 : vtec.expires) && !isNaN(new Date(vtec.expires).getTime()) ? new Date(vtec.expires).toLocaleString() : (ugc == null ? void 0 : ugc.expiry) != null ? new Date(ugc.expiry).toLocaleString() : new Date((/* @__PURE__ */ new Date()).getTime() + 1 * 60 * 60 * 1e3).toLocaleString();
     if (time == `Invalid Date`) return new Date((/* @__PURE__ */ new Date()).getTime() + 1 * 60 * 60 * 1e3).toLocaleString();
     return time;
+  }
+  /**
+   * getLocationDistances calculates distances from current locations to the alert's geometry and determines if it's within a specified range.
+   *
+   * @private
+   * @static
+   * @param {?types.BaseProperties} [properties] 
+   * @param {?boolean} [isFiltered] 
+   * @param {?number} [maxDistance] 
+   * @param {?string} [unit] 
+   * @returns {*} 
+   */
+  static getLocationDistances(properties, isFiltered, maxDistance, unit) {
+    let inRange = false;
+    if (properties.geometry != null) {
+      for (const key in cache.currentLocations) {
+        const coordinates = cache.currentLocations[key];
+        const singleCoord = properties.geometry.coordinates;
+        const center = singleCoord.reduce((acc, [lat, lon]) => [acc[0] + lat, acc[1] + lon], [0, 0]).map((sum) => sum / singleCoord.length);
+        const validUnit = unit === "miles" || unit === "kilometers" ? unit : "miles";
+        const distance = utils_default.calculateDistance({ lat: coordinates.lat, lon: coordinates.lon }, { lat: center[0], lon: center[1] }, validUnit);
+        if (!properties.distance) {
+          properties.distance = {};
+        }
+        properties.distance[key] = { unit, distance };
+      }
+    }
+    if (!isFiltered) {
+      return __spreadProps(__spreadValues({}, properties.distance), { in_range: true });
+    }
+    if (isFiltered) {
+      for (const key in properties.distance) {
+        if (properties.distance[key].distance <= maxDistance) {
+          inRange = true;
+        }
+      }
+    }
+    return __spreadProps(__spreadValues({}, properties.distance), { in_range: inRange });
+  }
+  /**
+   * buildDefaultSignature processes and standardizes the event's properties, ensuring proper status correlation, cancellation detection, and expiry handling.
+   *
+   * @private
+   * @static
+   * @param {*} event The event object to process.
+   * @param {boolean} checkExpiry Whether to check if the event has expired.
+   * @returns {*} The processed event with updated properties.
+   */
+  static buildDefaultSignature(event, checkExpiry) {
+    var _a;
+    const statusCorrelation = definitions.correlations.find((c) => c.type === event.properties.action_type);
+    const defEventTags = definitions.tags;
+    const tags = Object.entries(defEventTags).filter(([key]) => event.properties.description.includes(key.toLowerCase())).map(([, value]) => value);
+    event.properties.tags = tags.length > 0 ? tags : [`N/A`];
+    event.properties.action_type = statusCorrelation ? statusCorrelation.forward : event.properties.action_type;
+    event.properties.is_updated = statusCorrelation ? statusCorrelation.update == true : false;
+    event.properties.is_issued = statusCorrelation ? statusCorrelation.new == true : false;
+    event.properties.is_cancelled = statusCorrelation ? statusCorrelation.cancel == true : false;
+    if (event.properties.description) {
+      const detectedPhrase = definitions.cancelSignatures.find((sig) => event.properties.description.toLowerCase().includes(sig.toLowerCase()));
+      if (detectedPhrase) {
+        event.properties.action_type = "Cancel";
+        event.properties.is_cancelled = true;
+      }
+    }
+    if (event.vtec) {
+      const getType = event.vtec.split(`.`)[0];
+      const isTestProduct = definitions.productTypes[getType] == `Test Product`;
+      if (isTestProduct) {
+        event.properties.action_type = "Cancel";
+        event.properties.is_cancelled = true;
+        event.properties.is_test = true;
+      }
+    }
+    if (checkExpiry && new Date((_a = event.properties) == null ? void 0 : _a.expires).getTime() < (/* @__PURE__ */ new Date()).getTime()) {
+      event.properties.is_cancelled = true;
+      event.properties.action_type = "Cancel";
+    }
+    return event;
   }
 };
 var events_default = EventParser;
@@ -2886,6 +3024,32 @@ var Utils = class {
       }
     }
   }
+  /**
+   * Calculate the distance between 2 given coordinates.
+   *
+   * @public
+   * @static
+   * @async
+   * @param {types.Coordinates} coord1 
+   * @param {types.Coordinates} coord2 
+   * @param {('miles' | 'kilometers')} [unit='miles'] 
+   * @returns {Promise<number>} 
+   */
+  static calculateDistance(coord1, coord2, unit = "miles") {
+    if (!coord1 || !coord2) return 0;
+    const { lat: lat1, lon: lon1 } = coord1;
+    const { lat: lat2, lon: lon2 } = coord2;
+    const toRad = (deg) => deg * Math.PI / 180;
+    const earthRadius = unit === "miles" ? 3958.8 : 6371;
+    let dLat = toRad(lat2 - lat1);
+    let dLon = toRad(lon2 - lon1);
+    if (dLon > Math.PI) dLon -= 2 * Math.PI;
+    if (dLon < -Math.PI) dLon += 2 * Math.PI;
+    const a = __pow(Math.sin(dLat / 2), 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * __pow(Math.sin(dLon / 2), 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = earthRadius * c;
+    return Number(distance.toFixed(2));
+  }
 };
 var utils_default = Utils;
 
@@ -2910,6 +3074,23 @@ var AlertManager = class {
       return;
     }
     settings2.NoaaWeatherWireService.clientCredentials.nickname = trimmed;
+  }
+  /**
+   * This will set custom coordinates based on given paramters and key name. This will be used to 
+   * get the distance between each alert at a given coord in either miles or kilometers.
+   *
+   * @public
+   * @param {string} locationName 
+   * @param {?types.Coordinates} [coordinates] 
+   */
+  setCurrentLocation(locationName, coordinates) {
+    const latitude = coordinates == null ? void 0 : coordinates.lat;
+    const longitude = coordinates == null ? void 0 : coordinates.lon;
+    if (isNaN(latitude) || isNaN(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+      cache.events.emit(`onError`, { code: `error-invalid-coordinates`, message: definitions.messages.invalid_coordinates });
+      return;
+    }
+    cache.currentLocations[locationName] = coordinates;
   }
   /**
    * getAllAlertTypes provides a comprehensive list of all possible alert event and action combinations
@@ -2972,7 +3153,7 @@ var AlertManager = class {
    * @public
    * @param {string} event 
    * @param {(...args: any[]) => void} callback 
-   * @returns {() => void} 
+   * @returns {() => void}
    */
   onEvent(event, callback) {
     cache.events.on(event, callback);
@@ -3006,7 +3187,7 @@ var AlertManager = class {
         yield utils_default.loadCollectionCache();
       }
       utils_default.handleCronJob(this.isNoaaWeatherWireService);
-      packages.cron.schedule(`*/${!this.isNoaaWeatherWireService ? settings2.NationalWeatherService.checkInterval : 5} * * * * *`, () => {
+      this.job = new packages.jobs.Cron(`*/${!this.isNoaaWeatherWireService ? settings2.NationalWeatherService.checkInterval : 5} * * * * *`, () => {
         utils_default.handleCronJob(this.isNoaaWeatherWireService);
       });
     });
@@ -3016,12 +3197,15 @@ var AlertManager = class {
    *
    * @public
    * @async
-   * @returns {Promise<void>} 
+   * @returns {Promise<void>}
    */
   stop() {
     return __async(this, null, function* () {
       cache.isReady = true;
-      packages.cron.getTasks().forEach((task) => task.stop());
+      if (this.job) {
+        this.job.stop();
+        this.job = null;
+      }
       if (cache.session && this.isNoaaWeatherWireService) {
         yield cache.session.stop();
         cache.sigHalt = true;
@@ -3042,6 +3226,6 @@ var index_default = AlertManager;
   StanzaParser,
   TextParser,
   UGCParser,
-  VtecParser,
-  types
+  Utils,
+  VtecParser
 });

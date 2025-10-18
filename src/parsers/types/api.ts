@@ -18,7 +18,15 @@ import TextParser from '../text';
 
 
 export class APIAlerts {
-
+    
+    /**
+     * getTracking generates a unique tracking identifier for an API alert based on extracted JSON values.
+     *
+     * @private
+     * @static
+     * @param {Record<string, string>} extracted 
+     * @returns {string} 
+     */
     private static getTracking(extracted: Record<string, string>) {
         return extracted.vtec ? (() => {
             const vtecValue = Array.isArray(extracted.vtec) ? extracted.vtec[0] : extracted.vtec;
@@ -27,12 +35,29 @@ export class APIAlerts {
         })() : `${extracted.wmoidentifier} (${extracted.ugc})`;
     }
     
+    /**
+     * getICAO extracts the ICAO code and corresponding name from a VTEC string.
+     *
+     * @private
+     * @static
+     * @param {string} vtec 
+     * @returns {{ icao: any; name: any; }} 
+     */
     private static getICAO(vtec: string) {
         const icao = vtec ? vtec.split(`.`)[2] : `N/A`;
         const name = loader.definitions.ICAO?.[icao] ?? `N/A`;
         return { icao, name };
     }
-
+    
+    /**
+     * event processes validated API alert messages, extracting relevant information and compiling it into structured event objects.
+     *
+     * @public
+     * @static
+     * @async
+     * @param {types.TypeCompiled} validated 
+     * @returns {*} 
+     */
     public static async event(validated: types.TypeCompiled) {
         let processed = [] as unknown[];
         const messages = Object.values(JSON.parse(validated.message).features) as types.TypeAlert[];
@@ -49,6 +74,7 @@ export class APIAlerts {
             const getOffice = this.getICAO(getVTEC || ``);
             processed.push({
                 performance: performance.now() - tick,
+                source: `api-parser`,
                 tracking: this.getTracking({ vtec: getVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
                 header: getHeader,
                 vtec: getVTEC || `N/A`,

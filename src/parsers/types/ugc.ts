@@ -70,6 +70,7 @@ export class UGCAlerts {
                 const getEvent = this.getEvent(message, getBaseProperties.attributes.getAwip);
                 processed.push({
                     performance: performance.now() - tick,
+                    source: `ugc-parser`,
                     tracking: this.getTracking(getBaseProperties, getUGC.zones),
                     header: getHeader,
                     vtec: `N/A`,

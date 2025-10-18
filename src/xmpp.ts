@@ -32,7 +32,7 @@ export class Xmpp {
      * @param {number} currentInterval 
      * @returns {Promise<void>} 
      */
-    public static async isSessionReconnectionEligible(currentInterval: number): Promise<void> {
+    public static async isSessionReconnectionEligible(currentInterval: number) {
         const settings = loader.settings as types.ClientSettings;
         if ((loader.cache.isConnected || loader.cache.sigHalt ) && loader.cache.session) { 
             const lastStanza = Date.now() - loader.cache.lastStanza;
@@ -59,7 +59,7 @@ export class Xmpp {
      * @async
      * @returns {Promise<void>} 
      */
-    public static async deploySession(): Promise<void> { 
+    public static async deploySession() { 
         const settings = loader.settings as types.ClientSettings
         loader.cache.session = loader.packages.xmpp.client({
             service: `xmpp://nwws-oi.weather.gov`, 

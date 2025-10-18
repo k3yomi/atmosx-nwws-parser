@@ -18,7 +18,15 @@ import TextParser from '../text';
 
 
 export class CapAlerts {
-
+    
+    /**
+     * getTracking generates a unique tracking identifier for a CAP alert based on extracted XML values.
+     * 
+     * @private
+     * @static
+     * @param {Record<string, string>} extracted 
+     * @returns {string} 
+     */
     private static getTracking(extracted: Record<string, string>) {
         return extracted.vtec ? (() => {
             const vtecValue = Array.isArray(extracted.vtec) ? extracted.vtec[0] : extracted.vtec;
@@ -27,6 +35,15 @@ export class CapAlerts {
         })() : `${extracted.wmoidentifier} (${extracted.ugc})`;
     }
 
+    /**
+     * event processes validated CAP alert messages, extracting relevant information and compiling it into structured event objects.
+     *
+     * @public
+     * @static
+     * @async
+     * @param {types.TypeCompiled} validated 
+     * @returns {*} 
+     */
     public static async event(validated: types.TypeCompiled) {
         let processed = [] as unknown[];
         const messages = validated.message.match(/<\?xml[\s\S]*?<\/alert>/g)?.map(msg => msg.trim());
@@ -48,6 +65,7 @@ export class CapAlerts {
             const getSource = TextParser.textProductToString(extracted.description, `SOURCE...`, [`.`]) || `N/A`;
             processed.push({
                 performance: performance.now() - tick,
+                source: `cap-parser`,
                 tracking: this.getTracking(extracted),
                 header: getHeader,
                 vtec: extracted.vtec || `N/A`,

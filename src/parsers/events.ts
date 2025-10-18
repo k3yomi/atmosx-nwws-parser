@@ -20,8 +20,7 @@ import UGCAlerts from './types/ugc';
 import TextAlerts from './types/text';
 import CAPAlerts from './types/cap';
 import APIAlerts from './types/api';
-
-
+import Utils from '../utils';
 import EAS from '../eas';
 
 export class EventParser {
@@ -39,7 +38,7 @@ export class EventParser {
      * @param {types.VTECParsed} [vtec=null] 
      * @returns {Promise<types.BaseProperties>} 
      */
-    public static async getBaseProperties(message: string, validated: types.TypeCompiled, ugc: types.UGCParsed = null, vtec: types.VTECParsed = null): Promise<types.BaseProperties> {
+    public static async getBaseProperties(message: string, validated: types.TypeCompiled, ugc: types.UGCParsed = null, vtec: types.VTECParsed = null) {
         const settings = loader.settings as types.ClientSettings;
         const definitions = {
             tornado: TextParser.textProductToString(message, `TORNADO...`) || TextParser.textProductToString(message, `WATERSPOUT...`) || `N/A`,
@@ -95,26 +94,24 @@ export class EventParser {
     }
 
     /**
-     * enhanceEvent refines the event name based on specific conditions and tags found in the event's description and parameters.
+     * betterParsedEventName refines the event name based on specific conditions and tags found in the event's description and parameters.
      *
      * @public
      * @static
      * @param {types.TypeAlert} event 
-     * @returns {{ eventName: any; tags: any; }} 
+     * @param {boolean} [betterParsing=false]
+     * @param {boolean} [useParentEvents=false]
+     * @returns {{ eventName: any }}
      */
-    public static enhanceEvent(event: types.TypeAlert) {
+    public static betterParsedEventName(event: types.TypeAlert, betterParsing?: boolean, useParentEvents?: boolean) {
         let eventName = event?.properties?.event ?? `Unknown Event`;
         const defEventTable = loader.definitions.enhancedEvents;
-        const defEventTags = loader.definitions.tags
-
         const properties = event?.properties;
         const parameters = properties?.parameters;
-
         const description = properties?.description ?? `Unknown Description`;
         const damageThreatTag = parameters?.damage_threat ?? `N/A`;
         const tornadoThreatTag = parameters?.tornado_detection ?? `N/A`;
-
-
+        if (!betterParsing) { return eventName }
         for (const eventGroup of defEventTable) {
             const [baseEvent, conditions] = Object.entries(eventGroup)[0] as [string, Record<string, types.EnhancedEventCondition>];
             if (eventName === baseEvent) {
@@ -126,8 +123,7 @@ export class EventParser {
                 break;
             }
         }
-        const tags = Object.entries(defEventTags).filter(([key]) => description.includes(key.toLowerCase())).map(([, value]) => value)
-        return { eventName, tags: tags.length > 0 ? tags : [`N/A`] }
+        return useParentEvents ? event?.properties?.event : eventName;
     }
     
     /**
@@ -139,62 +135,40 @@ export class EventParser {
      */
     public static validateEvents(events: unknown[]) {
         if (events.length == 0) return;
-
         const settings = loader.settings as types.ClientSettings;
         const filteringSettings = loader.settings?.global?.alertFiltering;
+        const locationSettings = filteringSettings?.locationFiltering;
         const easSettings = loader.settings?.global?.easSettings;
         const globalSettings = loader.settings?.global;
         const sets = {} as Record<string, Set<string>>;
         const bools = {} as Record<string, boolean>;
-        const megered = {...filteringSettings, ...easSettings, ...globalSettings};
-
+        const megered = {...filteringSettings, ...easSettings, ...globalSettings, ...locationSettings };
         for (const key in megered) {
             const setting = megered[key];
             if (Array.isArray(setting)) { sets[key] = new Set(setting.map(item => item.toLowerCase())); }
             if (typeof setting === 'boolean') { bools[key] = setting; }
         }
-
         const filtered = events.filter((alert: any) => {
-            const originalEvent = alert
+            const originalEvent = this.buildDefaultSignature(alert, bools?.checkExpired);
             const props = originalEvent?.properties;
             const ugcs = props?.geocode?.UGC ?? [];
             const { performance, header, ...eventWithoutPerformance } = originalEvent;
-            if (bools?.betterEventParsing) {
-                const { eventName, tags } = this.enhanceEvent(originalEvent);
-                originalEvent.properties.event = eventName;
-                originalEvent.properties.tags = tags;
-            }
-            const eventCheck = bools?.useParentEvents ? props.parent?.toLowerCase() : props.event?.toLowerCase();
-            const statusCorrelation = loader.definitions.correlations.find((c: { type: string }) => c.type === originalEvent.properties.action_type);
+            originalEvent.properties.parent = originalEvent.properties.event;           
+            originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools?.betterEventParsing, bools?.useParentEvents);
+            originalEvent.properties.distance = this.getLocationDistances(props, bools?.filterByCurrentLocation, locationSettings?.maxDistance, locationSettings?.unit);
+            originalEvent.hash = loader.packages.crypto.createHash('md5').update(JSON.stringify(eventWithoutPerformance)).digest('hex');
+            if (!originalEvent.properties.distance?.in_range) { return false; }
+            if (bools?.checkExpired && originalEvent.properties.is_cancelled == true) return false;
             for (const key in sets) {
                 const setting = sets[key];
-                if (key === 'filteredEvents' && setting.size > 0 && eventCheck != null && !setting.has(eventCheck)) return false;
-                if (key === 'ignoredEvents' && setting.size > 0 && eventCheck != null && setting.has(eventCheck)) return false;
+                if (key === 'filteredEvents' && setting.size > 0 && !setting.has(originalEvent.properties.event.toLowerCase())) return false; // Exit early if invalid event found.
+                if (key === 'ignoredEvents' && setting.size > 0 && setting.has(originalEvent.properties.event.toLowerCase())) return false;
                 if (key === 'filteredICOAs' && setting.size > 0 && props.sender_icao != null && !setting.has(props.sender_icao.toLowerCase())) return false;
                 if (key === 'ignoredICOAs' && setting.size > 0 && props.sender_icao != null && setting.has(props.sender_icao.toLowerCase())) return false;
                 if (key === 'ugcFilter' && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc: string) => setting.has(ugc.toLowerCase()))) return false;
                 if (key === 'stateFilter' && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc: string) => setting.has(ugc.substring(0, 2).toLowerCase()))) return false;
-                if (key === 'easAlerts' && setting.size > 0 && eventCheck != null && setting.has(eventCheck) && settings.isNWWS) { EAS.generateEASAudio(props.description, alert.header) }
+                if (key === 'easAlerts' && setting.size > 0 && setting.has(originalEvent.properties.event.toLowerCase()) && settings.isNWWS) { EAS.generateEASAudio(props.description, alert.header) }
             }
-            for (const key in bools) {
-                const setting = bools[key];
-                if (key === 'checkExpired' && setting && new Date(props?.expires).getTime() < new Date().getTime()) return false;   
-            }
-            originalEvent.properties.action_type = statusCorrelation ? statusCorrelation.forward : originalEvent.properties.action_type;
-            originalEvent.properties.is_updated = statusCorrelation ? (statusCorrelation.update == true) : false;
-            originalEvent.properties.is_issued = statusCorrelation ? (statusCorrelation.new == true) : false;
-            originalEvent.properties.is_cancelled = statusCorrelation ? (statusCorrelation.cancel == true) : false;
-            originalEvent.hash = loader.packages.crypto.createHash('md5').update(JSON.stringify(eventWithoutPerformance)).digest('hex');
-            if (props.description) { 
-                const detectedPhrase = loader.definitions.cancelSignatures.find(sig => props.description.toLowerCase().includes(sig.toLowerCase()));
-                if (detectedPhrase) { originalEvent.properties.action_type = 'Cancel'; originalEvent.properties.is_cancelled = true; } 
-            }
-            if (originalEvent.vtec) { 
-                const getType = originalEvent.vtec.split(`.`)[0];
-                const isTestProduct = loader.definitions.productTypes[getType] == `Test Product`
-                if (isTestProduct) { return false; }
-            }
-            if (bools.checkExpired && originalEvent.properties.is_cancelled == true) return false;
             loader.cache.events.emit(`on${originalEvent.properties.parent.replace(/\s+/g, '')}`)
             return true;
         })
@@ -289,6 +263,74 @@ export class EventParser {
         return time;
     }
 
+    /**
+     * getLocationDistances calculates distances from current locations to the alert's geometry and determines if it's within a specified range.
+     *
+     * @private
+     * @static
+     * @param {?types.BaseProperties} [properties] 
+     * @param {?boolean} [isFiltered] 
+     * @param {?number} [maxDistance] 
+     * @param {?string} [unit] 
+     * @returns {*} 
+     */
+    private static getLocationDistances(properties?: types.BaseProperties, isFiltered?: boolean, maxDistance?: number, unit?: string) {
+        let inRange = false;
+        if (properties.geometry != null) {
+            for (const key in loader.cache.currentLocations) {
+                const coordinates = loader.cache.currentLocations[key];
+                const singleCoord = properties.geometry.coordinates; 
+                const center = singleCoord.reduce((acc, [lat, lon]) => ([acc[0] + lat, acc[1] + lon]), [0, 0]).map(sum => sum / singleCoord.length);
+                const validUnit = unit === 'miles' || unit === 'kilometers' ? unit : 'miles';
+                const distance = Utils.calculateDistance({ lat: coordinates.lat, lon: coordinates.lon }, { lat: center[0], lon: center[1] }, validUnit);
+                if (!properties.distance) { properties.distance = {}; }
+                properties.distance[key] = { unit, distance };
+            }
+        }
+        if (!isFiltered) { return {...properties.distance, in_range: true }; }
+        if (isFiltered) { 
+            for (const key in properties.distance) {
+                if (properties.distance[key].distance <= maxDistance) {
+                    inRange = true;
+                }
+            }
+        }
+        return {...properties.distance, in_range: inRange };
+    }
+
+    /**
+     * buildDefaultSignature processes and standardizes the event's properties, ensuring proper status correlation, cancellation detection, and expiry handling.
+     *
+     * @private
+     * @static
+     * @param {*} event The event object to process.
+     * @param {boolean} checkExpiry Whether to check if the event has expired.
+     * @returns {*} The processed event with updated properties.
+     */
+    private static buildDefaultSignature(event: any, checkExpiry: boolean) {
+        const statusCorrelation = loader.definitions.correlations.find((c: { type: string }) => c.type === event.properties.action_type);
+        const defEventTags = loader.definitions.tags;
+        const tags = Object.entries(defEventTags).filter(([key]) => event.properties.description.includes(key.toLowerCase())).map(([, value]) => value)
+        event.properties.tags = tags.length > 0 ? tags : [`N/A`];
+        event.properties.action_type = statusCorrelation ? statusCorrelation.forward : event.properties.action_type;
+        event.properties.is_updated = statusCorrelation ? (statusCorrelation.update == true) : false;
+        event.properties.is_issued = statusCorrelation ? (statusCorrelation.new == true) : false;
+        event.properties.is_cancelled = statusCorrelation ? (statusCorrelation.cancel == true) : false;
+        if (event.properties.description) { 
+            const detectedPhrase = loader.definitions.cancelSignatures.find(sig => event.properties.description.toLowerCase().includes(sig.toLowerCase()));
+            if (detectedPhrase) { event.properties.action_type = 'Cancel'; event.properties.is_cancelled = true; } 
+        }
+        if (event.vtec) { 
+            const getType = event.vtec.split(`.`)[0];
+            const isTestProduct = loader.definitions.productTypes[getType] == `Test Product`
+            if (isTestProduct) { event.properties.action_type = 'Cancel'; event.properties.is_cancelled = true; event.properties.is_test = true; }
+        }
+        if (checkExpiry && new Date(event.properties?.expires).getTime() < new Date().getTime()) {
+           event.properties.is_cancelled = true;
+           event.properties.action_type = 'Cancel';
+        }
+        return event;
+    }
 }
 
 export default EventParser

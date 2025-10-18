@@ -44,7 +44,7 @@ export class Database {
      * @async
      * @returns {Promise<void>} 
      */
-    public static async loadDatabase(): Promise<void> {
+    public static async loadDatabase() {
         const settings = loader.settings as types.ClientSettings;
         try {
             if (!loader.packages.fs.existsSync(settings.database)) { loader.packages.fs.writeFileSync(settings.database, ''); }

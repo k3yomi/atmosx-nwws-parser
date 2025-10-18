@@ -29,7 +29,7 @@ export class EAS {
      * @param {string} vtec 
      * @returns {*} 
      */
-    public static generateEASAudio(message: string, vtec: string): Promise<string> {
+    public static generateEASAudio(message: string, vtec: string) {
         return new Promise(async (resolve) => {
             const settings = loader.settings as types.ClientSettings;
             for (const { regex, replacement } of loader.definitions.messageSignatures) { message = message.replace(regex, replacement); }
@@ -95,7 +95,7 @@ export class EAS {
      * @param {number} [sampleRate=8000] 
      * @returns {Buffer} 
      */
-    private static encodeWavPCM16(samples: Record<string, number>[], sampleRate: number = 8000): Buffer {
+    private static encodeWavPCM16(samples: Record<string, number>[], sampleRate: number = 8000) {
         const bytesPerSample = 2;
         const blockAlign = 1 * bytesPerSample;
         const byteRate = sampleRate * blockAlign;

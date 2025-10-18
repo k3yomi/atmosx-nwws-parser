@@ -29,7 +29,7 @@ export class Utils {
      * @param {number} ms 
      * @returns {Promise<void>} 
      */
-    public static async sleep(ms: number): Promise<void> {
+    public static async sleep(ms: number) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
     
@@ -41,7 +41,7 @@ export class Utils {
      * @async
      * @returns {Promise<void>} 
      */
-    public static async loadCollectionCache(): Promise<void> {
+    public static async loadCollectionCache() {
         try {
             const settings = loader.settings as types.ClientSettings;
             if (settings.NoaaWeatherWireService.cache.read && settings.NoaaWeatherWireService.cache.directory) {
@@ -73,7 +73,7 @@ export class Utils {
      * @async
      * @returns {Promise<void>} 
      */
-    public static async loadGeoJsonData(): Promise<void> {
+    public static async loadGeoJsonData() {
         try {
             const settings = loader.settings as types.ClientSettings;
             const response = await this.createHttpRequest(settings.NationalWeatherService.endpoint) as types.NationalWeatherServiceResponse
@@ -91,7 +91,7 @@ export class Utils {
      * @public
      * @static
      */
-    public static detectUncaughtExceptions(): void {
+    public static detectUncaughtExceptions() {
         if (loader.cache.events.listenerCount('uncaughtException') > 0) return;
         process.on('uncaughtException', (error: Error) => {
             loader.cache.events.emit(`onError`, {message: `Uncaught Exception: ${error.message}`, code: `error-uncaught-exception`, stack: error.stack});
@@ -142,7 +142,7 @@ export class Utils {
      * @static
      * @param {number} maxFileMegabytes 
      */
-    public static garbageCollectionCache(maxFileMegabytes: number): void {
+    public static garbageCollectionCache(maxFileMegabytes: number) {
         try {
             const settings = loader.settings as types.ClientSettings;
             if (!settings.NoaaWeatherWireService.cache.directory) return;
@@ -177,8 +177,8 @@ export class Utils {
      * @public
      * @static
      * @param {boolean} isNwws 
-     */
-    public static handleCronJob(isNwws: boolean): void {
+     */ 
+    public static handleCronJob(isNwws: boolean) {
         try { 
             const settings = loader.settings as types.ClientSettings;
             if (isNwws) { 
@@ -200,7 +200,7 @@ export class Utils {
      * @param {Record<string, any>} target 
      * @param {Record<string, any>} settings 
      */
-    public static mergeClientSettings(target: Record<string, any>, settings: Record<string, any>): void {
+    public static mergeClientSettings(target: Record<string, any>, settings: Record<string, any>) {
         for (const key in settings) {
             if (settings.hasOwnProperty(key)) {
                 if (typeof settings[key] === 'object' && settings[key] !== null && !Array.isArray(settings[key])) {
@@ -211,6 +211,33 @@ export class Utils {
                 }
             }
         }
+    }
+
+    /**
+     * Calculate the distance between 2 given coordinates.
+     *
+     * @public
+     * @static
+     * @async
+     * @param {types.Coordinates} coord1 
+     * @param {types.Coordinates} coord2 
+     * @param {('miles' | 'kilometers')} [unit='miles'] 
+     * @returns {Promise<number>} 
+     */
+    public static calculateDistance(coord1: types.Coordinates, coord2: types.Coordinates, unit: 'miles' | 'kilometers' = 'miles') {
+        if (!coord1 || !coord2) return 0;
+        const { lat: lat1, lon: lon1 } = coord1;
+        const { lat: lat2, lon: lon2 } = coord2;
+        const toRad = (deg: number) => deg * Math.PI / 180;
+        const earthRadius = unit === 'miles' ? 3958.8 : 6371;
+        let dLat = toRad(lat2 - lat1);
+        let dLon = toRad(lon2 - lon1);
+        if (dLon > Math.PI) dLon -= 2 * Math.PI;
+        if (dLon < -Math.PI) dLon += 2 * Math.PI;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distance = earthRadius * c;
+        return Number(distance.toFixed(2));
     }
 }
 

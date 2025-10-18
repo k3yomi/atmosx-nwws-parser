@@ -27,6 +27,11 @@ interface GlobalSettings {
         stateFilter: string[], 
         ignoredEvents: string[], 
         checkExpired: boolean 
+        locationFiltering: {
+            maxDistance: number,
+            unit: `miles` | `kilometers`,
+            filterByCurrentLocation: boolean
+        },
     }, 
 }
 
@@ -135,6 +140,7 @@ export interface UGCParsed {
 }
 
 export interface BaseProperties {
+    parent?: string,
     event?: string, 
     locations: string,
     issued: string,
@@ -149,6 +155,7 @@ export interface BaseProperties {
     messageType?: string,
     sent?: string,
     areaDesc?: string,
+    distance?: Record<string, { distance: number, unit: string}>,
 }
 
 export interface TypeAlert { 
@@ -184,5 +191,5 @@ export interface TypeCompiled {
     ignore: boolean,
 }
 
-
+export type Coordinates = { lat: number, lon: number }
 export type HTTPSettings = { timeout?: number, headers?: Record<string, string> }

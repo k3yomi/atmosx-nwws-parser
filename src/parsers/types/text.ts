@@ -18,16 +18,42 @@ import EventParser from '../events';
 
 export class UGCAlerts {
 
+    /**
+     * Generates a tracking identifier based on the sender's ICAO code.
+     *
+     * @private
+     * @static
+     * @param {types.BaseProperties} baseProperties
+     * @returns {string}
+     */
     private static getTracking(baseProperties: types.BaseProperties) {
         return `${baseProperties.sender_icao}`
     }
 
+    /**
+     * Determines the event type based on the message content and provided attributes.
+     *
+     * @private
+     * @static
+     * @param {string} message
+     * @param {Record<string, any>} attributes
+     * @returns {*}
+     */
     private static getEvent(message: string, attributes: Record<string, any>) {
         const offshoreEvent = Object.keys(loader.definitions.offshore).find(event => message.toLowerCase().includes(event.toLowerCase()));
         if (offshoreEvent) return Object.keys(loader.definitions.offshore).find(event => message.toLowerCase().includes(event.toLowerCase()));
         return attributes.type.split(`-`).map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(` `)
     }
     
+    /**
+     * event processes validated UGC alert messages, extracting relevant information and compiling it into structured event objects.
+     *
+     * @public
+     * @static
+     * @async
+     * @param {types.TypeCompiled} validated 
+     * @returns {*} 
+     */
     public static async event(validated: types.TypeCompiled) {
         let processed = [] as unknown[];
         const messages = validated.message.split(/(?=\$\$|ISSUED TIME...|=================================================)/g)?.map(msg => msg.trim());
@@ -40,6 +66,7 @@ export class UGCAlerts {
             const getEvent = this.getEvent(message, getBaseProperties.attributes.getAwip);
             processed.push({
                 performance: performance.now() - tick,
+                source: `text-parser`,
                 tracking: this.getTracking(getBaseProperties),
                 header: getHeader,
                 vtec: `N/A`,

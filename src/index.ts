@@ -26,6 +26,7 @@ import UGCParser from './parsers/ugc';
 
 export class AlertManager { 
     isNoaaWeatherWireService: boolean
+    job: any
     constructor(metadata: types.ClientSettings) { this.start(metadata) }
 
     /**
@@ -36,7 +37,7 @@ export class AlertManager {
      * @public
      * @param {?string} [name] 
      */
-    public setDisplayName(name?: string): void {
+    public setDisplayName(name?: string) {
         const settings = loader.settings as types.ClientSettings;
         const trimmed = name?.trim();
         if (!trimmed) {
@@ -44,6 +45,25 @@ export class AlertManager {
             return;
         }
         settings.NoaaWeatherWireService.clientCredentials.nickname = trimmed;
+    }
+
+    
+    /**
+     * This will set custom coordinates based on given paramters and key name. This will be used to 
+     * get the distance between each alert at a given coord in either miles or kilometers.
+     *
+     * @public
+     * @param {string} locationName 
+     * @param {?types.Coordinates} [coordinates] 
+     */
+    public setCurrentLocation(locationName: string, coordinates?: types.Coordinates) {
+        const latitude = coordinates?.lat;
+        const longitude = coordinates?.lon;
+        if (isNaN(latitude) || isNaN(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+            loader.cache.events.emit(`onError`, { code: `error-invalid-coordinates`, message: loader.definitions.messages.invalid_coordinates });
+            return;
+        }
+        loader.cache.currentLocations[locationName] = coordinates;
     }
 
     /**
@@ -88,7 +108,7 @@ export class AlertManager {
      * @param {types.ClientSettings} settings 
      * @returns {Promise<void>} 
      */
-    public async setSettings(settings: types.ClientSettings): Promise<void> {
+    public async setSettings(settings: types.ClientSettings) {
         Utils.mergeClientSettings(loader.settings, settings);
     }
 
@@ -106,9 +126,9 @@ export class AlertManager {
      * @public
      * @param {string} event 
      * @param {(...args: any[]) => void} callback 
-     * @returns {() => void} 
+     * @returns {() => void}
      */
-    public onEvent(event: string, callback: (...args: any[]) => void): () => void {
+    public onEvent(event: string, callback: (...args: any[]) => void) {
         loader.cache.events.on(event, callback);
         return () => loader.cache.events.off(event, callback);
     }
@@ -122,7 +142,7 @@ export class AlertManager {
      * @param {Record<string, string>} [metadata={}] 
      * @returns {Promise<void>} 
      */
-    public async start(metadata: types.ClientSettings): Promise<void>  {
+    public async start(metadata: types.ClientSettings) {
         if (!loader.cache.isReady) { 
             console.log(loader.definitions.messages.not_ready);
             return Promise.resolve();
@@ -138,7 +158,7 @@ export class AlertManager {
             await Utils.loadCollectionCache();
         }
         Utils.handleCronJob(this.isNoaaWeatherWireService)
-        loader.packages.cron.schedule(`*/${!this.isNoaaWeatherWireService ? settings.NationalWeatherService.checkInterval : 5} * * * * *`, () => { 
+        this.job = new loader.packages.jobs.Cron(`*/${!this.isNoaaWeatherWireService ? settings.NationalWeatherService.checkInterval : 5} * * * * *`, () => { 
             Utils.handleCronJob(this.isNoaaWeatherWireService);
         })
     }
@@ -148,11 +168,11 @@ export class AlertManager {
      *
      * @public
      * @async
-     * @returns {Promise<void>} 
+     * @returns {Promise<void>}
      */
-    public async stop(): Promise<void> {
+    public async stop() {
         loader.cache.isReady = true;
-        loader.packages.cron.getTasks().forEach((task: any) => task.stop());
+        if (this.job) { this.job.stop(); this.job = null; }
         if (loader.cache.session && this.isNoaaWeatherWireService) {
             await loader.cache.session.stop();  
             loader.cache.sigHalt = true; 
@@ -164,4 +184,4 @@ export class AlertManager {
 }
 
 export default AlertManager;
-export { StanzaParser, EventParser, TextParser, VtecParser, UGCParser, EAS, Database, types };
+export { StanzaParser, EventParser, TextParser, VtecParser, UGCParser, EAS, Database, Utils };

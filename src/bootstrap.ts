@@ -18,7 +18,7 @@ import * as events from 'events';
 import * as xmpp from '@xmpp/client';
 import * as shapefile from 'shapefile';
 import * as xml2js from 'xml2js';
-import * as cron from 'node-cron';
+import * as jobs from 'croner';
 import sqlite3 from 'better-sqlite3';
 import axios from 'axios';
 import crypto from 'crypto';
@@ -41,7 +41,7 @@ export const packages = {
     shapefile, 
     xml2js, 
     sqlite3, 
-    cron, 
+    jobs, 
     axios, 
     crypto, 
     os, 
@@ -60,7 +60,8 @@ export const cache = {
     db: null,
     events: new events.EventEmitter(),
     isProcessingAudioQueue: false,
-    audioQueue: []
+    audioQueue: [],
+    currentLocations: {},
 };
 
 export const settings = { 
@@ -103,6 +104,11 @@ export const settings = {
             ugcFilter: [],
             stateFilter: [],
             checkExpired: true,
+            locationFiltering: {
+                maxDistance: 100,
+                unit: `miles`,
+                filterByCurrentLocation: true
+            },
         },
         easSettings: {
             easAlerts: [],
@@ -168,5 +174,6 @@ export const definitions = {
         not_ready: "[ERROR] You can NOT create another instance without shutting down the current one first, please make sure to call the stop() method first!",
         invalid_nickname: "[WARNING] The nickname you provided is invalid, please provide a valid nickname to continue.",
         eas_no_directory: "[WARNING] You have not set a directory for EAS audio files to be saved to, please set the 'easDirectory' setting in the global settings to enable EAS audio generation.",
+        invalid_coordinates: "[WARNING] The coordinates you provided are invalid, please provide valid latitude and longitude values.",
     }
 };

@@ -25,7 +25,7 @@ export class TextParser {
      * @param {string[]} [removal=[]] 
      * @returns {(string | null)} 
      */
-    public static textProductToString(message: string,value: string,removal: string[] = []): string | null {
+    public static textProductToString(message: string,value: string,removal: string[] = []) {
         const lines = message.split('\n');
         for (const line of lines) {
             if (line.includes(value)) {
@@ -46,7 +46,7 @@ export class TextParser {
      * @param {string} message 
      * @returns {[number, number][]} 
      */
-    public static textProductToPolygon(message: string): [number, number][] {
+    public static textProductToPolygon(message: string) {
         const coordinates: [number, number][] = [];
         const latLonMatch = message.match(/LAT\.{3}LON\s+([\d\s]+)/i);
         if (!latLonMatch || !latLonMatch[1]) return coordinates;
@@ -69,7 +69,7 @@ export class TextParser {
      * @param {string} [handle=null] 
      * @returns {string} 
      */
-    public static textProductToDescription(message: string, handle: string = null): string {
+    public static textProductToDescription(message: string, handle: string = null) {
         const original = message;
         const dateRegex = /\d{3,4}\s*(AM|PM)?\s*[A-Z]{2,4}\s+[A-Z]{3,}\s+[A-Z]{3,}\s+\d{1,2}\s+\d{4}/gim;
         const discoveredDates = Array.from(message.matchAll(dateRegex));
@@ -126,8 +126,8 @@ export class TextParser {
      */
     public static getXmlValues(parsed: any, valuesToExtract: string[]) {
         const extracted: Record<string, any> = {};   
-        const findValueByKey = (obj: any, searchKey: string): any[] => {
-            const results: any[] = [];
+        const findValueByKey = (obj: any, searchKey: string) => {
+            const results = [];
             if (obj === null || typeof obj !== 'object') {
                 return results;
             }
