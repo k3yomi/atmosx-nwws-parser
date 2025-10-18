@@ -2638,7 +2638,6 @@ var Xmpp = class {
           }
           if (stanza.is(`presence`) && stanza.attrs.from && stanza.attrs.from.startsWith("nwws@conference.nwws-oi.weather.gov/")) {
             const occupant = stanza.attrs.from.split("/").slice(1).join("/");
-            console.log(occupant);
             cache.events.emit("onOccupant", { occupant, type: stanza.attrs.type === "unavailable" ? "unavailable" : "available" });
           }
         } catch (e) {
