@@ -108,7 +108,7 @@ export const settings = {
             locationFiltering: {
                 maxDistance: 100,
                 unit: `miles`,
-                filterByCurrentLocation: true
+                filter: false
             },
         },
         easSettings: {
@@ -169,11 +169,13 @@ export const definitions = {
         { id: `Z`, file: `Marine` }
     ],
     messages: {
-        shapefile_creation: `[NOTICE] DO NOT CLOSE THIS PROJECT UNTIL THE SHAPEFILES ARE DONE COMPLETING!\n\t THIS COULD TAKE A WHILE DEPENDING ON THE SPEED OF YOUR STORAGE!!\n\t IF YOU CLOSE YOUR PROJECT, THE SHAPEFILES WILL NOT BE CREATED AND YOU WILL NEED TO DELETE ${settings.database} AND RESTART TO CREATE THEM AGAIN!`,
-        shapefile_creation_finished: `[NOTICE] SHAPEFILES HAVE BEEN SUCCESSFULLY CREATED AND THE DATABASE IS READY FOR USE!`,
-        not_ready: "[ERROR] You can NOT create another instance without shutting down the current one first, please make sure to call the stop() method first!",
-        invalid_nickname: "[WARNING] The nickname you provided is invalid, please provide a valid nickname to continue.",
-        eas_no_directory: "[WARNING] You have not set a directory for EAS audio files to be saved to, please set the 'easDirectory' setting in the global settings to enable EAS audio generation.",
-        invalid_coordinates: "[WARNING] The coordinates you provided are invalid, please provide valid latitude and longitude values.",
+        shapefile_creation: `DO NOT CLOSE THIS PROJECT UNTIL THE SHAPEFILES ARE DONE COMPLETING!\n\t THIS COULD TAKE A WHILE DEPENDING ON THE SPEED OF YOUR STORAGE!!\n\t IF YOU CLOSE YOUR PROJECT, THE SHAPEFILES WILL NOT BE CREATED AND YOU WILL NEED TO DELETE ${settings.database} AND RESTART TO CREATE THEM AGAIN!`,
+        shapefile_creation_finished: `SHAPEFILES HAVE BEEN SUCCESSFULLY CREATED AND THE DATABASE IS READY FOR USE!`,
+        not_ready: "You can NOT create another instance without shutting down the current one first, please make sure to call the stop() method first!",
+        invalid_nickname: "The nickname you provided is invalid, please provide a valid nickname to continue.",
+        eas_no_directory: "You have not set a directory for EAS audio files to be saved to, please set the 'easDirectory' setting in the global settings to enable EAS audio generation.",
+        invalid_coordinates: "The coordinates you provided are invalid, please provide valid latitude and longitude values. Attempted: {lat}, {lon}.",
+        no_current_locations: "No current locations have been set, distance-based filtering will be skipped until at least one location is provided.",
+        reconnect_too_fast: "The client is attempting to reconnect too fast. This may be due to network instability. Reconnection attempt has been halted for safety.",
     }
 };

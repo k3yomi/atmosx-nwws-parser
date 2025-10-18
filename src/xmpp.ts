@@ -41,7 +41,7 @@ export class Xmpp {
                     loader.cache.attemptingReconnect = true;
                     loader.cache.isConnected = false;
                     loader.cache.totalReconnects += 1;
-                    loader.cache.events.emit(`onReconnect`, { reconnects: loader.cache.totalReconnects, lastStanza: lastStanza, lastName: settings.NoaaWeatherWireService.clientCredentials.nickname})
+                    loader.cache.events.emit(`onReconnection`, { reconnects: loader.cache.totalReconnects, lastStanza: lastStanza, lastName: settings.NoaaWeatherWireService.clientCredentials.nickname})
                     await loader.cache.session.stop().catch(() => {});
                     await loader.cache.session.start().catch(() => {});
                 }
@@ -71,10 +71,8 @@ export class Xmpp {
         loader.cache.session.on(`online`, async (address: string) => {
             if (loader.cache.lastConnect && Date.now() - loader.cache.lastConnect < 10 * 1000) {
                 loader.cache.sigHalt = true;
-                Utils.sleep(2 * 1000).then(async () => { 
-                    await loader.cache.session.stop()
-                 });
-                loader.cache.events.emit(`onError`, { code: `error-reconnecting-too-fast`, message: `The client is attempting to reconnect too fast. Please wait a few seconds before trying again.` });
+                Utils.sleep(2 * 1000).then(async () => { await loader.cache.session.stop() });
+                Utils.warn(loader.definitions.messages.reconnect_too_fast);
                 return;
             }
             loader.cache.isConnected = true;
@@ -89,12 +87,12 @@ export class Xmpp {
         loader.cache.session.on(`offline`, async () => {
             loader.cache.isConnected = false;
             loader.cache.sigHalt = true;
-            loader.cache.events.emit(`onError`, { code: `connection-lost`, message: `XMPP connection went offline` });
+            Utils.warn(`XMPP connection went offline`);
         });
         loader.cache.session.on(`error`, async (error: Error) => {
             loader.cache.isConnected = false;
             loader.cache.sigHalt = true;
-            loader.cache.events.emit(`onError`, { code: `connection-error`, message: error.message });
+            Utils.warn(`XMPP connection error: ${error.message}`);
         });
         loader.cache.session.on(`stanza`, async (stanza: any) => {
             try {
@@ -111,10 +109,10 @@ export class Xmpp {
                     loader.cache.events.emit('onOccupant', { occupant, type: stanza.attrs.type === 'unavailable' ? 'unavailable' : 'available' });
                 }
             } catch (e) {
-                loader.cache.events.emit(`onError`, {code: `error-processing-stanza`, message: (e as Error).message})
+                Utils.warn(`Error processing stanza: ${(e as Error).message}`);
             }
         });
-        await loader.cache.session.start()
+        await loader.cache.session.start().catch(() => {})
     }
 
 }

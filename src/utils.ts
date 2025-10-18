@@ -34,6 +34,17 @@ export class Utils {
     }
     
     /**
+     * warn logs a warning message to the console with a standardized format.
+     *
+     * @public
+     * @static
+     * @param {string} message 
+     */
+    public static warn(message: string) {
+        console.warn(`\x1b[33m[ATMX-MANAGER]\x1b[0m ${message}`);
+    }
+    
+    /**
      * loadCollectionCache reads cached alert files from the specified cache directory and processes them.
      *
      * @public
@@ -61,7 +72,7 @@ export class Utils {
                 }
             }
         } catch (error: any) {
-            loader.cache.events.emit('onError', { code: 'error-load-cache', message: `Failed to load cache: ${error.message}`});
+            Utils.warn(`Failed to load cache: ${error.message}`);
         }
     }
 
@@ -81,7 +92,7 @@ export class Utils {
                 EventParser.eventHandler({message: JSON.stringify(response.message), attributes: {}, isCap: true, isApi: true, isVtec: false, isUGC: false, isCapDescription: false, awipsType: { type: 'api', prefix: 'AP' }, ignore: false});
             }
         } catch (error: any) {
-            loader.cache.events.emit('onError', { code: 'error-fetching-nws-data', message: `Failed to fetch NWS data: ${error.message}`});
+            Utils.warn(`Failed to load National Weather Service GeoJSON Data: ${error.message}`);
         }
     }
 
@@ -94,7 +105,7 @@ export class Utils {
     public static detectUncaughtExceptions() {
         if (loader.cache.events.listenerCount('uncaughtException') > 0) return;
         process.on('uncaughtException', (error: Error) => {
-            loader.cache.events.emit(`onError`, {message: `Uncaught Exception: ${error.message}`, code: `error-uncaught-exception`, stack: error.stack});
+            Utils.warn(`Uncaught Exception: ${error.message}`);
         });
     }
     
@@ -167,7 +178,7 @@ export class Utils {
                 if (f.size > maxBytes) loader.packages.fs.unlinkSync(f.file);
             })
         } catch (error: any) {
-            loader.cache.events.emit('onError', { code: 'error-garbage-collection', message: `Failed to perform garbage collection: ${error.message}`});
+            Utils.warn(`Failed to perform garbage collection: ${error.message}`);
         }
     }
 
@@ -188,7 +199,7 @@ export class Utils {
                 void this.loadGeoJsonData();
             }
         } catch (error: any) {
-            loader.cache.events.emit('onError', { code: 'error-cron-job', message: `Failed to perform scheduled tasks: ${error.message}`});
+            Utils.warn(`Failed to perform scheduled tasks: ${error.message}`);
         }
     }
 

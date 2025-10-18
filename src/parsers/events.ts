@@ -155,7 +155,7 @@ export class EventParser {
             const { performance, header, ...eventWithoutPerformance } = originalEvent;
             originalEvent.properties.parent = originalEvent.properties.event;          
             originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools?.betterEventParsing, bools?.useParentEvents);
-            originalEvent.properties.distance = this.getLocationDistances(props, bools?.filterByCurrentLocation, locationSettings?.maxDistance, locationSettings?.unit);
+            originalEvent.properties.distance = this.getLocationDistances(props, bools?.filter, locationSettings?.maxDistance, locationSettings?.unit);
             originalEvent.hash = loader.packages.crypto.createHash('md5').update(JSON.stringify(eventWithoutPerformance)).digest('hex');
             if (!originalEvent.properties.distance?.in_range) { return false; }
             if (originalEvent.properties.is_test == true && bools?.ignoreTestProducts) return false;
@@ -286,48 +286,59 @@ export class EventParser {
                 if (!properties.distance) { properties.distance = {}; }
                 properties.distance[key] = { unit, distance };
             }
-        }
-        if (!isFiltered) { return {...properties.distance, in_range: true }; }
-        if (isFiltered) { 
-            for (const key in properties.distance) {
-                if (properties.distance[key].distance <= maxDistance) {
-                    inRange = true;
+            if (!isFiltered) { return {range: properties.distance, in_range: true}; }
+            if (isFiltered) { 
+                for (const key in properties.distance) {
+                    if (properties.distance[key].distance <= maxDistance) {
+                        inRange = true;
+                    }
                 }
             }
+            if (loader.cache.currentLocations && Object.keys(loader.cache.currentLocations).length == 0) {
+                Utils.warn(loader.definitions.messages.no_current_locations);
+                inRange = true;
+            }
+            return {range: properties.distance, in_range: inRange }
         }
-        return {...properties.distance, in_range: inRange };
+        return null;
     }
 
     /**
      * buildDefaultSignature processes and standardizes the event's properties, ensuring proper status correlation, cancellation detection, and expiry handling.
-     *
+     * C = Cancelled, U = Updated, I = Issued
+     * 
      * @private
      * @static
      * @param {*} event The event object to process.
      * @returns {*} The processed event with updated properties.
      */
     private static buildDefaultSignature(event: any) {
-        const statusCorrelation = loader.definitions.correlations.find((c: { type: string }) => c.type === event.properties.action_type);
+        const props = event.properties ?? {};
+        const statusCorrelation = loader.definitions.correlations.find((c: { type: string }) => c.type === props.action_type);
         const defEventTags = loader.definitions.tags;
-        const tags = Object.entries(defEventTags).filter(([key]) => event.properties.description.includes(key.toLowerCase())).map(([, value]) => value)
-        event.properties.tags = tags.length > 0 ? tags : [`N/A`];
-        event.properties.action_type = statusCorrelation ? statusCorrelation.forward : event.properties.action_type;
-        event.properties.is_updated = statusCorrelation ? (statusCorrelation.update == true) : false;
-        event.properties.is_issued = statusCorrelation ? (statusCorrelation.new == true) : false;
-        event.properties.is_cancelled = statusCorrelation ? (statusCorrelation.cancel == true) : false;
-        if (event.properties.description) { 
-            const detectedPhrase = loader.definitions.cancelSignatures.find(sig => event.properties.description.toLowerCase().includes(sig.toLowerCase()));
-            if (detectedPhrase) { event.properties.action_type = 'Cancel'; event.properties.is_cancelled = true; } 
+        const tags = Object.entries(defEventTags).filter(([key]) => props?.description.includes(key.toLowerCase())).map(([, value]) => value)
+        props.tags = tags.length > 0 ? tags : [`N/A`];
+        const setAction = (type: `C` | `U` | `I`) => { 
+            props.action_type = type; 
+            props.is_cancelled = type === `C`; 
+            props.is_updated = type === `U`; 
+            props.is_issued = type === `I`; 
+        };
+        if (statusCorrelation) { 
+            props.action_type = statusCorrelation.forward ?? props.action_type; 
+            props.is_updated = !!statusCorrelation.update; props.is_issued = !!statusCorrelation.new;
+            props.is_cancelled = !!statusCorrelation.cancel; 
+        } else { setAction(`I`); }
+        if (props.description) { 
+            const detectedPhrase = loader.definitions.cancelSignatures.find(sig => props.description.toLowerCase().includes(sig.toLowerCase()));
+            if (detectedPhrase) { setAction(`C`); }
         }
         if (event.vtec) { 
             const getType = event.vtec.split(`.`)[0];
             const isTestProduct = loader.definitions.productTypes[getType] == `Test Product`
-            if (isTestProduct) { event.properties.action_type = 'Cancel'; event.properties.is_cancelled = true; event.properties.is_test = true; }
+            if (isTestProduct) { setAction(`C`); props.is_test = true; }
         }
-        if (new Date(event.properties?.expires).getTime() < new Date().getTime()) {
-           event.properties.is_cancelled = true;
-           event.properties.action_type = 'Cancel';
-        }
+        if (new Date(props?.expires).getTime() < new Date().getTime()) { setAction(`C`); }
         return event;
     }
 }

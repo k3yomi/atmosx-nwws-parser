@@ -34,7 +34,7 @@ export class EAS {
             const settings = loader.settings as types.ClientSettings;
             for (const { regex, replacement } of loader.definitions.messageSignatures) { message = message.replace(regex, replacement); }
             const assetsDir = settings.global.easSettings.easDirectory;
-            if (!assetsDir) { console.warn(loader.definitions.messages.eas_no_directory); return resolve(null); }
+            if (!assetsDir) { Utils.warn(loader.definitions.messages.eas_no_directory); return resolve(null); }
             const rngFile = `${vtec.replace(/[^a-zA-Z0-9]/g, `_`)}`.substring(0, 32).replace(/^_+|_+$/g, '');
             if (!loader.packages.fs.existsSync(assetsDir)) { loader.packages.fs.mkdirSync(assetsDir); }
 

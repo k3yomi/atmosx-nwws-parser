@@ -29,7 +29,7 @@ interface GlobalSettings {
         locationFiltering: {
             maxDistance: number,
             unit: `miles` | `kilometers`,
-            filterByCurrentLocation: boolean
+            filter: boolean
         },
     }, 
 }

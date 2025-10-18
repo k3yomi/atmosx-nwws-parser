@@ -41,13 +41,12 @@ export class AlertManager {
         const settings = loader.settings as types.ClientSettings;
         const trimmed = name?.trim();
         if (!trimmed) {
-            loader.cache.events.emit(`onError`, { code: `error-invalid-nickname`, message: loader.definitions.messages.invalid_nickname });
+            Utils.warn(loader.definitions.messages.invalid_nickname);
             return;
         }
         settings.NoaaWeatherWireService.clientCredentials.nickname = trimmed;
     }
 
-    
     /**
      * This will set custom coordinates based on given paramters and key name. This will be used to 
      * get the distance between each alert at a given coord in either miles or kilometers.
@@ -60,12 +59,21 @@ export class AlertManager {
         const latitude = coordinates?.lat;
         const longitude = coordinates?.lon;
         if (isNaN(latitude) || isNaN(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-            loader.cache.events.emit(`onError`, { code: `error-invalid-coordinates`, message: loader.definitions.messages.invalid_coordinates });
+            Utils.warn(loader.definitions.messages.invalid_coordinates.replace('{lat}', String(latitude)).replace('{lon}', String(longitude)));
             return;
         }
         loader.cache.currentLocations[locationName] = coordinates;
     }
 
+    /**
+     * createEasAudio generates EAS audio files based on the provided description and header information.
+     *
+     * @public
+     * @async
+     * @param {string} description 
+     * @param {string} header 
+     * @returns {unknown} 
+     */
     public async createEasAudio(description: string, header: string) {
         return await EAS.generateEASAudio(description, header);
     }
@@ -117,11 +125,10 @@ export class AlertManager {
     }
 
     /**
-     * onEvent allows the client to listen for specific events emitted by the parser.
+     * "on" allows the client to listen for specific events emitted by the parser.
      * Events include:
      * - onAlerts: Emitted when a batch of new alerts have been fully parsed
      * - onMessage: Emitted when a raw CAP/XML has been parsed by the StanzaParser
-     * - onError: Emitted when an error occurs within the parser
      * - onConnection: Emitted when the XMPP client connects successfully
      * - onReconnect: Emitted when the XMPP client is attempting to reconnect
      * - onOccupant: Emitted when an occupant joins or leaves the XMPP MUC room (NWWS only)
@@ -132,7 +139,7 @@ export class AlertManager {
      * @param {(...args: any[]) => void} callback 
      * @returns {() => void}
      */
-    public onEvent(event: string, callback: (...args: any[]) => void) {
+    public on(event: string, callback: (...args: any[]) => void) {
         loader.cache.events.on(event, callback);
         return () => loader.cache.events.off(event, callback);
     }
@@ -148,7 +155,7 @@ export class AlertManager {
      */
     public async start(metadata: types.ClientSettings) {
         if (!loader.cache.isReady) { 
-            console.log(loader.definitions.messages.not_ready);
+            Utils.warn(loader.definitions.messages.not_ready);
             return Promise.resolve();
         }
         this.setSettings(metadata);

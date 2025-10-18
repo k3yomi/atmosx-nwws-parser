@@ -14,6 +14,7 @@
 
 import * as loader from './bootstrap';
 import * as types from './types';
+import Utils from './utils';
 
 
 export class Database {
@@ -54,12 +55,12 @@ export class Database {
             if (!stanzaTable) { loader.cache.db.prepare(`CREATE TABLE stanzas (id INTEGER PRIMARY KEY AUTOINCREMENT, stanza TEXT)`).run(); }
             if (!shapfileTable) {
                 loader.cache.db.prepare(`CREATE TABLE shapefiles (id TEXT PRIMARY KEY, location TEXT, geometry TEXT)`).run();
-                console.log(loader.definitions.messages.shapefile_creation);
+                Utils.warn(loader.definitions.messages.shapefile_creation);
                 for (const shape of loader.definitions.shapefiles) {
                     const { id, file } = shape;
                     const filepath = loader.packages.path.join(__dirname, `../../shapefiles`, file);
                     const { features } = await loader.packages.shapefile.read(filepath, filepath);
-                    console.log(`Importing ${features.length} entries from ${file}...`);
+                    Utils.warn(`Importing ${features.length} entries from ${file}...`);
                     const insertStmt = loader.cache.db.prepare(`INSERT OR REPLACE INTO shapefiles (id, location, geometry)VALUES (?, ?, ?)`);
                     const insertTransaction = loader.cache.db.transaction((entries: any[]) => {
                         for (const feature of entries) {
@@ -88,10 +89,10 @@ export class Database {
                     });
                     await insertTransaction(features);
                 }
-                console.log(loader.definitions.messages.shapefile_creation_finished);
+                Utils.warn(loader.definitions.messages.shapefile_creation_finished);
             }
         } catch (error: any) {
-            loader.cache.events.emit('onError', { code: 'error-load-database', message: `Failed to load database: ${error.message}`});
+            Utils.warn(`Failed to load database: ${error.message}`);
         }
     }
 }

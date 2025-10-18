@@ -941,7 +941,7 @@ var settings = {
       locationFiltering: {
         maxDistance: 100,
         unit: `miles`,
-        filterByCurrentLocation: true
+        filter: false
       }
     },
     easSettings: {
@@ -1004,14 +1004,16 @@ var definitions = {
     { id: `Z`, file: `Marine` }
   ],
   messages: {
-    shapefile_creation: `[NOTICE] DO NOT CLOSE THIS PROJECT UNTIL THE SHAPEFILES ARE DONE COMPLETING!
+    shapefile_creation: `DO NOT CLOSE THIS PROJECT UNTIL THE SHAPEFILES ARE DONE COMPLETING!
 	 THIS COULD TAKE A WHILE DEPENDING ON THE SPEED OF YOUR STORAGE!!
 	 IF YOU CLOSE YOUR PROJECT, THE SHAPEFILES WILL NOT BE CREATED AND YOU WILL NEED TO DELETE ${settings.database} AND RESTART TO CREATE THEM AGAIN!`,
-    shapefile_creation_finished: `[NOTICE] SHAPEFILES HAVE BEEN SUCCESSFULLY CREATED AND THE DATABASE IS READY FOR USE!`,
-    not_ready: "[ERROR] You can NOT create another instance without shutting down the current one first, please make sure to call the stop() method first!",
-    invalid_nickname: "[WARNING] The nickname you provided is invalid, please provide a valid nickname to continue.",
-    eas_no_directory: "[WARNING] You have not set a directory for EAS audio files to be saved to, please set the 'easDirectory' setting in the global settings to enable EAS audio generation.",
-    invalid_coordinates: "[WARNING] The coordinates you provided are invalid, please provide valid latitude and longitude values."
+    shapefile_creation_finished: `SHAPEFILES HAVE BEEN SUCCESSFULLY CREATED AND THE DATABASE IS READY FOR USE!`,
+    not_ready: "You can NOT create another instance without shutting down the current one first, please make sure to call the stop() method first!",
+    invalid_nickname: "The nickname you provided is invalid, please provide a valid nickname to continue.",
+    eas_no_directory: "You have not set a directory for EAS audio files to be saved to, please set the 'easDirectory' setting in the global settings to enable EAS audio generation.",
+    invalid_coordinates: "The coordinates you provided are invalid, please provide valid latitude and longitude values. Attempted: {lat}, {lon}.",
+    no_current_locations: "No current locations have been set, distance-based filtering will be skipped until at least one location is provided.",
+    reconnect_too_fast: "The client is attempting to reconnect too fast. This may be due to network instability. Reconnection attempt has been halted for safety."
   }
 };
 
@@ -1988,7 +1990,7 @@ var EventParser = class {
       const _c2 = originalEvent, { performance: performance2, header } = _c2, eventWithoutPerformance = __objRest(_c2, ["performance", "header"]);
       originalEvent.properties.parent = originalEvent.properties.event;
       originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools == null ? void 0 : bools.betterEventParsing, bools == null ? void 0 : bools.useParentEvents);
-      originalEvent.properties.distance = this.getLocationDistances(props, bools == null ? void 0 : bools.filterByCurrentLocation, locationSettings == null ? void 0 : locationSettings.maxDistance, locationSettings == null ? void 0 : locationSettings.unit);
+      originalEvent.properties.distance = this.getLocationDistances(props, bools == null ? void 0 : bools.filter, locationSettings == null ? void 0 : locationSettings.maxDistance, locationSettings == null ? void 0 : locationSettings.unit);
       originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(eventWithoutPerformance)).digest("hex");
       if (!((_d2 = originalEvent.properties.distance) == null ? void 0 : _d2.in_range)) {
         return false;
@@ -2115,56 +2117,70 @@ var EventParser = class {
         }
         properties.distance[key] = { unit, distance };
       }
-    }
-    if (!isFiltered) {
-      return __spreadProps(__spreadValues({}, properties.distance), { in_range: true });
-    }
-    if (isFiltered) {
-      for (const key in properties.distance) {
-        if (properties.distance[key].distance <= maxDistance) {
-          inRange = true;
+      if (!isFiltered) {
+        return { range: properties.distance, in_range: true };
+      }
+      if (isFiltered) {
+        for (const key in properties.distance) {
+          if (properties.distance[key].distance <= maxDistance) {
+            inRange = true;
+          }
         }
       }
+      if (cache.currentLocations && Object.keys(cache.currentLocations).length == 0) {
+        utils_default.warn(definitions.messages.no_current_locations);
+        inRange = true;
+      }
+      return { range: properties.distance, in_range: inRange };
     }
-    return __spreadProps(__spreadValues({}, properties.distance), { in_range: inRange });
+    return null;
   }
   /**
    * buildDefaultSignature processes and standardizes the event's properties, ensuring proper status correlation, cancellation detection, and expiry handling.
-   *
+   * C = Cancelled, U = Updated, I = Issued
+   * 
    * @private
    * @static
    * @param {*} event The event object to process.
    * @returns {*} The processed event with updated properties.
    */
   static buildDefaultSignature(event) {
-    var _a;
-    const statusCorrelation = definitions.correlations.find((c) => c.type === event.properties.action_type);
+    var _a, _b;
+    const props = (_a = event.properties) != null ? _a : {};
+    const statusCorrelation = definitions.correlations.find((c) => c.type === props.action_type);
     const defEventTags = definitions.tags;
-    const tags = Object.entries(defEventTags).filter(([key]) => event.properties.description.includes(key.toLowerCase())).map(([, value]) => value);
-    event.properties.tags = tags.length > 0 ? tags : [`N/A`];
-    event.properties.action_type = statusCorrelation ? statusCorrelation.forward : event.properties.action_type;
-    event.properties.is_updated = statusCorrelation ? statusCorrelation.update == true : false;
-    event.properties.is_issued = statusCorrelation ? statusCorrelation.new == true : false;
-    event.properties.is_cancelled = statusCorrelation ? statusCorrelation.cancel == true : false;
-    if (event.properties.description) {
-      const detectedPhrase = definitions.cancelSignatures.find((sig) => event.properties.description.toLowerCase().includes(sig.toLowerCase()));
+    const tags = Object.entries(defEventTags).filter(([key]) => props == null ? void 0 : props.description.includes(key.toLowerCase())).map(([, value]) => value);
+    props.tags = tags.length > 0 ? tags : [`N/A`];
+    const setAction = (type) => {
+      props.action_type = type;
+      props.is_cancelled = type === `C`;
+      props.is_updated = type === `U`;
+      props.is_issued = type === `I`;
+    };
+    if (statusCorrelation) {
+      props.action_type = (_b = statusCorrelation.forward) != null ? _b : props.action_type;
+      props.is_updated = !!statusCorrelation.update;
+      props.is_issued = !!statusCorrelation.new;
+      props.is_cancelled = !!statusCorrelation.cancel;
+    } else {
+      setAction(`I`);
+    }
+    if (props.description) {
+      const detectedPhrase = definitions.cancelSignatures.find((sig) => props.description.toLowerCase().includes(sig.toLowerCase()));
       if (detectedPhrase) {
-        event.properties.action_type = "Cancel";
-        event.properties.is_cancelled = true;
+        setAction(`C`);
       }
     }
     if (event.vtec) {
       const getType = event.vtec.split(`.`)[0];
       const isTestProduct = definitions.productTypes[getType] == `Test Product`;
       if (isTestProduct) {
-        event.properties.action_type = "Cancel";
-        event.properties.is_cancelled = true;
-        event.properties.is_test = true;
+        setAction(`C`);
+        props.is_test = true;
       }
     }
-    if (new Date((_a = event.properties) == null ? void 0 : _a.expires).getTime() < (/* @__PURE__ */ new Date()).getTime()) {
-      event.properties.is_cancelled = true;
-      event.properties.action_type = "Cancel";
+    if (new Date(props == null ? void 0 : props.expires).getTime() < (/* @__PURE__ */ new Date()).getTime()) {
+      setAction(`C`);
     }
     return event;
   }
@@ -2215,12 +2231,12 @@ var Database = class {
         }
         if (!shapfileTable) {
           cache.db.prepare(`CREATE TABLE shapefiles (id TEXT PRIMARY KEY, location TEXT, geometry TEXT)`).run();
-          console.log(definitions.messages.shapefile_creation);
+          utils_default.warn(definitions.messages.shapefile_creation);
           for (const shape of definitions.shapefiles) {
             const { id, file } = shape;
             const filepath = packages.path.join(__dirname, `../../shapefiles`, file);
             const { features } = yield packages.shapefile.read(filepath, filepath);
-            console.log(`Importing ${features.length} entries from ${file}...`);
+            utils_default.warn(`Importing ${features.length} entries from ${file}...`);
             const insertStmt = cache.db.prepare(`INSERT OR REPLACE INTO shapefiles (id, location, geometry)VALUES (?, ?, ?)`);
             const insertTransaction = cache.db.transaction((entries) => {
               for (const feature of entries) {
@@ -2249,10 +2265,10 @@ var Database = class {
             });
             yield insertTransaction(features);
           }
-          console.log(definitions.messages.shapefile_creation_finished);
+          utils_default.warn(definitions.messages.shapefile_creation_finished);
         }
       } catch (error) {
-        cache.events.emit("onError", { code: "error-load-database", message: `Failed to load database: ${error.message}` });
+        utils_default.warn(`Failed to load database: ${error.message}`);
       }
     });
   }
@@ -2281,7 +2297,7 @@ var Xmpp = class {
             cache.attemptingReconnect = true;
             cache.isConnected = false;
             cache.totalReconnects += 1;
-            cache.events.emit(`onReconnect`, { reconnects: cache.totalReconnects, lastStanza, lastName: settings2.NoaaWeatherWireService.clientCredentials.nickname });
+            cache.events.emit(`onReconnection`, { reconnects: cache.totalReconnects, lastStanza, lastName: settings2.NoaaWeatherWireService.clientCredentials.nickname });
             yield cache.session.stop().catch(() => {
             });
             yield cache.session.start().catch(() => {
@@ -2318,7 +2334,7 @@ var Xmpp = class {
           utils_default.sleep(2 * 1e3).then(() => __async(null, null, function* () {
             yield cache.session.stop();
           }));
-          cache.events.emit(`onError`, { code: `error-reconnecting-too-fast`, message: `The client is attempting to reconnect too fast. Please wait a few seconds before trying again.` });
+          utils_default.warn(definitions.messages.reconnect_too_fast);
           return;
         }
         cache.isConnected = true;
@@ -2335,12 +2351,12 @@ var Xmpp = class {
       cache.session.on(`offline`, () => __async(null, null, function* () {
         cache.isConnected = false;
         cache.sigHalt = true;
-        cache.events.emit(`onError`, { code: `connection-lost`, message: `XMPP connection went offline` });
+        utils_default.warn(`XMPP connection went offline`);
       }));
       cache.session.on(`error`, (error) => __async(null, null, function* () {
         cache.isConnected = false;
         cache.sigHalt = true;
-        cache.events.emit(`onError`, { code: `connection-error`, message: error.message });
+        utils_default.warn(`XMPP connection error: ${error.message}`);
       }));
       cache.session.on(`stanza`, (stanza) => __async(null, null, function* () {
         try {
@@ -2357,17 +2373,18 @@ var Xmpp = class {
             cache.events.emit("onOccupant", { occupant, type: stanza.attrs.type === "unavailable" ? "unavailable" : "available" });
           }
         } catch (e) {
-          cache.events.emit(`onError`, { code: `error-processing-stanza`, message: e.message });
+          utils_default.warn(`Error processing stanza: ${e.message}`);
         }
       }));
-      yield cache.session.start();
+      yield cache.session.start().catch(() => {
+      });
     });
   }
 };
 var xmpp_default = Xmpp;
 
 // src/utils.ts
-var Utils = class {
+var Utils = class _Utils {
   /**
    * Zzzzzzz... yeah not much to explain here. Simple sleep function that returns a promise after the specified milliseconds.
    *
@@ -2381,6 +2398,16 @@ var Utils = class {
     return __async(this, null, function* () {
       return new Promise((resolve) => setTimeout(resolve, ms));
     });
+  }
+  /**
+   * warn logs a warning message to the console with a standardized format.
+   *
+   * @public
+   * @static
+   * @param {string} message 
+   */
+  static warn(message) {
+    console.warn(`\x1B[33m[ATMX-MANAGER]\x1B[0m ${message}`);
   }
   /**
    * loadCollectionCache reads cached alert files from the specified cache directory and processes them.
@@ -2413,7 +2440,7 @@ var Utils = class {
           }
         }
       } catch (error) {
-        cache.events.emit("onError", { code: "error-load-cache", message: `Failed to load cache: ${error.message}` });
+        _Utils.warn(`Failed to load cache: ${error.message}`);
       }
     });
   }
@@ -2434,7 +2461,7 @@ var Utils = class {
           events_default.eventHandler({ message: JSON.stringify(response.message), attributes: {}, isCap: true, isApi: true, isVtec: false, isUGC: false, isCapDescription: false, awipsType: { type: "api", prefix: "AP" }, ignore: false });
         }
       } catch (error) {
-        cache.events.emit("onError", { code: "error-fetching-nws-data", message: `Failed to fetch NWS data: ${error.message}` });
+        _Utils.warn(`Failed to load National Weather Service GeoJSON Data: ${error.message}`);
       }
     });
   }
@@ -2447,7 +2474,7 @@ var Utils = class {
   static detectUncaughtExceptions() {
     if (cache.events.listenerCount("uncaughtException") > 0) return;
     process.on("uncaughtException", (error) => {
-      cache.events.emit(`onError`, { message: `Uncaught Exception: ${error.message}`, code: `error-uncaught-exception`, stack: error.stack });
+      _Utils.warn(`Uncaught Exception: ${error.message}`);
     });
   }
   /**
@@ -2516,7 +2543,7 @@ var Utils = class {
         if (f.size > maxBytes) packages.fs.unlinkSync(f.file);
       });
     } catch (error) {
-      cache.events.emit("onError", { code: "error-garbage-collection", message: `Failed to perform garbage collection: ${error.message}` });
+      _Utils.warn(`Failed to perform garbage collection: ${error.message}`);
     }
   }
   /**
@@ -2536,7 +2563,7 @@ var Utils = class {
         void this.loadGeoJsonData();
       }
     } catch (error) {
-      cache.events.emit("onError", { code: "error-cron-job", message: `Failed to perform scheduled tasks: ${error.message}` });
+      _Utils.warn(`Failed to perform scheduled tasks: ${error.message}`);
     }
   }
   /**
@@ -2609,7 +2636,7 @@ var EAS = class {
       }
       const assetsDir = settings2.global.easSettings.easDirectory;
       if (!assetsDir) {
-        console.warn(definitions.messages.eas_no_directory);
+        utils_default.warn(definitions.messages.eas_no_directory);
         return resolve(null);
       }
       const rngFile = `${vtec.replace(/[^a-zA-Z0-9]/g, `_`)}`.substring(0, 32).replace(/^_+|_+$/g, "");
@@ -3024,7 +3051,7 @@ var AlertManager = class {
     const settings2 = settings;
     const trimmed = name == null ? void 0 : name.trim();
     if (!trimmed) {
-      cache.events.emit(`onError`, { code: `error-invalid-nickname`, message: definitions.messages.invalid_nickname });
+      utils_default.warn(definitions.messages.invalid_nickname);
       return;
     }
     settings2.NoaaWeatherWireService.clientCredentials.nickname = trimmed;
@@ -3041,11 +3068,20 @@ var AlertManager = class {
     const latitude = coordinates == null ? void 0 : coordinates.lat;
     const longitude = coordinates == null ? void 0 : coordinates.lon;
     if (isNaN(latitude) || isNaN(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-      cache.events.emit(`onError`, { code: `error-invalid-coordinates`, message: definitions.messages.invalid_coordinates });
+      utils_default.warn(definitions.messages.invalid_coordinates.replace("{lat}", String(latitude)).replace("{lon}", String(longitude)));
       return;
     }
     cache.currentLocations[locationName] = coordinates;
   }
+  /**
+   * createEasAudio generates EAS audio files based on the provided description and header information.
+   *
+   * @public
+   * @async
+   * @param {string} description 
+   * @param {string} header 
+   * @returns {unknown} 
+   */
   createEasAudio(description, header) {
     return __async(this, null, function* () {
       return yield eas_default.generateEASAudio(description, header);
@@ -3099,11 +3135,10 @@ var AlertManager = class {
     });
   }
   /**
-   * onEvent allows the client to listen for specific events emitted by the parser.
+   * "on" allows the client to listen for specific events emitted by the parser.
    * Events include:
    * - onAlerts: Emitted when a batch of new alerts have been fully parsed
    * - onMessage: Emitted when a raw CAP/XML has been parsed by the StanzaParser
-   * - onError: Emitted when an error occurs within the parser
    * - onConnection: Emitted when the XMPP client connects successfully
    * - onReconnect: Emitted when the XMPP client is attempting to reconnect
    * - onOccupant: Emitted when an occupant joins or leaves the XMPP MUC room (NWWS only)
@@ -3114,7 +3149,7 @@ var AlertManager = class {
    * @param {(...args: any[]) => void} callback 
    * @returns {() => void}
    */
-  onEvent(event, callback) {
+  on(event, callback) {
     cache.events.on(event, callback);
     return () => cache.events.off(event, callback);
   }
@@ -3130,7 +3165,7 @@ var AlertManager = class {
   start(metadata) {
     return __async(this, null, function* () {
       if (!cache.isReady) {
-        console.log(definitions.messages.not_ready);
+        utils_default.warn(definitions.messages.not_ready);
         return Promise.resolve();
       }
       this.setSettings(metadata);
