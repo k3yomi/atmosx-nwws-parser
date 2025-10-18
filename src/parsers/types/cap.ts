@@ -78,7 +78,13 @@ export class CapAlerts {
                         discussion_wind_intensity: `N/A`,
                         discussion_hail_intensity: `N/A`,
                     },
-                    geometry: extracted.polygon ? { type: `Polygon`, coordinates: extracted.polygon.split(` `).map((coord: string) => coord.split(`,`).map((num: string) => parseFloat(num))) } : null,
+                    geometry: extracted.polygon ? { 
+                        type: `Polygon`, 
+                        coordinates: extracted.polygon.split(` `).map((coord: string) => {
+                            const [lon, lat] = coord.split(`,`).map((num: string) => parseFloat(num));
+                            return [lat, lon];
+                        }) 
+                    } : null,
                 }
             })
         }

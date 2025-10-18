@@ -164,6 +164,7 @@ export interface TypeAlert {
 export interface ClientSettings {
     database?: string,
     isNWWS: boolean,
+    catchUnhandledExceptions: boolean,
     NoaaWeatherWireService: NoaaWeatherWireServiceSettings,
     NationalWeatherService: NationalWeatherServiceSettings,
     global: GlobalSettings,

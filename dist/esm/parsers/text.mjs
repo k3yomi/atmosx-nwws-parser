@@ -831,6 +831,7 @@ var cache = {
 var settings = {
   database: path.join(process.cwd(), "shapefiles.db"),
   isNWWS: true,
+  catchUnhandledExceptions: false,
   NoaaWeatherWireService: {
     clientReconnections: {
       canReconnect: true,

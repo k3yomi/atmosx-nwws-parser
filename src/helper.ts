@@ -128,7 +128,7 @@ export class AlertManager {
             return Promise.resolve();
         }
         this.setSettings(metadata);
-        Utils.detectUncaughtExceptions();
+        if (loader.settings.catchUnhandledExceptions) { Utils.detectUncaughtExceptions(); }
         const settings = loader.settings as types.ClientSettings;
         this.isNoaaWeatherWireService = loader.settings.isNWWS
         loader.cache.isReady = false;

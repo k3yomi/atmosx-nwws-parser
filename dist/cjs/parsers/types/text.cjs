@@ -933,6 +933,7 @@ var cache = {
 var settings = {
   database: path.join(process.cwd(), "shapefiles.db"),
   isNWWS: true,
+  catchUnhandledExceptions: false,
   NoaaWeatherWireService: {
     clientReconnections: {
       canReconnect: true,
@@ -1561,7 +1562,13 @@ var CapAlerts = class {
               discussion_wind_intensity: `N/A`,
               discussion_hail_intensity: `N/A`
             },
-            geometry: extracted.polygon ? { type: `Polygon`, coordinates: extracted.polygon.split(` `).map((coord) => coord.split(`,`).map((num) => parseFloat(num))) } : null
+            geometry: extracted.polygon ? {
+              type: `Polygon`,
+              coordinates: extracted.polygon.split(` `).map((coord) => {
+                const [lon, lat] = coord.split(`,`).map((num) => parseFloat(num));
+                return [lat, lon];
+              })
+            } : null
           }
         });
       }
@@ -1588,7 +1595,7 @@ var APIAlerts = class {
   }
   static event(validated) {
     return __async(this, null, function* () {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca;
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia;
       let processed = [];
       const messages = Object.values(JSON.parse(validated.message).features);
       for (let feature of messages) {
@@ -1638,7 +1645,13 @@ var APIAlerts = class {
               peakWindGust: `N/A`,
               peakHailSize: `N/A`
             },
-            geometry: (_ca = feature == null ? void 0 : feature.geometry) != null ? _ca : null
+            geometry: ((_ea = (_da = (_ca = feature == null ? void 0 : feature.geometry) == null ? void 0 : _ca.coordinates) == null ? void 0 : _da[0]) == null ? void 0 : _ea.length) ? {
+              type: ((_fa = feature == null ? void 0 : feature.geometry) == null ? void 0 : _fa.type) || "Polygon",
+              coordinates: (_ia = (_ha = (_ga = feature == null ? void 0 : feature.geometry) == null ? void 0 : _ga.coordinates) == null ? void 0 : _ha[0]) == null ? void 0 : _ia.map((coord) => {
+                const [lon, lat] = Array.isArray(coord) ? coord : [0, 0];
+                return [lat, lon];
+              })
+            } : null
           }
         });
       }
@@ -2025,8 +2038,8 @@ var Utils = class {
    * @static
    */
   static detectUncaughtExceptions() {
-    if (process.listeners("uncaughtException").some((l) => l.name === "uncaughtExceptionHandler")) return;
-    process.on(`uncaughtException`, (error) => {
+    if (cache.events.listenerCount("uncaughtException") > 0) return;
+    cache.events.on("uncaughtException", (error) => {
       cache.events.emit(`onError`, { message: `Uncaught Exception: ${error.message}`, code: `error-uncaught-exception`, stack: error.stack });
     });
   }
