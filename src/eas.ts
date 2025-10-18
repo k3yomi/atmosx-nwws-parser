@@ -62,6 +62,7 @@ export class EAS {
             if (loader.packages.fs.existsSync(settings.global.easSettings.easIntroWav)) {
                 const toneBuffer = loader.packages.fs.readFileSync(settings.global.easSettings.easIntroWav);
                 const toneWav = this.parseWavPCM16(toneBuffer);
+                if (toneWav == null) { console.log(`[EAS] Intro tone WAV file is not valid PCM 16-bit format.`); return resolve(null); }
                 const toneSamples = (toneWav.sampleRate !== 8000 ? this.resamplePCM16(toneWav.samples, toneWav.sampleRate, 8000) : toneWav.samples);
                 toneRadio = this.applyNWREffect(toneSamples, 8000);
             }

@@ -93,7 +93,7 @@ export class Utils {
      */
     public static detectUncaughtExceptions(): void {
         if (loader.cache.events.listenerCount('uncaughtException') > 0) return;
-        loader.cache.events.on('uncaughtException', (error: Error) => {
+        process.on('uncaughtException', (error: Error) => {
             loader.cache.events.emit(`onError`, {message: `Uncaught Exception: ${error.message}`, code: `error-uncaught-exception`, stack: error.stack});
         });
     }
