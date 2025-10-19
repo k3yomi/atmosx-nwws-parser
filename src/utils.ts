@@ -41,6 +41,7 @@ export class Utils {
      * @param {string} message 
      */
     public static warn(message: string, force: boolean = false) {
+        loader.cache.events.emit('log', `\x1b[33m[ATMOSX-PARSER]\x1b[0m [${new Date().toLocaleString()}] ${message}`)
         if (!loader.settings.journal) return;
         if (loader.cache.lastWarn != null && (Date.now() - loader.cache.lastWarn < 500) && !force) return;
         loader.cache.lastWarn = Date.now();

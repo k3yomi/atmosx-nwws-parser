@@ -169,8 +169,8 @@ export interface TypeCompiled {
     isCapDescription: boolean,
     isVtec: boolean,
     isUGC: boolean,
-    getAwip?: { type: string, prefix: string },
-    awipsType: { type: string, prefix: string } | null,
+    getAwip?: Record<string, string>,
+    awipsType: Record<string, string>,
     awipsPrefix?: string,
     ignore: boolean,
 }

@@ -136,6 +136,7 @@ export class AlertManager {
      * - onReconnect: Emitted when the XMPP client is attempting to reconnect
      * - onOccupant: Emitted when an occupant joins or leaves the XMPP MUC room (NWWS only)
      * - onAnyEventType (Ex. onTornadoWarning) Emitted when a specific alert event type is received
+     * - log: Emitted for general log messages from the parser
      * 
      * @public
      * @param {string} event 
