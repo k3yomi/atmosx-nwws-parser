@@ -58,6 +58,8 @@ export const cache = {
     session: null,
     lastConnect: null,
     db: null,
+    lastWarn: null,
+    totalLocationWarns: 0,
     events: new events.EventEmitter(),
     isProcessingAudioQueue: false,
     audioQueue: [],
@@ -67,7 +69,7 @@ export const cache = {
 export const settings = { 
     database: path.join(process.cwd(), 'shapefiles.db'),
     isNWWS: true,
-    catchUnhandledExceptions: false,
+    journal: true,
     NoaaWeatherWireService: {
         clientReconnections: {
             canReconnect: true,
@@ -91,7 +93,7 @@ export const settings = {
     },
     NationalWeatherService: {
         checkInterval: 15,
-        endpoint: "https://api.weather.gov/alerts/active",
+        endpoint: `https://api.weather.gov/alerts/active`,
     },
     global: {
         useParentEvents: true,
@@ -171,11 +173,14 @@ export const definitions = {
     messages: {
         shapefile_creation: `DO NOT CLOSE THIS PROJECT UNTIL THE SHAPEFILES ARE DONE COMPLETING!\n\t THIS COULD TAKE A WHILE DEPENDING ON THE SPEED OF YOUR STORAGE!!\n\t IF YOU CLOSE YOUR PROJECT, THE SHAPEFILES WILL NOT BE CREATED AND YOU WILL NEED TO DELETE ${settings.database} AND RESTART TO CREATE THEM AGAIN!`,
         shapefile_creation_finished: `SHAPEFILES HAVE BEEN SUCCESSFULLY CREATED AND THE DATABASE IS READY FOR USE!`,
-        not_ready: "You can NOT create another instance without shutting down the current one first, please make sure to call the stop() method first!",
-        invalid_nickname: "The nickname you provided is invalid, please provide a valid nickname to continue.",
-        eas_no_directory: "You have not set a directory for EAS audio files to be saved to, please set the 'easDirectory' setting in the global settings to enable EAS audio generation.",
-        invalid_coordinates: "The coordinates you provided are invalid, please provide valid latitude and longitude values. Attempted: {lat}, {lon}.",
-        no_current_locations: "No current locations have been set, distance-based filtering will be skipped until at least one location is provided.",
-        reconnect_too_fast: "The client is attempting to reconnect too fast. This may be due to network instability. Reconnection attempt has been halted for safety.",
+        not_ready: `You can NOT create another instance without shutting down the current one first, please make sure to call the stop() method first!`,
+        invalid_nickname: `The nickname you provided is invalid, please provide a valid nickname to continue.`,
+        eas_no_directory: `You have not set a directory for EAS audio files to be saved to, please set the 'easDirectory' setting in the global settings to enable EAS audio generation.`,
+        invalid_coordinates: `The coordinates you provided are invalid, please provide valid latitude and longitude values. Attempted: {lat}, {lon}.`,
+        no_current_locations: `No current location has been set, operations will be haulted until a location is set or location filtering is disabled.`,
+        disabled_location_warning: `Exceeded maximum warnings for invalid or missing lat/lon coordinates. Location filtering has been ignored until you set valid coordinates or disable location filtering.`,
+        reconnect_too_fast: `The client is attempting to reconnect too fast. This may be due to network instability. Reconnection attempt has been halted for safety.`,
+        dump_cache: `Found {count} cached alert files and will begin dumping them shortly...`,
+        dump_cache_complete: `Completed dumping all cached alert files.`,
     }
 };

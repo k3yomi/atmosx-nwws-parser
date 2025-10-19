@@ -892,6 +892,8 @@ var cache = {
   session: null,
   lastConnect: null,
   db: null,
+  lastWarn: null,
+  totalLocationWarns: 0,
   events: new events.EventEmitter(),
   isProcessingAudioQueue: false,
   audioQueue: [],
@@ -900,7 +902,7 @@ var cache = {
 var settings = {
   database: path.join(process.cwd(), "shapefiles.db"),
   isNWWS: true,
-  catchUnhandledExceptions: false,
+  journal: true,
   NoaaWeatherWireService: {
     clientReconnections: {
       canReconnect: true,
@@ -924,7 +926,7 @@ var settings = {
   },
   NationalWeatherService: {
     checkInterval: 15,
-    endpoint: "https://api.weather.gov/alerts/active"
+    endpoint: `https://api.weather.gov/alerts/active`
   },
   global: {
     useParentEvents: true,
@@ -1008,12 +1010,15 @@ var definitions = {
 	 THIS COULD TAKE A WHILE DEPENDING ON THE SPEED OF YOUR STORAGE!!
 	 IF YOU CLOSE YOUR PROJECT, THE SHAPEFILES WILL NOT BE CREATED AND YOU WILL NEED TO DELETE ${settings.database} AND RESTART TO CREATE THEM AGAIN!`,
     shapefile_creation_finished: `SHAPEFILES HAVE BEEN SUCCESSFULLY CREATED AND THE DATABASE IS READY FOR USE!`,
-    not_ready: "You can NOT create another instance without shutting down the current one first, please make sure to call the stop() method first!",
-    invalid_nickname: "The nickname you provided is invalid, please provide a valid nickname to continue.",
-    eas_no_directory: "You have not set a directory for EAS audio files to be saved to, please set the 'easDirectory' setting in the global settings to enable EAS audio generation.",
-    invalid_coordinates: "The coordinates you provided are invalid, please provide valid latitude and longitude values. Attempted: {lat}, {lon}.",
-    no_current_locations: "No current locations have been set, distance-based filtering will be skipped until at least one location is provided.",
-    reconnect_too_fast: "The client is attempting to reconnect too fast. This may be due to network instability. Reconnection attempt has been halted for safety."
+    not_ready: `You can NOT create another instance without shutting down the current one first, please make sure to call the stop() method first!`,
+    invalid_nickname: `The nickname you provided is invalid, please provide a valid nickname to continue.`,
+    eas_no_directory: `You have not set a directory for EAS audio files to be saved to, please set the 'easDirectory' setting in the global settings to enable EAS audio generation.`,
+    invalid_coordinates: `The coordinates you provided are invalid, please provide valid latitude and longitude values. Attempted: {lat}, {lon}.`,
+    no_current_locations: `No current location has been set, operations will be haulted until a location is set or location filtering is disabled.`,
+    disabled_location_warning: `Exceeded maximum warnings for invalid or missing lat/lon coordinates. Location filtering has been ignored until you set valid coordinates or disable location filtering.`,
+    reconnect_too_fast: `The client is attempting to reconnect too fast. This may be due to network instability. Reconnection attempt has been halted for safety.`,
+    dump_cache: `Found {count} cached alert files and will begin dumping them shortly...`,
+    dump_cache_complete: `Completed dumping all cached alert files.`
   }
 };
 
@@ -1073,13 +1078,14 @@ var StanzaParser = class {
    */
   static getType(attributes) {
     const attrs = attributes;
-    if (!attrs || !attrs.awipsid) return { type: `XX`, prefix: `XX` };
-    for (const [prefix, type] of Object.entries(definitions.awips)) {
+    if (!(attrs == null ? void 0 : attrs.awipsid)) return { type: "XX", prefix: "XX" };
+    const awipsDefs = definitions.awips;
+    for (const [prefix, type] of Object.entries(awipsDefs)) {
       if (attrs.awipsid.startsWith(prefix)) {
         return { type, prefix };
       }
     }
-    return { type: `XX`, prefix: `XX` };
+    return { type: "XX", prefix: "XX" };
   }
   /**
    * cache stores the compiled alert data into a cache file if caching is enabled in the settings.
@@ -1089,32 +1095,37 @@ var StanzaParser = class {
    * @param {unknown} compiled 
    */
   static cache(compiled) {
-    const data = compiled;
-    const settings2 = settings;
-    if (!settings2.NoaaWeatherWireService.cache.directory) return;
-    if (!packages.fs.existsSync(settings2.NoaaWeatherWireService.cache.directory)) {
-      packages.fs.mkdirSync(settings2.NoaaWeatherWireService.cache.directory, { recursive: true });
-    }
-    data.message = data.message.replace(/\$\$/g, `
-STANZA ATTRIBUTES...${JSON.stringify(data.attributes)}
-ISSUED TIME...${(/* @__PURE__ */ new Date()).toISOString()}
-$$$
-`);
-    if (!data.message.includes(`STANZA ATTRIBUTES...`)) {
-      data.message += `
+    return __async(this, null, function* () {
+      if (!compiled) return;
+      const data = compiled;
+      const settings2 = settings;
+      const { fs: fs2, path: path2 } = packages;
+      if (!data.message || !settings2.NoaaWeatherWireService.cache.directory) return;
+      const cacheDir = settings2.NoaaWeatherWireService.cache.directory;
+      if (!fs2.existsSync(cacheDir)) fs2.mkdirSync(cacheDir, { recursive: true });
+      let msg = data.message.replace(/\$\$/g, "");
+      if (!msg.includes("STANZA ATTRIBUTES...")) {
+        msg += `
 STANZA ATTRIBUTES...${JSON.stringify(data.attributes)}
 ISSUED TIME...${(/* @__PURE__ */ new Date()).toISOString()}
 $$
 `;
-    }
-    packages.fs.appendFileSync(`${settings2.NoaaWeatherWireService.cache.directory}/category-${data.awipsPrefix}-${data.awipsType}s-${data.isCap ? `cap` : `raw`}${data.isVtec ? `-vtec` : ``}.bin`, `=================================================
-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}
+      }
+      data.message = msg;
+      const time = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+      const prefix = `category-${data.awipsPrefix}-${data.awipsType}s`;
+      const suffix = `${data.isCap ? "cap" : "raw"}${data.isVtec ? "-vtec" : ""}`;
+      const categoryFile = path2.join(cacheDir, `${prefix}-${suffix}.bin`);
+      const cacheFile = path2.join(cacheDir, `cache-${suffix}.bin`);
+      const entry = `=================================================
+${time}
 =================================================
-${data.message}`, "utf8");
-    packages.fs.appendFileSync(`${settings2.NoaaWeatherWireService.cache.directory}/cache-${data.isCap ? `cap` : `raw`}${data.isVtec ? `-vtec` : ``}.bin`, `=================================================
-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}
-=================================================
-${data.message}`, "utf8");
+${msg}`;
+      yield Promise.all([
+        fs2.promises.appendFile(categoryFile, entry, "utf8"),
+        fs2.promises.appendFile(cacheFile, entry, "utf8")
+      ]);
+    });
   }
 };
 var stanza_default = StanzaParser;
@@ -1286,11 +1297,16 @@ var UGCParser = class {
   static ugcExtractor(message) {
     return __async(this, null, function* () {
       const header = this.getHeader(message);
+      if (!header) return null;
       const zones = this.getZones(header);
+      if (zones.length === 0) return null;
       const expiry = this.getExpiry(message);
       const locations = yield this.getLocations(zones);
-      const ugc = zones.length > 0 ? { zones, locations, expiry } : null;
-      return ugc;
+      return {
+        zones,
+        locations,
+        expiry
+      };
     });
   }
   /**
@@ -1303,9 +1319,12 @@ var UGCParser = class {
    */
   static getHeader(message) {
     const start = message.search(new RegExp(definitions.expressions.ugc1, "gimu"));
-    const end = message.substring(start).search(new RegExp(definitions.expressions.ugc2, "gimu"));
-    const full = message.substring(start, start + end).replace(/\s+/g, "").slice(0, -1);
-    return full;
+    if (start === -1) return null;
+    const subMessage = message.substring(start);
+    const end = subMessage.search(new RegExp(definitions.expressions.ugc2, "gimu"));
+    if (end === -1) return null;
+    const full = subMessage.substring(0, end).replace(/\s+/g, "").slice(0, -1);
+    return full || null;
   }
   /**
    * getExpiry extracts the expiry date and time from a UGC message and returns it as a Date object.
@@ -1341,7 +1360,10 @@ var UGCParser = class {
       const locations = [];
       for (let i = 0; i < zones.length; i++) {
         const id = zones[i].trim();
-        const located = yield cache.db.prepare(`SELECT location FROM shapefiles WHERE id = ?`).get(id);
+        const located = yield cache.db.prepare(
+          `
+                SELECT location FROM shapefiles WHERE id = ?`
+        ).get(id);
         located != void 0 ? locations.push(located.location) : locations.push(id);
       }
       return Array.from(new Set(locations)).sort();
@@ -1359,9 +1381,11 @@ var UGCParser = class {
     let coordinates = [];
     for (let i = 0; i < zones.length; i++) {
       const id = zones[i].trim();
-      let located = cache.db.prepare(`SELECT geometry FROM shapefiles WHERE id = ?`).get(id);
-      if (located != void 0) {
-        let geometry = JSON.parse(located.geometry);
+      const row = cache.db.prepare(
+        `SELECT geometry FROM shapefiles WHERE id = ?`
+      ).get(id);
+      if (row != void 0) {
+        let geometry = JSON.parse(row.geometry);
         if ((geometry == null ? void 0 : geometry.type) === "Polygon") {
           coordinates.push(...geometry.coordinates[0].map((coord) => [coord[1], coord[0]]));
           break;
@@ -1382,20 +1406,32 @@ var UGCParser = class {
     const ugcSplit = header.split("-");
     const zones = [];
     let state = ugcSplit[0].substring(0, 2);
-    let format = ugcSplit[0].substring(2, 3);
-    for (let i = 0; i < ugcSplit.length; i++) {
-      if (/^[A-Z]/.test(ugcSplit[i])) {
-        state = ugcSplit[i].substring(0, 2);
-        if (ugcSplit[i].includes(">")) {
-          let [start, end] = ugcSplit[i].split(">"), startNum = parseInt(start.substring(3), 10), endNum = parseInt(end, 10);
-          for (let j = startNum; j <= endNum; j++) zones.push(`${state}${format}${j.toString().padStart(3, "0")}`);
-        } else zones.push(ugcSplit[i]);
+    const format = ugcSplit[0].substring(2, 3);
+    for (const part of ugcSplit) {
+      if (/^[A-Z]/.test(part)) {
+        state = part.substring(0, 2);
+        if (part.includes(">")) {
+          const [start, end] = part.split(">");
+          const startNum = parseInt(start.substring(3), 10);
+          const endNum = parseInt(end, 10);
+          for (let j = startNum; j <= endNum; j++) {
+            zones.push(`${state}${format}${j.toString().padStart(3, "0")}`);
+          }
+        } else {
+          zones.push(part);
+        }
         continue;
       }
-      if (ugcSplit[i].includes(">")) {
-        let [start, end] = ugcSplit[i].split(">"), startNum = parseInt(start, 10), endNum = parseInt(end, 10);
-        for (let j = startNum; j <= endNum; j++) zones.push(`${state}${format}${j.toString().padStart(3, "0")}`);
-      } else zones.push(`${state}${format}${ugcSplit[i]}`);
+      if (part.includes(">")) {
+        const [start, end] = part.split(">");
+        const startNum = parseInt(start, 10);
+        const endNum = parseInt(end, 10);
+        for (let j = startNum; j <= endNum; j++) {
+          zones.push(`${state}${format}${j.toString().padStart(3, "0")}`);
+        }
+      } else {
+        zones.push(`${state}${format}${part}`);
+      }
     }
     return zones.filter((item) => item !== "");
   }
@@ -1415,24 +1451,25 @@ var VtecParser = class {
    */
   static vtecExtractor(message) {
     return __async(this, null, function* () {
-      const vtecs = [];
+      var _a;
       const matches = message.match(new RegExp(definitions.expressions.vtec, "g"));
       if (!matches) return null;
-      for (let i = 0; i < matches.length; i++) {
-        const vtec = matches[i];
-        const parts = vtec.split(`.`);
-        const dates = parts[6].split(`-`);
+      const vtecs = [];
+      for (const vtec of matches) {
+        const parts = vtec.split(".");
+        if (parts.length < 7) continue;
+        const dates = parts[6].split("-");
         vtecs.push({
           raw: vtec,
           type: definitions.productTypes[parts[0]],
           tracking: `${parts[2]}-${parts[3]}-${parts[4]}-${parts[5]}`,
           event: `${definitions.events[parts[3]]} ${definitions.actions[parts[4]]}`,
           status: definitions.status[parts[1]],
-          wmo: message.match(new RegExp(definitions.expressions.wmo, "gimu")),
+          wmo: (_a = message.match(new RegExp(definitions.expressions.wmo, "gimu"))) != null ? _a : [],
           expires: this.parseExpiryDate(dates)
         });
       }
-      return vtecs;
+      return vtecs.length ? vtecs : null;
     });
   }
   /**
@@ -1858,8 +1895,8 @@ var EventParser = class {
    * @async
    * @param {string} message 
    * @param {types.TypeCompiled} validated 
-   * @param {types.UGCParsed} [ugc=null] 
-   * @param {types.VTECParsed} [vtec=null] 
+   * @param {types.UGCEntry} [ugc=null] 
+   * @param {types.VtecEntry} [vtec=null] 
    * @returns {Promise<types.BaseProperties>} 
    */
   static getBaseProperties(message, validated, ugc = null, vtec = null) {
@@ -1956,7 +1993,12 @@ var EventParser = class {
     return useParentEvents ? (_f = event == null ? void 0 : event.properties) == null ? void 0 : _f.event : eventName;
   }
   /**
-   * getCorrectExpiryDate determines the correct expiration date for an alert based on VTEC information or UGC zones.
+   * validateEvents determines the correct expiration date for an alert based on VTEC information or UGC zones.
+   * This will filter incoming alerts based on the user's settings and emit events accordingly.
+   * This will also emit specific events based on the alert type for easier handling.
+   * For exmaple, a "Tornado Warning" will emit both "onTornadoWarning" and "onRadarIndicatedTornadoWarning" events.
+   * Then the user can listen to those events individually as needed.
+   * If you want to listen to all alerts, use the "onAlerts" event.
    *
    * @public
    * @static
@@ -1965,7 +2007,7 @@ var EventParser = class {
   static validateEvents(events2) {
     var _a, _b, _c, _d, _e;
     if (events2.length == 0) return;
-    const settings2 = settings;
+    const originalEvents = JSON.parse(JSON.stringify(events2));
     const filteringSettings = (_b = (_a = settings) == null ? void 0 : _a.global) == null ? void 0 : _b.alertFiltering;
     const locationSettings = filteringSettings == null ? void 0 : filteringSettings.locationFiltering;
     const easSettings = (_d = (_c = settings) == null ? void 0 : _c.global) == null ? void 0 : _d.easSettings;
@@ -1990,8 +2032,8 @@ var EventParser = class {
       const _c2 = originalEvent, { performance: performance2, header } = _c2, eventWithoutPerformance = __objRest(_c2, ["performance", "header"]);
       originalEvent.properties.parent = originalEvent.properties.event;
       originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools == null ? void 0 : bools.betterEventParsing, bools == null ? void 0 : bools.useParentEvents);
-      originalEvent.properties.distance = this.getLocationDistances(props, bools == null ? void 0 : bools.filter, locationSettings == null ? void 0 : locationSettings.maxDistance, locationSettings == null ? void 0 : locationSettings.unit);
       originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(eventWithoutPerformance)).digest("hex");
+      originalEvent.properties.distance = this.getLocationDistances(props, bools == null ? void 0 : bools.filter, locationSettings == null ? void 0 : locationSettings.maxDistance, locationSettings == null ? void 0 : locationSettings.unit);
       if (!((_d2 = originalEvent.properties.distance) == null ? void 0 : _d2.in_range)) {
         return false;
       }
@@ -2007,6 +2049,7 @@ var EventParser = class {
         if (key === "stateFilter" && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc) => setting.has(ugc.substring(0, 2).toLowerCase()))) return false;
       }
       cache.events.emit(`on${originalEvent.properties.parent.replace(/\s+/g, "")}`);
+      cache.events.emit(`on${originalEvent.properties.event.replace(/\s+/g, "")}`);
       return true;
     });
     if (filtered.length > 0) {
@@ -2020,7 +2063,7 @@ var EventParser = class {
    * @static
    * @param {types.TypeAttributes} attributes 
    * @param {?types.BaseProperties} [properties] 
-   * @param {?types.VTECParsed} [vtec] 
+   * @param {?types.VtecEntry} [vtec] 
    * @returns {string} 
    */
   static getHeader(attributes, properties, vtec) {
@@ -2054,7 +2097,7 @@ var EventParser = class {
    *
    * @private
    * @static
-   * @param {types.VTECParsed} vtec 
+   * @param {types.VtecEntry} vtec 
    * @param {Record<string, string>} attributes 
    * @param {(RegExpMatchArray | string | null)} WMO 
    * @returns {{ icao: any; name: any; }} 
@@ -2083,8 +2126,8 @@ var EventParser = class {
    *
    * @private
    * @static
-   * @param {types.VTECParsed} vtec 
-   * @param {types.UGCParsed} ugc 
+   * @param {types.VtecEntry} vtec 
+   * @param {types.UGCEntry} ugc 
    * @returns {*} 
    */
   static getCorrectExpiryDate(vtec, ugc) {
@@ -2105,6 +2148,7 @@ var EventParser = class {
    */
   static getLocationDistances(properties, isFiltered, maxDistance, unit) {
     let inRange = false;
+    const totalTracks = Object.keys(cache.currentLocations).length;
     if (properties.geometry != null) {
       for (const key in cache.currentLocations) {
         const coordinates = cache.currentLocations[key];
@@ -2120,20 +2164,14 @@ var EventParser = class {
       if (!isFiltered) {
         return { range: properties.distance, in_range: true };
       }
-      if (isFiltered) {
-        for (const key in properties.distance) {
-          if (properties.distance[key].distance <= maxDistance) {
-            inRange = true;
-          }
+      for (const key in properties.distance) {
+        if (properties.distance[key].distance <= maxDistance) {
+          inRange = true;
         }
       }
-      if (cache.currentLocations && Object.keys(cache.currentLocations).length == 0) {
-        utils_default.warn(definitions.messages.no_current_locations);
-        inRange = true;
-      }
-      return { range: properties.distance, in_range: inRange };
+      return { range: properties.distance, in_range: totalTracks == 0 ? true : inRange };
     }
-    return null;
+    return { in_range: false };
   }
   /**
    * buildDefaultSignature processes and standardizes the event's properties, ensuring proper status correlation, cancellation detection, and expiry handling.
@@ -2152,7 +2190,6 @@ var EventParser = class {
     const tags = Object.entries(defEventTags).filter(([key]) => props == null ? void 0 : props.description.includes(key.toLowerCase())).map(([, value]) => value);
     props.tags = tags.length > 0 ? tags : [`N/A`];
     const setAction = (type) => {
-      props.action_type = type;
       props.is_cancelled = type === `C`;
       props.is_updated = type === `U`;
       props.is_issued = type === `I`;
@@ -2201,10 +2238,30 @@ var Database = class {
   static stanzaCacheImport(stanza) {
     return __async(this, null, function* () {
       const settings2 = settings;
-      cache.db.prepare(`INSERT OR IGNORE INTO stanzas (stanza) VALUES (?)`).run(stanza);
-      const count = cache.db.prepare(`SELECT COUNT(*) as total FROM stanzas`).get();
-      if (count.total > settings2.NoaaWeatherWireService.cache.maxHistory) {
-        cache.db.prepare(`DELETE FROM stanzas WHERE rowid IN (SELECT rowid FROM stanzas ORDER BY rowid ASC LIMIT ?)`).run(count.total - settings2.NoaaWeatherWireService.cache.maxHistory / 2);
+      try {
+        const db = cache.db;
+        if (!db) return;
+        db.prepare(`INSERT OR IGNORE INTO stanzas (stanza) VALUES (?)`).run(stanza);
+        const countRow = db.prepare(`SELECT COUNT(*) AS total FROM stanzas`).get();
+        const totalRows = countRow.total;
+        const maxHistory = settings2.NoaaWeatherWireService.cache.maxHistory;
+        if (totalRows > maxHistory) {
+          const rowsToDelete = Math.floor((totalRows - maxHistory) / 2);
+          if (rowsToDelete > 0) {
+            db.prepare(`
+                        DELETE FROM stanzas 
+                        WHERE rowid IN (
+                            SELECT rowid 
+                            FROM stanzas 
+                            ORDER BY rowid ASC 
+                            LIMIT ?
+                        )
+                    `).run(rowsToDelete);
+          }
+        }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        utils_default.warn(`Failed to import stanza into cache: ${msg}`);
       }
     });
   }
@@ -2220,55 +2277,59 @@ var Database = class {
     return __async(this, null, function* () {
       const settings2 = settings;
       try {
-        if (!packages.fs.existsSync(settings2.database)) {
-          packages.fs.writeFileSync(settings2.database, "");
-        }
-        cache.db = new packages.sqlite3(settings2.database);
-        const shapfileTable = cache.db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='shapefiles'`).get();
-        const stanzaTable = cache.db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='stanzas'`).get();
-        if (!stanzaTable) {
-          cache.db.prepare(`CREATE TABLE stanzas (id INTEGER PRIMARY KEY AUTOINCREMENT, stanza TEXT)`).run();
-        }
-        if (!shapfileTable) {
-          cache.db.prepare(`CREATE TABLE shapefiles (id TEXT PRIMARY KEY, location TEXT, geometry TEXT)`).run();
+        const { fs: fs2, path: path2, sqlite3: sqlite32, shapefile: shapefile2 } = packages;
+        if (!fs2.existsSync(settings2.database)) fs2.writeFileSync(settings2.database, "");
+        cache.db = new sqlite32(settings2.database);
+        cache.db.prepare(`
+                CREATE TABLE IF NOT EXISTS stanzas (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    stanza TEXT
+                )
+            `).run();
+        cache.db.prepare(`
+                CREATE TABLE IF NOT EXISTS shapefiles (
+                    id TEXT PRIMARY KEY,
+                    location TEXT,
+                    geometry TEXT
+                )
+            `).run();
+        const shapefileCount = cache.db.prepare(`SELECT COUNT(*) AS count FROM shapefiles`).get().count;
+        if (shapefileCount === 0) {
           utils_default.warn(definitions.messages.shapefile_creation);
           for (const shape of definitions.shapefiles) {
-            const { id, file } = shape;
-            const filepath = packages.path.join(__dirname, `../../shapefiles`, file);
-            const { features } = yield packages.shapefile.read(filepath, filepath);
-            utils_default.warn(`Importing ${features.length} entries from ${file}...`);
-            const insertStmt = cache.db.prepare(`INSERT OR REPLACE INTO shapefiles (id, location, geometry)VALUES (?, ?, ?)`);
+            const filepath = path2.resolve(__dirname, "../../shapefiles", shape.file);
+            const { features } = yield shapefile2.read(filepath, filepath);
+            utils_default.warn(`Importing ${features.length} entries from ${shape.file}...`);
+            const insertStmt = cache.db.prepare(`
+                        INSERT OR REPLACE INTO shapefiles (id, location, geometry) VALUES (?, ?, ?)
+                    `);
             const insertTransaction = cache.db.transaction((entries) => {
               for (const feature of entries) {
                 const { properties, geometry } = feature;
                 let final, location;
-                switch (true) {
-                  case !!properties.FIPS:
-                    final = `${properties.STATE}${id}${properties.FIPS.substring(2)}`;
-                    location = `${properties.COUNTYNAME}, ${properties.STATE}`;
-                    break;
-                  case !!properties.FULLSTAID:
-                    final = `${properties.ST}${id}${properties.WFO}`;
-                    location = `${properties.CITY}, ${properties.STATE}`;
-                    break;
-                  case !!properties.STATE:
-                    final = `${properties.STATE}${id}${properties.ZONE}`;
-                    location = `${properties.NAME}, ${properties.STATE}`;
-                    break;
-                  default:
-                    final = properties.ID;
-                    location = properties.NAME;
-                    break;
+                if (properties.FIPS) {
+                  final = `${properties.STATE}${shape.id}${properties.FIPS.substring(2)}`;
+                  location = `${properties.COUNTYNAME}, ${properties.STATE}`;
+                } else if (properties.FULLSTAID) {
+                  final = `${properties.ST}${shape.id}${properties.WFO}`;
+                  location = `${properties.CITY}, ${properties.STATE}`;
+                } else if (properties.STATE) {
+                  final = `${properties.STATE}${shape.id}${properties.ZONE}`;
+                  location = `${properties.NAME}, ${properties.STATE}`;
+                } else {
+                  final = properties.ID;
+                  location = properties.NAME;
                 }
                 insertStmt.run(final, location, JSON.stringify(geometry));
               }
             });
-            yield insertTransaction(features);
+            insertTransaction(features);
           }
           utils_default.warn(definitions.messages.shapefile_creation_finished);
         }
       } catch (error) {
-        utils_default.warn(`Failed to load database: ${error.message}`);
+        const msg = error instanceof Error ? error.message : String(error);
+        utils_default.warn(`Failed to load database: ${msg}`);
       }
     });
   }
@@ -2290,20 +2351,34 @@ var Xmpp = class {
   static isSessionReconnectionEligible(currentInterval) {
     return __async(this, null, function* () {
       const settings2 = settings;
-      if ((cache.isConnected || cache.sigHalt) && cache.session) {
-        const lastStanza = Date.now() - cache.lastStanza;
-        if (lastStanza >= currentInterval * 1e3) {
-          if (!cache.attemptingReconnect) {
-            cache.attemptingReconnect = true;
-            cache.isConnected = false;
-            cache.totalReconnects += 1;
-            cache.events.emit(`onReconnection`, { reconnects: cache.totalReconnects, lastStanza, lastName: settings2.NoaaWeatherWireService.clientCredentials.nickname });
-            yield cache.session.stop().catch(() => {
-            });
-            yield cache.session.start().catch(() => {
-            });
-          }
-        }
+      const lastStanzaElapsed = Date.now() - cache.lastStanza;
+      const threshold = currentInterval * 1e3;
+      if (!cache.isConnected && !cache.sigHalt || !cache.session) {
+        return;
+      }
+      if (lastStanzaElapsed < threshold) {
+        return;
+      }
+      if (cache.attemptingReconnect) {
+        return;
+      }
+      cache.attemptingReconnect = true;
+      cache.isConnected = false;
+      cache.totalReconnects += 1;
+      try {
+        cache.events.emit("onReconnection", {
+          reconnects: cache.totalReconnects,
+          lastStanza: lastStanzaElapsed,
+          lastName: settings2.NoaaWeatherWireService.clientCredentials.nickname
+        });
+        yield cache.session.stop().catch(() => {
+        });
+        yield cache.session.start().catch(() => {
+        });
+      } catch (err) {
+        utils_default.warn(`XMPP reconnection failed: ${err.message}`);
+      } finally {
+        cache.attemptingReconnect = false;
       }
     });
   }
@@ -2321,63 +2396,74 @@ var Xmpp = class {
     return __async(this, null, function* () {
       var _a, _b;
       const settings2 = settings;
+      (_b = (_a = settings2.NoaaWeatherWireService.clientCredentials).nickname) != null ? _b : _a.nickname = settings2.NoaaWeatherWireService.clientCredentials.username;
       cache.session = packages.xmpp.client({
-        service: `xmpp://nwws-oi.weather.gov`,
-        domain: `nwws-oi.weather.gov`,
+        service: "xmpp://nwws-oi.weather.gov",
+        domain: "nwws-oi.weather.gov",
         username: settings2.NoaaWeatherWireService.clientCredentials.username,
         password: settings2.NoaaWeatherWireService.clientCredentials.password
       });
-      (_b = (_a = settings2.NoaaWeatherWireService.clientCredentials).nickname) != null ? _b : _a.nickname = settings2.NoaaWeatherWireService.clientCredentials.username;
-      cache.session.on(`online`, (address) => __async(null, null, function* () {
-        if (cache.lastConnect && Date.now() - cache.lastConnect < 10 * 1e3) {
+      cache.session.on("online", (address) => __async(null, null, function* () {
+        const now = Date.now();
+        if (cache.lastConnect && now - cache.lastConnect < 1e4) {
           cache.sigHalt = true;
-          utils_default.sleep(2 * 1e3).then(() => __async(null, null, function* () {
-            yield cache.session.stop();
-          }));
           utils_default.warn(definitions.messages.reconnect_too_fast);
+          yield utils_default.sleep(2e3);
+          yield cache.session.stop().catch(() => {
+          });
           return;
         }
         cache.isConnected = true;
         cache.sigHalt = false;
-        cache.lastConnect = Date.now();
-        cache.session.send(packages.xmpp.xml("presence", { to: `nwws@conference.nwws-oi.weather.gov/${settings2.NoaaWeatherWireService.clientCredentials.nickname}`, xmlns: "http://jabber.org/protocol/muc" }));
-        cache.events.emit(`onConnection`, settings2.NoaaWeatherWireService.clientCredentials.nickname);
-        if (cache.attemptingReconnect) {
-          utils_default.sleep(15 * 1e3).then(() => {
-            cache.attemptingReconnect = false;
-          });
-        }
+        cache.lastConnect = now;
+        cache.session.send(packages.xmpp.xml("presence", {
+          to: `nwws@conference.nwws-oi.weather.gov/${settings2.NoaaWeatherWireService.clientCredentials.nickname}`,
+          xmlns: "http://jabber.org/protocol/muc"
+        }));
+        cache.events.emit("onConnection", settings2.NoaaWeatherWireService.clientCredentials.nickname);
+        if (cache.attemptingReconnect) return;
+        cache.attemptingReconnect = true;
+        yield utils_default.sleep(15e3);
+        cache.attemptingReconnect = false;
       }));
-      cache.session.on(`offline`, () => __async(null, null, function* () {
+      cache.session.on("offline", () => {
         cache.isConnected = false;
         cache.sigHalt = true;
-        utils_default.warn(`XMPP connection went offline`);
-      }));
-      cache.session.on(`error`, (error) => __async(null, null, function* () {
+        utils_default.warn("XMPP connection went offline");
+      });
+      cache.session.on("error", (error) => {
         cache.isConnected = false;
         cache.sigHalt = true;
         utils_default.warn(`XMPP connection error: ${error.message}`);
-      }));
-      cache.session.on(`stanza`, (stanza) => __async(null, null, function* () {
+      });
+      cache.session.on("stanza", (stanza) => __async(null, null, function* () {
+        var _a2;
         try {
           cache.lastStanza = Date.now();
-          if (stanza.is(`message`)) {
+          if (stanza.is("message")) {
             const validate = stanza_default.validate(stanza);
-            if (validate.ignore || validate.isCap && !settings2.NoaaWeatherWireService.alertPreferences.isCapOnly || !validate.isCap && settings2.NoaaWeatherWireService.alertPreferences.isCapOnly || validate.isCap && !validate.isCapDescription) return;
+            const skipMessage = validate.ignore || validate.isCap && !settings2.NoaaWeatherWireService.alertPreferences.isCapOnly || !validate.isCap && settings2.NoaaWeatherWireService.alertPreferences.isCapOnly || validate.isCap && !validate.isCapDescription;
+            if (skipMessage) return;
             events_default.eventHandler(validate);
-            cache.events.emit(`onMessage`, validate);
             database_default.stanzaCacheImport(JSON.stringify(validate));
+            cache.events.emit("onMessage", validate);
           }
-          if (stanza.is(`presence`) && stanza.attrs.from && stanza.attrs.from.startsWith("nwws@conference.nwws-oi.weather.gov/")) {
+          if (stanza.is("presence") && ((_a2 = stanza.attrs.from) == null ? void 0 : _a2.startsWith("nwws@conference.nwws-oi.weather.gov/"))) {
             const occupant = stanza.attrs.from.split("/").slice(1).join("/");
-            cache.events.emit("onOccupant", { occupant, type: stanza.attrs.type === "unavailable" ? "unavailable" : "available" });
+            cache.events.emit("onOccupant", {
+              occupant,
+              type: stanza.attrs.type === "unavailable" ? "unavailable" : "available"
+            });
           }
-        } catch (e) {
-          utils_default.warn(`Error processing stanza: ${e.message}`);
+        } catch (err) {
+          utils_default.warn(`Error processing stanza: ${err.message}`);
         }
       }));
-      yield cache.session.start().catch(() => {
-      });
+      try {
+        yield cache.session.start();
+      } catch (err) {
+        utils_default.warn(`Failed to start XMPP session: ${err.message}`);
+      }
     });
   }
 };
@@ -2406,8 +2492,11 @@ var Utils = class _Utils {
    * @static
    * @param {string} message 
    */
-  static warn(message) {
-    console.warn(`\x1B[33m[ATMX-MANAGER]\x1B[0m ${message}`);
+  static warn(message, force = false) {
+    if (!settings.journal) return;
+    if (cache.lastWarn != null && Date.now() - cache.lastWarn < 500 && !force) return;
+    cache.lastWarn = Date.now();
+    console.warn(`\x1B[33m[ATMOSX-PARSER]\x1B[0m [${(/* @__PURE__ */ new Date()).toLocaleString()}] ${message}`);
   }
   /**
    * loadCollectionCache reads cached alert files from the specified cache directory and processes them.
@@ -2425,6 +2514,8 @@ var Utils = class _Utils {
           if (!packages.fs.existsSync(settings2.NoaaWeatherWireService.cache.directory)) return;
           const cacheDir = settings2.NoaaWeatherWireService.cache.directory;
           const getAllFiles = packages.fs.readdirSync(cacheDir).filter((file) => file.endsWith(".bin") && file.startsWith("cache-"));
+          this.warn(definitions.messages.dump_cache.replace(`{count}`, getAllFiles.length.toString()), true);
+          yield this.sleep(2e3);
           for (const file of getAllFiles) {
             const filepath = packages.path.join(cacheDir, file);
             const readFile = packages.fs.readFileSync(filepath, { encoding: "utf-8" });
@@ -2438,6 +2529,7 @@ var Utils = class _Utils {
             const validate = stanza_default.validate(readFile, { awipsid: file, isCap, raw: true, issue: void 0 });
             yield events_default.eventHandler(validate);
           }
+          this.warn(definitions.messages.dump_cache_complete, true);
         }
       } catch (error) {
         _Utils.warn(`Failed to load cache: ${error.message}`);
@@ -2456,25 +2548,25 @@ var Utils = class _Utils {
     return __async(this, null, function* () {
       try {
         const settings2 = settings;
-        const response = yield this.createHttpRequest(settings2.NationalWeatherService.endpoint);
-        if (!response.error) {
-          events_default.eventHandler({ message: JSON.stringify(response.message), attributes: {}, isCap: true, isApi: true, isVtec: false, isUGC: false, isCapDescription: false, awipsType: { type: "api", prefix: "AP" }, ignore: false });
-        }
+        const response = yield this.createHttpRequest(
+          settings2.NationalWeatherService.endpoint
+        );
+        if (response.error) return;
+        events_default.eventHandler({
+          message: JSON.stringify(response.message),
+          attributes: {},
+          isCap: true,
+          isApi: true,
+          isVtec: false,
+          isUGC: false,
+          isCapDescription: false,
+          awipsType: { type: "api", prefix: "AP" },
+          ignore: false
+        });
       } catch (error) {
-        _Utils.warn(`Failed to load National Weather Service GeoJSON Data: ${error.message}`);
+        const msg = error instanceof Error ? error.message : String(error);
+        _Utils.warn(`Failed to load National Weather Service GeoJSON Data: ${msg}`);
       }
-    });
-  }
-  /**
-   * detectUncaughtExceptions sets up a global handler for uncaught exceptions in the Node.js process,
-   *
-   * @public
-   * @static
-   */
-  static detectUncaughtExceptions() {
-    if (cache.events.listenerCount("uncaughtException") > 0) return;
-    process.on("uncaughtException", (error) => {
-      _Utils.warn(`Uncaught Exception: ${error.message}`);
     });
   }
   /**
@@ -2489,7 +2581,7 @@ var Utils = class _Utils {
    */
   static createHttpRequest(url, options) {
     return __async(this, null, function* () {
-      var _a, _b;
+      var _a;
       const defaultOptions = {
         timeout: 1e4,
         headers: {
@@ -2510,7 +2602,8 @@ var Utils = class _Utils {
         });
         return { error: false, message: resp.data };
       } catch (err) {
-        return { error: true, message: (_b = err == null ? void 0 : err.message) != null ? _b : String(err) };
+        const msg = err instanceof Error ? err.message : String(err);
+        return { error: true, message: msg };
       }
     });
   }
@@ -2524,26 +2617,28 @@ var Utils = class _Utils {
   static garbageCollectionCache(maxFileMegabytes) {
     try {
       const settings2 = settings;
-      if (!settings2.NoaaWeatherWireService.cache.directory) return;
-      if (!packages.fs.existsSync(settings2.NoaaWeatherWireService.cache.directory)) return;
+      const cacheDir = settings2.NoaaWeatherWireService.cache.directory;
+      if (!cacheDir) return;
+      const { fs: fs2, path: path2 } = packages;
+      if (!fs2.existsSync(cacheDir)) return;
       const maxBytes = maxFileMegabytes * 1024 * 1024;
-      const cacheDirectory = settings2.NoaaWeatherWireService.cache.directory;
-      const stackFiles = [cacheDirectory], files = [];
-      while (stackFiles.length) {
-        const currentDirectory = stackFiles.pop();
-        packages.fs.readdirSync(currentDirectory).forEach((file) => {
-          const fullPath = packages.path.join(currentDirectory, file);
-          const stat = packages.fs.statSync(fullPath);
-          if (stat.isDirectory()) stackFiles.push(fullPath);
+      const stackDirs = [cacheDir];
+      const files = [];
+      while (stackDirs.length) {
+        const currentDir = stackDirs.pop();
+        fs2.readdirSync(currentDir).forEach((file) => {
+          const fullPath = path2.join(currentDir, file);
+          const stat = fs2.statSync(fullPath);
+          if (stat.isDirectory()) stackDirs.push(fullPath);
           else files.push({ file: fullPath, size: stat.size });
         });
       }
-      if (!files.length) return;
       files.forEach((f) => {
-        if (f.size > maxBytes) packages.fs.unlinkSync(f.file);
+        if (f.size > maxBytes) fs2.unlinkSync(f.file);
       });
     } catch (error) {
-      _Utils.warn(`Failed to perform garbage collection: ${error.message}`);
+      const msg = error instanceof Error ? error.message : String(error);
+      _Utils.warn(`Failed to perform garbage collection: ${msg}`);
     }
   }
   /**
@@ -2556,14 +2651,21 @@ var Utils = class _Utils {
   static handleCronJob(isNwws) {
     try {
       const settings2 = settings;
+      const cache2 = settings2.NoaaWeatherWireService.cache;
+      const reconnections = settings2.NoaaWeatherWireService.clientReconnections;
       if (isNwws) {
-        if (settings2.NoaaWeatherWireService.cache.read) void this.garbageCollectionCache(settings2.NoaaWeatherWireService.cache.maxSizeMB);
-        if (settings2.NoaaWeatherWireService.clientReconnections.canReconnect) void xmpp_default.isSessionReconnectionEligible(settings2.NoaaWeatherWireService.clientReconnections.currentInterval);
+        if (cache2.read) {
+          void this.garbageCollectionCache(cache2.maxSizeMB);
+        }
+        if (reconnections.canReconnect) {
+          void xmpp_default.isSessionReconnectionEligible(reconnections.currentInterval);
+        }
       } else {
         void this.loadGeoJsonData();
       }
     } catch (error) {
-      _Utils.warn(`Failed to perform scheduled tasks: ${error.message}`);
+      const msg = error instanceof Error ? error.message : String(error);
+      _Utils.warn(`Failed to perform scheduled tasks (${isNwws ? "NWWS" : "GeoJSON"}): ${msg}`);
     }
   }
   /**
@@ -2576,17 +2678,18 @@ var Utils = class _Utils {
    */
   static mergeClientSettings(target, settings2) {
     for (const key in settings2) {
-      if (settings2.hasOwnProperty(key)) {
-        if (typeof settings2[key] === "object" && settings2[key] !== null && !Array.isArray(settings2[key])) {
-          if (!target[key] || typeof target[key] !== "object") {
-            target[key] = {};
-          }
-          this.mergeClientSettings(target[key], settings2[key]);
-        } else {
-          target[key] = settings2[key];
+      if (!Object.prototype.hasOwnProperty.call(settings2, key)) continue;
+      const value = settings2[key];
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        if (!target[key] || typeof target[key] !== "object" || Array.isArray(target[key])) {
+          target[key] = {};
         }
+        this.mergeClientSettings(target[key], value);
+      } else {
+        target[key] = value;
       }
     }
+    return target;
   }
   /**
    * Calculate the distance between 2 given coordinates.
@@ -2603,16 +2706,37 @@ var Utils = class _Utils {
     if (!coord1 || !coord2) return 0;
     const { lat: lat1, lon: lon1 } = coord1;
     const { lat: lat2, lon: lon2 } = coord2;
+    if ([lat1, lon1, lat2, lon2].some((v) => typeof v !== "number")) return 0;
     const toRad = (deg) => deg * Math.PI / 180;
-    const earthRadius = unit === "miles" ? 3958.8 : 6371;
-    let dLat = toRad(lat2 - lat1);
-    let dLon = toRad(lon2 - lon1);
-    if (dLon > Math.PI) dLon -= 2 * Math.PI;
-    if (dLon < -Math.PI) dLon += 2 * Math.PI;
+    const R = unit === "miles" ? 3958.8 : 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
     const a = __pow(Math.sin(dLat / 2), 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * __pow(Math.sin(dLon / 2), 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = earthRadius * c;
-    return Number(distance.toFixed(2));
+    return Math.round(R * c * 100) / 100;
+  }
+  /**
+   * validateEventReady checks if there are current locations set when location filtering is enabled, and manages warning messages accordingly.
+   *
+   * @public
+   * @static
+   * @param {boolean} isFiltering 
+   * @returns {boolean} 
+   */
+  static isReadyToProcess(isFiltering) {
+    const totalTracks = Object.keys(cache.currentLocations).length;
+    if (totalTracks > 0) {
+      cache.totalLocationWarns = 0;
+      return true;
+    }
+    if (!isFiltering) return true;
+    if (cache.totalLocationWarns < 3) {
+      _Utils.warn(definitions.messages.no_current_locations);
+      cache.totalLocationWarns++;
+      return false;
+    }
+    _Utils.warn(definitions.messages.disabled_location_warning, true);
+    return true;
   }
 };
 var utils_default = Utils;
@@ -3065,10 +3189,13 @@ var AlertManager = class {
    * @param {?types.Coordinates} [coordinates] 
    */
   setCurrentLocation(locationName, coordinates) {
-    const latitude = coordinates == null ? void 0 : coordinates.lat;
-    const longitude = coordinates == null ? void 0 : coordinates.lon;
-    if (isNaN(latitude) || isNaN(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-      utils_default.warn(definitions.messages.invalid_coordinates.replace("{lat}", String(latitude)).replace("{lon}", String(longitude)));
+    if (!coordinates) {
+      utils_default.warn(`Coordinates not provided for location: ${locationName}`);
+      return;
+    }
+    const { lat, lon } = coordinates;
+    if (typeof lat !== "number" || typeof lon !== "number" || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      utils_default.warn(definitions.messages.invalid_coordinates.replace("{lat}", String(lat)).replace("{lon}", String(lon)));
       return;
     }
     cache.currentLocations[locationName] = coordinates;
@@ -3094,17 +3221,11 @@ var AlertManager = class {
    * @returns {{}} 
    */
   getAllAlertTypes() {
-    const events2 = /* @__PURE__ */ new Set();
-    const actions = /* @__PURE__ */ new Set();
-    const combinations = [];
-    Object.values(definitions.events).forEach((event) => events2.add(event));
-    Object.values(definitions.actions).forEach((action) => actions.add(action));
-    Array.from(events2).forEach((event) => {
-      Array.from(actions).forEach((action) => {
-        combinations.push(`${event} ${action}`);
-      });
-    });
-    return combinations;
+    const events2 = new Set(Object.values(definitions.events));
+    const actions = new Set(Object.values(definitions.actions));
+    return Array.from(events2).flatMap(
+      (event) => Array.from(actions).map((action) => `${event} ${action}`)
+    );
   }
   /**
    * searchAlertDatbase allows you to search the internal alert database for previously received alerts up to 50,000 records.
@@ -3112,11 +3233,14 @@ var AlertManager = class {
    * @public
    * @async
    * @param {string} query 
+   * @param {number} [limit=250]
    * @returns {unknown} 
    */
-  searchStanzaDatabase(query) {
+  searchStanzaDatabase(query, limit = 250) {
     return __async(this, null, function* () {
-      return yield cache.db.prepare(`SELECT * FROM stanzas WHERE stanza LIKE ? ORDER BY id DESC LIMIT 250`).all(`%${query}%`);
+      const escapeLike = (s) => s.replace(/[%_]/g, "\\$&");
+      const rows = yield cache.db.prepare(`SELECT * FROM stanzas WHERE stanza LIKE ? ESCAPE '\\' ORDER BY id DESC LIMIT ${limit}`).all(`%${escapeLike(query)}%`);
+      return rows;
     });
   }
   /**
@@ -3164,24 +3288,39 @@ var AlertManager = class {
    */
   start(metadata) {
     return __async(this, null, function* () {
+      var _a, _b;
       if (!cache.isReady) {
         utils_default.warn(definitions.messages.not_ready);
-        return Promise.resolve();
+        return;
       }
       this.setSettings(metadata);
-      if (settings.catchUnhandledExceptions) {
-        utils_default.detectUncaughtExceptions();
-      }
       const settings2 = settings;
-      this.isNoaaWeatherWireService = settings.isNWWS;
+      this.isNoaaWeatherWireService = settings2.isNWWS;
       cache.isReady = false;
+      while (!utils_default.isReadyToProcess((_b = (_a = settings2.global.alertFiltering.locationFiltering) == null ? void 0 : _a.filter) != null ? _b : false)) {
+        yield utils_default.sleep(2e3);
+      }
       if (this.isNoaaWeatherWireService) {
-        yield database_default.loadDatabase();
-        yield xmpp_default.deploySession();
-        yield utils_default.loadCollectionCache();
+        try {
+          yield database_default.loadDatabase();
+          yield xmpp_default.deploySession();
+          yield utils_default.loadCollectionCache();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          utils_default.warn(`Failed to initialize NWWS services: ${msg}`);
+        }
       }
       utils_default.handleCronJob(this.isNoaaWeatherWireService);
-      this.job = new packages.jobs.Cron(`*/${!this.isNoaaWeatherWireService ? settings2.NationalWeatherService.checkInterval : 5} * * * * *`, () => {
+      if (this.job) {
+        try {
+          this.job.stop();
+        } catch (e) {
+          utils_default.warn(`Failed to stop existing cron job.`);
+        }
+        this.job = null;
+      }
+      const interval = !this.isNoaaWeatherWireService ? settings2.NationalWeatherService.checkInterval : 5;
+      this.job = new packages.jobs.Cron(`*/${interval} * * * * *`, () => {
         utils_default.handleCronJob(this.isNoaaWeatherWireService);
       });
     });
@@ -3197,11 +3336,20 @@ var AlertManager = class {
     return __async(this, null, function* () {
       cache.isReady = true;
       if (this.job) {
-        this.job.stop();
+        try {
+          this.job.stop();
+        } catch (e) {
+          utils_default.warn(`Failed to stop cron job.`);
+        }
         this.job = null;
       }
-      if (cache.session && this.isNoaaWeatherWireService) {
-        yield cache.session.stop();
+      const session = cache.session;
+      if (session && this.isNoaaWeatherWireService) {
+        try {
+          yield session.stop();
+        } catch (e) {
+          utils_default.warn(`Failed to stop XMPP session.`);
+        }
         cache.sigHalt = true;
         cache.isConnected = false;
         cache.session = null;

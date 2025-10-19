@@ -123,21 +123,6 @@ export interface NationalWeatherServiceResponse {
     message?: { features: TypeAlert[] }
 }
 
-export interface VTECParsed { 
-    raw: string, 
-    tracking: string, 
-    event: string, 
-    status: string, 
-    wmo: string, 
-    expires: string 
-}
-export interface UGCParsed { 
-    zones: string[], 
-    locations: string[], 
-    expiry: Date | null, 
-    polygon: [number, number][] 
-}
-
 export interface BaseProperties {
     parent?: string,
     event?: string, 
@@ -170,7 +155,7 @@ export interface TypeAlert {
 export interface ClientSettings {
     database?: string,
     isNWWS: boolean,
-    catchUnhandledExceptions: boolean,
+    journal: boolean,
     NoaaWeatherWireService: NoaaWeatherWireServiceSettings,
     NationalWeatherService: NationalWeatherServiceSettings,
     global: GlobalSettings,
@@ -189,6 +174,27 @@ export interface TypeCompiled {
     awipsPrefix?: string,
     ignore: boolean,
 }
+
+export interface VtecEntry { 
+    raw: string;
+    type: string | undefined;
+    tracking: string;
+    event: string;
+    status: string | undefined;
+    wmo: string[];
+    expires: Date | string;
+}
+
+export interface UGCEntry {
+    zones: string[];
+    locations: string[];
+    expiry: Date | string;
+    polygon?: [number, number][];
+}
+
+
+
+
 
 export type Coordinates = { lat: number, lon: number }
 export type HTTPSettings = { timeout?: number, headers?: Record<string, string> }

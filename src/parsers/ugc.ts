@@ -12,6 +12,7 @@
 */
 
 import * as loader from '../bootstrap';
+import * as types from '../types';
 
 
 export class UGCParser {
@@ -25,13 +26,18 @@ export class UGCParser {
      * @param {string} message 
      * @returns {unknown} 
      */
-    public static async ugcExtractor(message: string) {
+    public static async ugcExtractor(message: string): Promise<types.UGCEntry | null> {
         const header = this.getHeader(message);
+        if (!header) return null;
         const zones = this.getZones(header);
-        const expiry = this.getExpiry(message)
-        const locations = await this.getLocations(zones)
-        const ugc = zones.length > 0 ? { zones, locations, expiry } : null;
-        return ugc;
+        if (zones.length === 0) return null;
+        const expiry = this.getExpiry(message);
+        const locations = await this.getLocations(zones);
+        return { 
+            zones: zones, 
+            locations: locations,
+            expiry: expiry
+        };
     }
 
     /**
@@ -42,11 +48,14 @@ export class UGCParser {
      * @param {string} message 
      * @returns {*} 
      */
-    public static getHeader(message: string) {
+    public static getHeader(message: string): string | null {
         const start = message.search(new RegExp(loader.definitions.expressions.ugc1, "gimu"));
-        const end = message.substring(start).search(new RegExp(loader.definitions.expressions.ugc2, "gimu"));
-        const full = message.substring(start, start + end).replace(/\s+/g, '').slice(0, -1);
-        return full;
+        if (start === -1) return null;
+        const subMessage = message.substring(start);
+        const end = subMessage.search(new RegExp(loader.definitions.expressions.ugc2, "gimu"));
+        if (end === -1) return null;
+        const full = subMessage.substring(0, end).replace(/\s+/g, '').slice(0, -1);
+        return full || null;
     }
 
     /**
@@ -57,7 +66,7 @@ export class UGCParser {
      * @param {string} message 
      * @returns {*} 
      */
-    public static getExpiry (message: string) {
+    public static getExpiry(message: string): Date | null {
         const start = message.match(new RegExp(loader.definitions.expressions.ugc3, "gimu"));
         if (start != null) { 
             const day = parseInt(start[0].substring(0, 2), 10);
@@ -79,11 +88,13 @@ export class UGCParser {
      * @param {String[]} zones 
      * @returns {unknown} 
      */
-    public static async getLocations (zones: String[]) {
+    public static async getLocations (zones: String[]): Promise<string[]> {
         const locations: string[] = [];
         for (let i = 0; i < zones.length; i++) {
             const id = zones[i].trim();
-            const located = await loader.cache.db.prepare(`SELECT location FROM shapefiles WHERE id = ?`).get(id);
+            const located = await loader.cache.db.prepare(`
+                SELECT location FROM shapefiles WHERE id = ?`
+            ).get(id);
             located != undefined ? locations.push(located.location) : locations.push(id);
         }
         return Array.from(new Set(locations)).sort();
@@ -97,13 +108,15 @@ export class UGCParser {
      * @param {String[]} zones 
      * @returns {{}} 
      */
-    public static getCoordinates (zones: String[]) {
+    public static getCoordinates (zones: String[]): [number, number][] {
         let coordinates: [number, number][] = [];
         for (let i = 0; i < zones.length; i++) {
             const id = zones[i].trim();
-            let located = loader.cache.db.prepare(`SELECT geometry FROM shapefiles WHERE id = ?`).get(id);
-            if (located != undefined) {
-                let geometry = JSON.parse(located.geometry);
+            const row = loader.cache.db.prepare(
+                `SELECT geometry FROM shapefiles WHERE id = ?`
+            ).get(id);
+            if (row != undefined) {
+                let geometry = JSON.parse(row.geometry);
                 if (geometry?.type === 'Polygon') {
                     coordinates.push(...geometry.coordinates[0].map((coord: [number, number]) => [coord[1], coord[0]]));
                     break;
@@ -121,28 +134,40 @@ export class UGCParser {
      * @param {string} header 
      * @returns {*} 
      */
-    public static getZones (header: string) {
-        const ugcSplit = header.split('-') 
+    public static getZones(header: string): string[] {
+        const ugcSplit = header.split('-');
         const zones: string[] = [];
-        let state = ugcSplit[0].substring(0, 2)
-        let format = ugcSplit[0].substring(2, 3);
-        for (let i = 0; i < ugcSplit.length; i++) {
-            if (/^[A-Z]/.test(ugcSplit[i])) {
-                state = ugcSplit[i].substring(0, 2);
-                if (ugcSplit[i].includes('>')) {
-                    let [start, end] = ugcSplit[i].split('>'), startNum = parseInt(start.substring(3), 10), endNum = parseInt(end, 10);
-                    for (let j = startNum; j <= endNum; j++) zones.push(`${state}${format}${j.toString().padStart(3, '0')}`);
-                } else zones.push(ugcSplit[i]);
+        let state = ugcSplit[0].substring(0, 2);
+        const format = ugcSplit[0].substring(2, 3);
+        for (const part of ugcSplit) {
+            if (/^[A-Z]/.test(part)) {
+                state = part.substring(0, 2);
+                if (part.includes('>')) {
+                    const [start, end] = part.split('>');
+                    const startNum = parseInt(start.substring(3), 10);
+                    const endNum = parseInt(end, 10);
+                    for (let j = startNum; j <= endNum; j++) {
+                        zones.push(`${state}${format}${j.toString().padStart(3, '0')}`);
+                    }
+                } else {
+                    zones.push(part);
+                }
                 continue;
             }
-            if (ugcSplit[i].includes('>')) {
-                let [start, end] = ugcSplit[i].split('>'), startNum = parseInt(start, 10), endNum = parseInt(end, 10);
-                for (let j = startNum; j <= endNum; j++) zones.push(`${state}${format}${j.toString().padStart(3, '0')}`);
-            } else zones.push(`${state}${format}${ugcSplit[i]}`);
+            if (part.includes('>')) {
+                const [start, end] = part.split('>');
+                const startNum = parseInt(start, 10);
+                const endNum = parseInt(end, 10);
+                for (let j = startNum; j <= endNum; j++) {
+                    zones.push(`${state}${format}${j.toString().padStart(3, '0')}`);
+                }
+            } else {
+                zones.push(`${state}${format}${part}`);
+            }
         }
         return zones.filter(item => item !== '');
     }
-    
+   
 }
 
 export default UGCParser;

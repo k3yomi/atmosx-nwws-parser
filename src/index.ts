@@ -55,15 +55,19 @@ export class AlertManager {
      * @param {string} locationName 
      * @param {?types.Coordinates} [coordinates] 
      */
-    public setCurrentLocation(locationName: string, coordinates?: types.Coordinates) {
-        const latitude = coordinates?.lat;
-        const longitude = coordinates?.lon;
-        if (isNaN(latitude) || isNaN(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-            Utils.warn(loader.definitions.messages.invalid_coordinates.replace('{lat}', String(latitude)).replace('{lon}', String(longitude)));
+    public setCurrentLocation(locationName: string, coordinates?: types.Coordinates): void {
+        if (!coordinates) {
+            Utils.warn(`Coordinates not provided for location: ${locationName}`);
+            return;
+        }
+        const { lat, lon } = coordinates;
+        if (typeof lat !== 'number' || typeof lon !== 'number' || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+            Utils.warn(loader.definitions.messages.invalid_coordinates.replace('{lat}', String(lat)).replace('{lon}', String(lon)));
             return;
         }
         loader.cache.currentLocations[locationName] = coordinates;
     }
+
 
     /**
      * createEasAudio generates EAS audio files based on the provided description and header information.
@@ -84,18 +88,12 @@ export class AlertManager {
      * @public
      * @returns {{}} 
      */
-    public getAllAlertTypes() {
-        const events = new Set<string>();
-        const actions = new Set<string>();
-        const combinations: string[] = [];
-        Object.values(loader.definitions.events).forEach(event => events.add(event));
-        Object.values(loader.definitions.actions).forEach(action => actions.add(action));
-        Array.from(events).forEach(event => {
-            Array.from(actions).forEach(action => {
-                combinations.push(`${event} ${action}`);
-            });
-        });
-        return combinations;
+    public getAllAlertTypes(): string[] {
+        const events = new Set(Object.values(loader.definitions.events));
+        const actions = new Set(Object.values(loader.definitions.actions));
+        return Array.from(events).flatMap(event =>
+            Array.from(actions).map(action => `${event} ${action}`)
+        );
     }
 
     /**
@@ -104,10 +102,15 @@ export class AlertManager {
      * @public
      * @async
      * @param {string} query 
+     * @param {number} [limit=250]
      * @returns {unknown} 
      */
-    public async searchStanzaDatabase(query: string) {
-        return await loader.cache.db.prepare(`SELECT * FROM stanzas WHERE stanza LIKE ? ORDER BY id DESC LIMIT 250`).all(`%${query}%`)
+    public async searchStanzaDatabase(query: string, limit: number = 250) {
+        const escapeLike = (s: string) => s.replace(/[%_]/g, '\\$&');
+        const rows = await loader.cache.db
+            .prepare(`SELECT * FROM stanzas WHERE stanza LIKE ? ESCAPE '\\' ORDER BY id DESC LIMIT ${limit}`)
+            .all(`%${escapeLike(query)}%`);
+        return rows;
     }
 
     /**
@@ -153,26 +156,39 @@ export class AlertManager {
      * @param {Record<string, string>} [metadata={}] 
      * @returns {Promise<void>} 
      */
-    public async start(metadata: types.ClientSettings) {
+    public async start(metadata: types.ClientSettings): Promise<void> {
         if (!loader.cache.isReady) { 
             Utils.warn(loader.definitions.messages.not_ready);
-            return Promise.resolve();
+            return;
         }
         this.setSettings(metadata);
-        if (loader.settings.catchUnhandledExceptions) { Utils.detectUncaughtExceptions(); }
         const settings = loader.settings as types.ClientSettings;
-        this.isNoaaWeatherWireService = loader.settings.isNWWS
+        this.isNoaaWeatherWireService = settings.isNWWS;
         loader.cache.isReady = false;
-        if (this.isNoaaWeatherWireService) {
-            await Database.loadDatabase();
-            await Xmpp.deploySession();
-            await Utils.loadCollectionCache();
+        while (!Utils.isReadyToProcess(settings.global.alertFiltering.locationFiltering?.filter ?? false)) {
+            await Utils.sleep(2000);
         }
-        Utils.handleCronJob(this.isNoaaWeatherWireService)
-        this.job = new loader.packages.jobs.Cron(`*/${!this.isNoaaWeatherWireService ? settings.NationalWeatherService.checkInterval : 5} * * * * *`, () => { 
+        if (this.isNoaaWeatherWireService) {
+            try {
+                await Database.loadDatabase();
+                await Xmpp.deploySession();
+                await Utils.loadCollectionCache();
+            } catch (err: unknown) {
+                const msg = err instanceof Error ? err.message : String(err);
+                Utils.warn(`Failed to initialize NWWS services: ${msg}`);
+            }
+        }
+        Utils.handleCronJob(this.isNoaaWeatherWireService);
+        if (this.job) {
+            try { this.job.stop(); } catch { Utils.warn(`Failed to stop existing cron job.`); }
+            this.job = null;
+        }
+        const interval = !this.isNoaaWeatherWireService ? settings.NationalWeatherService.checkInterval : 5;
+        this.job = new loader.packages.jobs.Cron(`*/${interval} * * * * *`, () => { 
             Utils.handleCronJob(this.isNoaaWeatherWireService);
-        })
+        });
     }
+
 
     /**
      * stop terminates the AlertManager instance, closing any active connections and cleaning up resources.
@@ -181,17 +197,22 @@ export class AlertManager {
      * @async
      * @returns {Promise<void>}
      */
-    public async stop() {
+    public async stop(): Promise<void> {
         loader.cache.isReady = true;
-        if (this.job) { this.job.stop(); this.job = null; }
-        if (loader.cache.session && this.isNoaaWeatherWireService) {
-            await loader.cache.session.stop();  
-            loader.cache.sigHalt = true; 
-            loader.cache.isConnected = false; 
+        if (this.job) {
+            try { this.job.stop(); } catch { Utils.warn(`Failed to stop cron job.`); }
+            this.job = null;
+        }
+        const session = loader.cache.session;
+        if (session && this.isNoaaWeatherWireService) {
+            try { await session.stop(); } catch { Utils.warn(`Failed to stop XMPP session.`); }
+            loader.cache.sigHalt = true;
+            loader.cache.isConnected = false;
             loader.cache.session = null;
             this.isNoaaWeatherWireService = false;
         }
     }
+
 }
 
 export default AlertManager;

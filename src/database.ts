@@ -28,14 +28,35 @@ export class Database {
      * @param {*} alert 
      * @returns {*} 
      */
-    public static async stanzaCacheImport(stanza: string) {
+    public static async stanzaCacheImport(stanza: string): Promise<void> {
         const settings = loader.settings as types.ClientSettings;
-        loader.cache.db.prepare(`INSERT OR IGNORE INTO stanzas (stanza) VALUES (?)`).run(stanza);
-        const count = loader.cache.db.prepare(`SELECT COUNT(*) as total FROM stanzas`).get() as { total: number };
-        if (count.total > settings.NoaaWeatherWireService.cache.maxHistory) {
-            loader.cache.db.prepare(`DELETE FROM stanzas WHERE rowid IN (SELECT rowid FROM stanzas ORDER BY rowid ASC LIMIT ?)`).run(count.total - settings.NoaaWeatherWireService.cache.maxHistory / 2); 
+        try {
+            const db = loader.cache.db;
+            if (!db) return;
+            db.prepare(`INSERT OR IGNORE INTO stanzas (stanza) VALUES (?)`).run(stanza);
+            const countRow = db.prepare(`SELECT COUNT(*) AS total FROM stanzas`).get() as { total: number };
+            const totalRows = countRow.total;
+            const maxHistory = settings.NoaaWeatherWireService.cache.maxHistory;
+            if (totalRows > maxHistory) {
+                const rowsToDelete = Math.floor((totalRows - maxHistory) / 2);
+                if (rowsToDelete > 0) {
+                    db.prepare(`
+                        DELETE FROM stanzas 
+                        WHERE rowid IN (
+                            SELECT rowid 
+                            FROM stanzas 
+                            ORDER BY rowid ASC 
+                            LIMIT ?
+                        )
+                    `).run(rowsToDelete);
+                }
+            }
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            Utils.warn(`Failed to import stanza into cache: ${msg}`);
         }
     }
+
 
     /**
      * loadDatabase initializes the SQLite database and imports shapefile data if the database or table does not exist.
@@ -45,56 +66,65 @@ export class Database {
      * @async
      * @returns {Promise<void>} 
      */
-    public static async loadDatabase() {
+    public static async loadDatabase(): Promise<void> {
         const settings = loader.settings as types.ClientSettings;
         try {
-            if (!loader.packages.fs.existsSync(settings.database)) { loader.packages.fs.writeFileSync(settings.database, ''); }
-            loader.cache.db = new loader.packages.sqlite3(settings.database);
-            const shapfileTable = loader.cache.db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='shapefiles'`).get();
-            const stanzaTable = loader.cache.db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='stanzas'`).get();
-            if (!stanzaTable) { loader.cache.db.prepare(`CREATE TABLE stanzas (id INTEGER PRIMARY KEY AUTOINCREMENT, stanza TEXT)`).run(); }
-            if (!shapfileTable) {
-                loader.cache.db.prepare(`CREATE TABLE shapefiles (id TEXT PRIMARY KEY, location TEXT, geometry TEXT)`).run();
+            const { fs, path, sqlite3, shapefile } = loader.packages;
+            if (!fs.existsSync(settings.database)) fs.writeFileSync(settings.database, '');
+            loader.cache.db = new sqlite3(settings.database);
+            loader.cache.db.prepare(`
+                CREATE TABLE IF NOT EXISTS stanzas (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    stanza TEXT
+                )
+            `).run();
+            loader.cache.db.prepare(`
+                CREATE TABLE IF NOT EXISTS shapefiles (
+                    id TEXT PRIMARY KEY,
+                    location TEXT,
+                    geometry TEXT
+                )
+            `).run();
+            const shapefileCount = loader.cache.db.prepare(`SELECT COUNT(*) AS count FROM shapefiles`).get().count;
+            if (shapefileCount === 0) {
                 Utils.warn(loader.definitions.messages.shapefile_creation);
                 for (const shape of loader.definitions.shapefiles) {
-                    const { id, file } = shape;
-                    const filepath = loader.packages.path.join(__dirname, `../../shapefiles`, file);
-                    const { features } = await loader.packages.shapefile.read(filepath, filepath);
-                    Utils.warn(`Importing ${features.length} entries from ${file}...`);
-                    const insertStmt = loader.cache.db.prepare(`INSERT OR REPLACE INTO shapefiles (id, location, geometry)VALUES (?, ?, ?)`);
+                    const filepath = path.resolve(__dirname, '../../shapefiles', shape.file);
+                    const { features } = await shapefile.read(filepath, filepath);
+                    Utils.warn(`Importing ${features.length} entries from ${shape.file}...`);
+                    const insertStmt = loader.cache.db.prepare(`
+                        INSERT OR REPLACE INTO shapefiles (id, location, geometry) VALUES (?, ?, ?)
+                    `);
                     const insertTransaction = loader.cache.db.transaction((entries: any[]) => {
                         for (const feature of entries) {
                             const { properties, geometry } = feature;
                             let final: string, location: string;
-                            switch (true) {
-                                case !!properties.FIPS:
-                                    final = `${properties.STATE}${id}${properties.FIPS.substring(2)}`;
-                                    location = `${properties.COUNTYNAME}, ${properties.STATE}`;
-                                    break;
-                                case !!properties.FULLSTAID:
-                                    final = `${properties.ST}${id}${properties.WFO}`;
-                                    location = `${properties.CITY}, ${properties.STATE}`;
-                                    break;
-                                case !!properties.STATE:
-                                    final = `${properties.STATE}${id}${properties.ZONE}`;
-                                    location = `${properties.NAME}, ${properties.STATE}`;
-                                    break;
-                                default:
-                                    final = properties.ID;
-                                    location = properties.NAME;
-                                    break;
+                            if (properties.FIPS) {
+                                final = `${properties.STATE}${shape.id}${properties.FIPS.substring(2)}`;
+                                location = `${properties.COUNTYNAME}, ${properties.STATE}`;
+                            } else if (properties.FULLSTAID) {
+                                final = `${properties.ST}${shape.id}${properties.WFO}`;
+                                location = `${properties.CITY}, ${properties.STATE}`;
+                            } else if (properties.STATE) {
+                                final = `${properties.STATE}${shape.id}${properties.ZONE}`;
+                                location = `${properties.NAME}, ${properties.STATE}`;
+                            } else {
+                                final = properties.ID;
+                                location = properties.NAME;
                             }
                             insertStmt.run(final, location, JSON.stringify(geometry));
                         }
                     });
-                    await insertTransaction(features);
+                    insertTransaction(features);
                 }
                 Utils.warn(loader.definitions.messages.shapefile_creation_finished);
             }
-        } catch (error: any) {
-            Utils.warn(`Failed to load database: ${error.message}`);
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            Utils.warn(`Failed to load database: ${msg}`);
         }
     }
+
 }
 
 export default Database;

@@ -12,6 +12,7 @@
 */
 
 import * as loader from '../bootstrap';
+import * as types from '../types';
 
 export class VtecParser {
 
@@ -24,25 +25,25 @@ export class VtecParser {
      * @param {string} message 
      * @returns {unknown} 
      */
-    public static async vtecExtractor(message: string) {
-        const vtecs: unknown[] = [];
+    public static async vtecExtractor(message: string): Promise<types.VtecEntry[] | null> {
         const matches = message.match(new RegExp(loader.definitions.expressions.vtec, 'g'));
         if (!matches) return null;
-        for (let i = 0; i < matches.length; i++) {
-            const vtec = matches[i];
-            const parts = vtec.split(`.`);
-            const dates = parts[6].split(`-`);
+        const vtecs: types.VtecEntry[] = [];
+        for (const vtec of matches) {
+            const parts = vtec.split('.');
+            if (parts.length < 7) continue; 
+            const dates = parts[6].split('-');
             vtecs.push({
                 raw: vtec,
                 type: loader.definitions.productTypes[parts[0]],
                 tracking: `${parts[2]}-${parts[3]}-${parts[4]}-${parts[5]}`,
                 event: `${loader.definitions.events[parts[3]]} ${loader.definitions.actions[parts[4]]}`,
                 status: loader.definitions.status[parts[1]],
-                wmo: message.match(new RegExp(loader.definitions.expressions.wmo, 'gimu')),
-                expires: this.parseExpiryDate(dates)
-            })
+                wmo: message.match(new RegExp(loader.definitions.expressions.wmo, 'gimu')) ?? [],
+                expires: this.parseExpiryDate(dates),
+            });
         }
-        return vtecs;
+        return vtecs.length ? vtecs : null;
     }
 
     /**
@@ -53,14 +54,13 @@ export class VtecParser {
      * @param {String[]} args 
      * @returns {string} 
      */
-    private static parseExpiryDate(args: String[]) {
+    private static parseExpiryDate(args: String[]): string {
         if (args[1] == `000000T0000Z`) return `Invalid Date Format`;
         const expires = `${new Date().getFullYear().toString().substring(0, 2)}${args[1].substring(0, 2)}-${args[1].substring(2, 4)}-${args[1].substring(4, 6)}T${args[1].substring(7, 9)}:${args[1].substring(9, 11)}:00`;
         const local = new Date(new Date(expires).getTime() - 4 * 60 * 60000);
         const pad = (n: number) => n.toString().padStart(2, '0');
         return `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}T${pad(local.getHours())}:${pad(local.getMinutes())}:00.000-04:00`;
     }
-
 }
 
 export default VtecParser;

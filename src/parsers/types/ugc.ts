@@ -63,7 +63,7 @@ export class UGCAlerts {
         for (let i = 0; i < messages.length; i++) {
             const tick = performance.now();
             const message = messages[i]
-            const getUGC = await UgcParser.ugcExtractor(message) as types.UGCParsed;
+            const getUGC = await UgcParser.ugcExtractor(message) as types.UGCEntry
             if (getUGC != null) {
                 const getBaseProperties = await EventParser.getBaseProperties(message, validated, getUGC) as types.BaseProperties;
                 const getHeader = EventParser.getHeader({ ...validated.attributes, ...getBaseProperties.attributes } as types.TypeAttributes, getBaseProperties);

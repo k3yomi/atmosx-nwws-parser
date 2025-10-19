@@ -34,11 +34,11 @@ export class EventParser {
      * @async
      * @param {string} message 
      * @param {types.TypeCompiled} validated 
-     * @param {types.UGCParsed} [ugc=null] 
-     * @param {types.VTECParsed} [vtec=null] 
+     * @param {types.UGCEntry} [ugc=null] 
+     * @param {types.VtecEntry} [vtec=null] 
      * @returns {Promise<types.BaseProperties>} 
      */
-    public static async getBaseProperties(message: string, validated: types.TypeCompiled, ugc: types.UGCParsed = null, vtec: types.VTECParsed = null) {
+    public static async getBaseProperties(message: string, validated: types.TypeCompiled, ugc: types.UGCEntry = null, vtec: types.VtecEntry = null) {
         const settings = loader.settings as types.ClientSettings;
         const definitions = {
             tornado: TextParser.textProductToString(message, `TORNADO...`) || TextParser.textProductToString(message, `WATERSPOUT...`) || `N/A`,
@@ -127,7 +127,12 @@ export class EventParser {
     }
     
     /**
-     * getCorrectExpiryDate determines the correct expiration date for an alert based on VTEC information or UGC zones.
+     * validateEvents determines the correct expiration date for an alert based on VTEC information or UGC zones.
+     * This will filter incoming alerts based on the user's settings and emit events accordingly.
+     * This will also emit specific events based on the alert type for easier handling.
+     * For exmaple, a "Tornado Warning" will emit both "onTornadoWarning" and "onRadarIndicatedTornadoWarning" events.
+     * Then the user can listen to those events individually as needed.
+     * If you want to listen to all alerts, use the "onAlerts" event.
      *
      * @public
      * @static
@@ -135,7 +140,7 @@ export class EventParser {
      */
     public static validateEvents(events: unknown[]) {
         if (events.length == 0) return;
-        const settings = loader.settings as types.ClientSettings;
+        const originalEvents = JSON.parse(JSON.stringify(events));
         const filteringSettings = loader.settings?.global?.alertFiltering;
         const locationSettings = filteringSettings?.locationFiltering;
         const easSettings = loader.settings?.global?.easSettings;
@@ -155,8 +160,8 @@ export class EventParser {
             const { performance, header, ...eventWithoutPerformance } = originalEvent;
             originalEvent.properties.parent = originalEvent.properties.event;          
             originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools?.betterEventParsing, bools?.useParentEvents);
-            originalEvent.properties.distance = this.getLocationDistances(props, bools?.filter, locationSettings?.maxDistance, locationSettings?.unit);
             originalEvent.hash = loader.packages.crypto.createHash('md5').update(JSON.stringify(eventWithoutPerformance)).digest('hex');
+            originalEvent.properties.distance = this.getLocationDistances(props, bools?.filter, locationSettings?.maxDistance, locationSettings?.unit);
             if (!originalEvent.properties.distance?.in_range) { return false; }
             if (originalEvent.properties.is_test == true && bools?.ignoreTestProducts) return false;
             if (bools?.checkExpired && originalEvent.properties.is_cancelled == true) return false;
@@ -169,7 +174,8 @@ export class EventParser {
                 if (key === 'ugcFilter' && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc: string) => setting.has(ugc.toLowerCase()))) return false;
                 if (key === 'stateFilter' && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc: string) => setting.has(ugc.substring(0, 2).toLowerCase()))) return false;
             }
-            loader.cache.events.emit(`on${originalEvent.properties.parent.replace(/\s+/g, '')}`)
+            loader.cache.events.emit(`on${originalEvent.properties.parent.replace(/\s+/g, '')}`) // onTornadoWarning
+            loader.cache.events.emit(`on${originalEvent.properties.event.replace(/\s+/g, '')}`) // onRadarIndicatedTornadoWarning
             return true;
         })
         if (filtered.length > 0) { loader.cache.events.emit(`onAlerts`, filtered); }
@@ -182,10 +188,10 @@ export class EventParser {
      * @static
      * @param {types.TypeAttributes} attributes 
      * @param {?types.BaseProperties} [properties] 
-     * @param {?types.VTECParsed} [vtec] 
+     * @param {?types.VtecEntry} [vtec] 
      * @returns {string} 
      */
-    public static getHeader(attributes: types.TypeAttributes, properties?: types.BaseProperties, vtec?: types.VTECParsed) {
+    public static getHeader(attributes: types.TypeAttributes, properties?: types.BaseProperties, vtec?: types.VtecEntry) {
         const parent = `ATSX`
         const alertType = attributes?.awipsType?.type ?? attributes?.getAwip?.prefix ?? `XX`;
         const ugc = properties?.geocode?.UGC != null ? properties?.geocode?.UGC.join(`-`) : `000000`;
@@ -217,12 +223,12 @@ export class EventParser {
      *
      * @private
      * @static
-     * @param {types.VTECParsed} vtec 
+     * @param {types.VtecEntry} vtec 
      * @param {Record<string, string>} attributes 
      * @param {(RegExpMatchArray | string | null)} WMO 
      * @returns {{ icao: any; name: any; }} 
      */
-    private static getICAO(vtec: types.VTECParsed, attributes: Record<string, string>, WMO: RegExpMatchArray | string | null) {
+    private static getICAO(vtec: types.VtecEntry, attributes: Record<string, string>, WMO: RegExpMatchArray | string | null) {
         const icao = vtec != null ? vtec?.tracking.split(`-`)[0] : (attributes?.cccc ?? (WMO != null ? (Array.isArray(WMO) ? WMO[0] : WMO) : `N/A`));
         const name = loader.definitions.ICAO?.[icao] ?? `N/A`;
         return { icao, name };
@@ -250,11 +256,11 @@ export class EventParser {
      *
      * @private
      * @static
-     * @param {types.VTECParsed} vtec 
-     * @param {types.UGCParsed} ugc 
+     * @param {types.VtecEntry} vtec 
+     * @param {types.UGCEntry} ugc 
      * @returns {*} 
      */
-    private static getCorrectExpiryDate(vtec: types.VTECParsed, ugc: types.UGCParsed) {
+    private static getCorrectExpiryDate(vtec: types.VtecEntry, ugc: types.UGCEntry) {
         const time =  vtec?.expires && !isNaN(new Date(vtec.expires).getTime()) ? 
             new Date(vtec.expires).toLocaleString() : 
             (ugc?.expiry != null ? new Date(ugc.expiry).toLocaleString() : 
@@ -276,6 +282,7 @@ export class EventParser {
      */
     private static getLocationDistances(properties?: types.BaseProperties, isFiltered?: boolean, maxDistance?: number, unit?: string) {
         let inRange = false;
+        const totalTracks = Object.keys(loader.cache.currentLocations).length;
         if (properties.geometry != null) {
             for (const key in loader.cache.currentLocations) {
                 const coordinates = loader.cache.currentLocations[key];
@@ -287,20 +294,12 @@ export class EventParser {
                 properties.distance[key] = { unit, distance };
             }
             if (!isFiltered) { return {range: properties.distance, in_range: true}; }
-            if (isFiltered) { 
-                for (const key in properties.distance) {
-                    if (properties.distance[key].distance <= maxDistance) {
-                        inRange = true;
-                    }
-                }
+            for (const key in properties.distance) {
+                if (properties.distance[key].distance <= maxDistance) { inRange = true; }
             }
-            if (loader.cache.currentLocations && Object.keys(loader.cache.currentLocations).length == 0) {
-                Utils.warn(loader.definitions.messages.no_current_locations);
-                inRange = true;
-            }
-            return {range: properties.distance, in_range: inRange }
+            return {range: properties.distance, in_range: totalTracks == 0 ? true : inRange}
         }
-        return null;
+        return {in_range: false};
     }
 
     /**
@@ -319,7 +318,6 @@ export class EventParser {
         const tags = Object.entries(defEventTags).filter(([key]) => props?.description.includes(key.toLowerCase())).map(([, value]) => value)
         props.tags = tags.length > 0 ? tags : [`N/A`];
         const setAction = (type: `C` | `U` | `I`) => { 
-            props.action_type = type; 
             props.is_cancelled = type === `C`; 
             props.is_updated = type === `U`; 
             props.is_issued = type === `I`; 

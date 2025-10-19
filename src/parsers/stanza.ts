@@ -69,13 +69,16 @@ export class StanzaParser {
      * @param {unknown} attributes 
      * @returns {*} 
      */
-    private static getType(attributes: unknown) {
-        const attrs = attributes as types.TypeAttributes;
-        if (!attrs || !attrs.awipsid) return {type: `XX`, prefix: `XX`};
-        for (const [prefix, type] of Object.entries(loader.definitions.awips)) {
-            if (attrs.awipsid.startsWith(prefix)) { return {type: type, prefix: prefix}; }
+    private static getType(attributes: unknown): Record<string, string> {
+        const attrs = attributes as types.TypeAttributes | undefined;
+        if (!attrs?.awipsid) return { type: 'XX', prefix: 'XX' };
+        const awipsDefs = loader.definitions.awips;
+        for (const [prefix, type] of Object.entries(awipsDefs)) {
+            if (attrs.awipsid.startsWith(prefix)) {
+                return { type, prefix };
+            }
         }
-        return {type: `XX`, prefix: `XX`};
+        return { type: 'XX', prefix: 'XX' };
     }
 
     /**
@@ -85,17 +88,29 @@ export class StanzaParser {
      * @static
      * @param {unknown} compiled 
      */
-    private static cache(compiled: unknown) {
+    private static async cache(compiled: unknown): Promise<void> {
+        if (!compiled) return;
         const data = compiled as types.TypeCompiled;
         const settings = loader.settings as types.ClientSettings;
-        if (!settings.NoaaWeatherWireService.cache.directory) return;
-        if (!loader.packages.fs.existsSync(settings.NoaaWeatherWireService.cache.directory)) { loader.packages.fs.mkdirSync(settings.NoaaWeatherWireService.cache.directory, { recursive: true }); }
-        data.message = data.message.replace(/\$\$/g, `\nSTANZA ATTRIBUTES...${JSON.stringify(data.attributes)}\nISSUED TIME...${new Date().toISOString()}\n$$$\n`);
-        if (!data.message.includes(`STANZA ATTRIBUTES...`)) {
-            data.message += `\nSTANZA ATTRIBUTES...${JSON.stringify(data.attributes)}\nISSUED TIME...${new Date().toISOString()}\n$$\n`;
+        const { fs, path } = loader.packages;
+        if (!data.message || !settings.NoaaWeatherWireService.cache.directory) return;
+        const cacheDir = settings.NoaaWeatherWireService.cache.directory;
+        if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
+        let msg = data.message.replace(/\$\$/g, '');
+        if (!msg.includes('STANZA ATTRIBUTES...')) {
+            msg += `\nSTANZA ATTRIBUTES...${JSON.stringify(data.attributes)}\nISSUED TIME...${new Date().toISOString()}\n$$\n`;
         }
-        loader.packages.fs.appendFileSync(`${settings.NoaaWeatherWireService.cache.directory}/category-${data.awipsPrefix}-${data.awipsType}s-${data.isCap ? `cap` : `raw`}${data.isVtec ? `-vtec` : ``}.bin`,`=================================================\n${new Date().toISOString().replace(/[:.]/g, '-')}\n=================================================\n${data.message}`, 'utf8');
-        loader.packages.fs.appendFileSync(`${settings.NoaaWeatherWireService.cache.directory}/cache-${data.isCap ? `cap` : `raw`}${data.isVtec ? `-vtec` : ``}.bin`,`=================================================\n${new Date().toISOString().replace(/[:.]/g, '-')}\n=================================================\n${data.message}`, 'utf8');
+        data.message = msg;
+        const time = new Date().toISOString().replace(/[:.]/g, '-');
+        const prefix = `category-${data.awipsPrefix}-${data.awipsType}s`;
+        const suffix = `${data.isCap ? 'cap' : 'raw'}${data.isVtec ? '-vtec' : ''}`;
+        const categoryFile = path.join(cacheDir, `${prefix}-${suffix}.bin`);
+        const cacheFile = path.join(cacheDir, `cache-${suffix}.bin`);
+        const entry = `=================================================\n${time}\n=================================================\n${msg}`;
+        await Promise.all([
+            fs.promises.appendFile(categoryFile, entry, 'utf8'),
+            fs.promises.appendFile(cacheFile, entry, 'utf8'),
+        ]);
     }
     
 }

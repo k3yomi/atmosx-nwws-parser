@@ -35,8 +35,8 @@ export class VTECAlerts {
         for (let i = 0; i < messages.length; i++) {
             const tick = performance.now();
             const message = messages[i]
-            const getVTEC = await VtecParser.vtecExtractor(message) as types.VTECParsed[];
-            const getUGC = await UgcParser.ugcExtractor(message) as types.UGCParsed;
+            const getVTEC = await VtecParser.vtecExtractor(message) as types.VtecEntry[]
+            const getUGC = await UgcParser.ugcExtractor(message) as types.UGCEntry
             if (getVTEC != null && getUGC != null) {
                 for (let j = 0; j < getVTEC.length; j++) {
                     const vtec = getVTEC[j];

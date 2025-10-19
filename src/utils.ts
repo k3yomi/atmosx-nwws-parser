@@ -32,7 +32,7 @@ export class Utils {
     public static async sleep(ms: number) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
-    
+
     /**
      * warn logs a warning message to the console with a standardized format.
      *
@@ -40,8 +40,11 @@ export class Utils {
      * @static
      * @param {string} message 
      */
-    public static warn(message: string) {
-        console.warn(`\x1b[33m[ATMX-MANAGER]\x1b[0m ${message}`);
+    public static warn(message: string, force: boolean = false) {
+        if (!loader.settings.journal) return;
+        if (loader.cache.lastWarn != null && (Date.now() - loader.cache.lastWarn < 500) && !force) return;
+        loader.cache.lastWarn = Date.now();
+        console.warn(`\x1b[33m[ATMOSX-PARSER]\x1b[0m [${new Date().toLocaleString()}] ${message}`);
     }
     
     /**
@@ -59,6 +62,8 @@ export class Utils {
                 if (!loader.packages.fs.existsSync(settings.NoaaWeatherWireService.cache.directory)) return;
                 const cacheDir = settings.NoaaWeatherWireService.cache.directory;
                 const getAllFiles = loader.packages.fs.readdirSync(cacheDir).filter((file: string) => file.endsWith('.bin') && file.startsWith('cache-'));
+                this.warn(loader.definitions.messages.dump_cache.replace(`{count}`, getAllFiles.length.toString()), true);
+                await this.sleep(2000);
                 for (const file of getAllFiles) {
                     const filepath = loader.packages.path.join(cacheDir, file);
                     const readFile = loader.packages.fs.readFileSync(filepath, { encoding: 'utf-8' });
@@ -70,6 +75,7 @@ export class Utils {
                     const validate = StanzaParser.validate(readFile, { awipsid: file, isCap: isCap, raw: true, issue: undefined });
                     await EventParser.eventHandler(validate);
                 }
+                this.warn(loader.definitions.messages.dump_cache_complete, true);
             }
         } catch (error: any) {
             Utils.warn(`Failed to load cache: ${error.message}`);
@@ -87,27 +93,27 @@ export class Utils {
     public static async loadGeoJsonData() {
         try {
             const settings = loader.settings as types.ClientSettings;
-            const response = await this.createHttpRequest(settings.NationalWeatherService.endpoint) as types.NationalWeatherServiceResponse
-            if (!response.error) { 
-                EventParser.eventHandler({message: JSON.stringify(response.message), attributes: {}, isCap: true, isApi: true, isVtec: false, isUGC: false, isCapDescription: false, awipsType: { type: 'api', prefix: 'AP' }, ignore: false});
-            }
-        } catch (error: any) {
-            Utils.warn(`Failed to load National Weather Service GeoJSON Data: ${error.message}`);
+            const response = await this.createHttpRequest<types.NationalWeatherServiceResponse>(
+                settings.NationalWeatherService.endpoint
+            );
+            if (response.error) return;
+            EventParser.eventHandler({
+                message: JSON.stringify(response.message),
+                attributes: {},
+                isCap: true,
+                isApi: true,
+                isVtec: false,
+                isUGC: false,
+                isCapDescription: false,
+                awipsType: { type: 'api', prefix: 'AP' },
+                ignore: false
+            });
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            Utils.warn(`Failed to load National Weather Service GeoJSON Data: ${msg}`);
         }
     }
 
-    /**
-     * detectUncaughtExceptions sets up a global handler for uncaught exceptions in the Node.js process,
-     *
-     * @public
-     * @static
-     */
-    public static detectUncaughtExceptions() {
-        if (loader.cache.events.listenerCount('uncaughtException') > 0) return;
-        process.on('uncaughtException', (error: Error) => {
-            Utils.warn(`Uncaught Exception: ${error.message}`);
-        });
-    }
     
     /**
      * createHttpRequest performs an HTTP GET request to the specified URL with optional settings.
@@ -119,7 +125,7 @@ export class Utils {
      * @param {?types.HTTPSettings} [options] 
      * @returns {unknown} 
      */
-    public static async createHttpRequest(url: string, options?: types.HTTPSettings) {
+    public static async createHttpRequest<T = unknown>(url: string, options?: types.HTTPSettings): Promise<{ error: boolean; message: T | string }> {
         const defaultOptions = { 
             timeout: 10000,
             headers: { 
@@ -134,17 +140,19 @@ export class Utils {
             headers: { ...defaultOptions.headers, ...(options?.headers ?? {}) }
         };
         try {
-            const resp = await loader.packages.axios.get(url, {
+            const resp = await loader.packages.axios.get<T>(url, {
                 headers: requestOptions.headers,
                 timeout: requestOptions.timeout,
                 maxRedirects: 0,
                 validateStatus: (status) => status === 200 || status === 500
             });
             return { error: false, message: resp.data };
-        } catch (err: any) {
-            return { error: true, message: err?.message ?? String(err) };
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return { error: true, message: msg };
         }
     }
+
 
     /**
      * garbageCollectionCache removes files from the cache directory that exceed the specified maximum file size in megabytes.
@@ -156,31 +164,31 @@ export class Utils {
     public static garbageCollectionCache(maxFileMegabytes: number) {
         try {
             const settings = loader.settings as types.ClientSettings;
-            if (!settings.NoaaWeatherWireService.cache.directory) return;
-            if (!loader.packages.fs.existsSync(settings.NoaaWeatherWireService.cache.directory)) return;
+            const cacheDir = settings.NoaaWeatherWireService.cache.directory;
+            if (!cacheDir) return;
+            const { fs, path } = loader.packages;
+            if (!fs.existsSync(cacheDir)) return;
             const maxBytes = maxFileMegabytes * 1024 * 1024;
-            const cacheDirectory = settings.NoaaWeatherWireService.cache.directory;
-            const stackFiles: string[] = [cacheDirectory], files: { 
-                file: string,
-                size: number,
-            }[] = [];
-            while (stackFiles.length) { 
-                const currentDirectory = stackFiles.pop();
-                loader.packages.fs.readdirSync(currentDirectory).forEach((file: string) => {
-                    const fullPath = loader.packages.path.join(currentDirectory, file);
-                    const stat = loader.packages.fs.statSync(fullPath)
-                    if (stat.isDirectory()) stackFiles.push(fullPath) ;
+            const stackDirs: string[] = [cacheDir];
+            const files: { file: string; size: number }[] = [];
+            while (stackDirs.length) {
+                const currentDir = stackDirs.pop()!;
+                fs.readdirSync(currentDir).forEach(file => {
+                    const fullPath = path.join(currentDir, file);
+                    const stat = fs.statSync(fullPath);
+                    if (stat.isDirectory()) stackDirs.push(fullPath);
                     else files.push({ file: fullPath, size: stat.size });
-                })
+                });
             }
-            if (!files.length) return;
             files.forEach(f => {
-                if (f.size > maxBytes) loader.packages.fs.unlinkSync(f.file);
-            })
-        } catch (error: any) {
-            Utils.warn(`Failed to perform garbage collection: ${error.message}`);
+                if (f.size > maxBytes) fs.unlinkSync(f.file);
+            });
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            Utils.warn(`Failed to perform garbage collection: ${msg}`);
         }
     }
+
 
     /**
      * handleCronJob performs periodic tasks based on whether the client is connected to NWWS or fetching data from NWS.
@@ -190,18 +198,26 @@ export class Utils {
      * @param {boolean} isNwws 
      */ 
     public static handleCronJob(isNwws: boolean) {
-        try { 
+        try {
             const settings = loader.settings as types.ClientSettings;
-            if (isNwws) { 
-                if (settings.NoaaWeatherWireService.cache.read ) void this.garbageCollectionCache(settings.NoaaWeatherWireService.cache.maxSizeMB);
-                if (settings.NoaaWeatherWireService.clientReconnections.canReconnect ) void Xmpp.isSessionReconnectionEligible(settings.NoaaWeatherWireService.clientReconnections.currentInterval);
+            const cache = settings.NoaaWeatherWireService.cache;
+            const reconnections = settings.NoaaWeatherWireService.clientReconnections;
+            if (isNwws) {
+                if (cache.read) {
+                    void this.garbageCollectionCache(cache.maxSizeMB);
+                }
+                if (reconnections.canReconnect) {
+                    void Xmpp.isSessionReconnectionEligible(reconnections.currentInterval);
+                }
             } else {
                 void this.loadGeoJsonData();
             }
-        } catch (error: any) {
-            Utils.warn(`Failed to perform scheduled tasks: ${error.message}`);
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
+            Utils.warn(`Failed to perform scheduled tasks (${isNwws ? 'NWWS' : 'GeoJSON'}): ${msg}`);
         }
     }
+
 
     /**
      * mergeClientSettings merges user-provided settings into the existing client settings, allowing for nested objects to be merged correctly.
@@ -211,18 +227,22 @@ export class Utils {
      * @param {Record<string, any>} target 
      * @param {Record<string, any>} settings 
      */
-    public static mergeClientSettings(target: Record<string, any>, settings: Record<string, any>) {
+    public static mergeClientSettings(target: Record<string, unknown>, settings: types.ClientSettings): Record<string, unknown> {
         for (const key in settings) {
-            if (settings.hasOwnProperty(key)) {
-                if (typeof settings[key] === 'object' && settings[key] !== null && !Array.isArray(settings[key])) {
-                    if (!target[key] || typeof target[key] !== 'object') { target[key] = {};  }
-                    this.mergeClientSettings(target[key], settings[key]);
-                } else {
-                    target[key] = settings[key];
+            if (!Object.prototype.hasOwnProperty.call(settings, key)) continue;
+            const value = settings[key];
+            if (value && typeof value === 'object' && !Array.isArray(value)) {
+                if (!target[key] || typeof target[key] !== 'object' || Array.isArray(target[key])) {
+                    target[key] = {};
                 }
+                this.mergeClientSettings(target[key] as Record<string, unknown>, value as types.ClientSettings);
+            } else {
+                target[key] = value;
             }
         }
+        return target;
     }
+
 
     /**
      * Calculate the distance between 2 given coordinates.
@@ -235,20 +255,44 @@ export class Utils {
      * @param {('miles' | 'kilometers')} [unit='miles'] 
      * @returns {Promise<number>} 
      */
-    public static calculateDistance(coord1: types.Coordinates, coord2: types.Coordinates, unit: 'miles' | 'kilometers' = 'miles') {
+    public static calculateDistance(coord1: types.Coordinates, coord2: types.Coordinates, unit: 'miles' | 'kilometers' = 'miles'): number {
         if (!coord1 || !coord2) return 0;
         const { lat: lat1, lon: lon1 } = coord1;
         const { lat: lat2, lon: lon2 } = coord2;
+        if ([lat1, lon1, lat2, lon2].some(v => typeof v !== 'number')) return 0;
         const toRad = (deg: number) => deg * Math.PI / 180;
-        const earthRadius = unit === 'miles' ? 3958.8 : 6371;
-        let dLat = toRad(lat2 - lat1);
-        let dLon = toRad(lon2 - lon1);
-        if (dLon > Math.PI) dLon -= 2 * Math.PI;
-        if (dLon < -Math.PI) dLon += 2 * Math.PI;
-        const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+        const R = unit === 'miles' ? 3958.8 : 6371;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a =
+            Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        const distance = earthRadius * c;
-        return Number(distance.toFixed(2));
+        return Math.round(R * c * 100) / 100;
+    }
+    
+    /**
+     * validateEventReady checks if there are current locations set when location filtering is enabled, and manages warning messages accordingly.
+     *
+     * @public
+     * @static
+     * @param {boolean} isFiltering 
+     * @returns {boolean} 
+     */
+    public static isReadyToProcess(isFiltering: boolean): boolean {
+        const totalTracks = Object.keys(loader.cache.currentLocations).length;
+        if (totalTracks > 0) {
+            loader.cache.totalLocationWarns = 0;
+            return true;
+        }
+        if (!isFiltering) return true;
+        if (loader.cache.totalLocationWarns < 3) {
+            Utils.warn(loader.definitions.messages.no_current_locations);
+            loader.cache.totalLocationWarns++;
+            return false;
+        }
+        Utils.warn(loader.definitions.messages.disabled_location_warning, true);
+        return true;
     }
 }
 
