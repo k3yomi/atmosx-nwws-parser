@@ -64,6 +64,7 @@ import axios from "axios";
 import crypto from "crypto";
 import os from "os";
 import say from "say";
+import child from "child_process";
 
 // src/dictionaries/events.ts
 var EVENTS = {
@@ -880,7 +881,8 @@ var packages = {
   axios,
   crypto,
   os,
-  say
+  say,
+  child
 };
 var cache = {
   isReady: true,
@@ -948,7 +950,8 @@ var settings = {
     },
     easSettings: {
       easDirectory: null,
-      easIntroWav: null
+      easIntroWav: null,
+      festivalVoice: `kal_diphone`
     }
   }
 };
@@ -1018,7 +1021,8 @@ var definitions = {
     disabled_location_warning: `Exceeded maximum warnings for invalid or missing lat/lon coordinates. Location filtering has been ignored until you set valid coordinates or disable location filtering.`,
     reconnect_too_fast: `The client is attempting to reconnect too fast. This may be due to network instability. Reconnection attempt has been halted for safety.`,
     dump_cache: `Found {count} cached alert files and will begin dumping them shortly...`,
-    dump_cache_complete: `Completed dumping all cached alert files.`
+    dump_cache_complete: `Completed dumping all cached alert files.`,
+    eas_missing_festival: `Festival TTS engine is not installed or not found in PATH. Please install Festival to enable EAS audio generation on Linux and macOS systems.`
   }
 };
 
@@ -2007,7 +2011,6 @@ var EventParser = class {
   static validateEvents(events2) {
     var _a, _b, _c, _d, _e;
     if (events2.length == 0) return;
-    const originalEvents = JSON.parse(JSON.stringify(events2));
     const filteringSettings = (_b = (_a = settings) == null ? void 0 : _a.global) == null ? void 0 : _b.alertFiltering;
     const locationSettings = filteringSettings == null ? void 0 : filteringSettings.locationFiltering;
     const easSettings = (_d = (_c = settings) == null ? void 0 : _c.global) == null ? void 0 : _d.easSettings;
@@ -2034,7 +2037,7 @@ var EventParser = class {
       originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools == null ? void 0 : bools.betterEventParsing, bools == null ? void 0 : bools.useParentEvents);
       originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(eventWithoutPerformance)).digest("hex");
       originalEvent.properties.distance = this.getLocationDistances(props, bools == null ? void 0 : bools.filter, locationSettings == null ? void 0 : locationSettings.maxDistance, locationSettings == null ? void 0 : locationSettings.unit);
-      if (!((_d2 = originalEvent.properties.distance) == null ? void 0 : _d2.in_range)) {
+      if (!((_d2 = originalEvent.properties.distance) == null ? void 0 : _d2.in_range) && (bools == null ? void 0 : bools.filter)) {
         return false;
       }
       if (originalEvent.properties.is_test == true && (bools == null ? void 0 : bools.ignoreTestProducts)) return false;
@@ -2187,7 +2190,7 @@ var EventParser = class {
     const props = (_a = event.properties) != null ? _a : {};
     const statusCorrelation = definitions.correlations.find((c) => c.type === props.action_type);
     const defEventTags = definitions.tags;
-    const tags = Object.entries(defEventTags).filter(([key]) => props == null ? void 0 : props.description.includes(key.toLowerCase())).map(([, value]) => value);
+    const tags = Object.entries(defEventTags).filter(([key]) => props == null ? void 0 : props.description.toLowerCase().includes(key.toLowerCase())).map(([, value]) => value);
     props.tags = tags.length > 0 ? tags : [`N/A`];
     const setAction = (type) => {
       props.is_cancelled = type === `C`;
@@ -2493,6 +2496,7 @@ var Utils = class _Utils {
    * @param {string} message 
    */
   static warn(message, force = false) {
+    cache.events.emit("log", message);
     if (!settings.journal) return;
     if (cache.lastWarn != null && Date.now() - cache.lastWarn < 500 && !force) return;
     cache.lastWarn = Date.now();
@@ -2755,15 +2759,16 @@ var EAS = class {
   static generateEASAudio(message, vtec) {
     return new Promise((resolve) => __async(this, null, function* () {
       const settings2 = settings;
+      const assetsDir = settings2.global.easSettings.easDirectory;
+      const rngFile = `${vtec.replace(/[^a-zA-Z0-9]/g, `_`)}`.substring(0, 32).replace(/^_+|_+$/g, "");
+      const os2 = packages.os.platform();
       for (const { regex, replacement } of definitions.messageSignatures) {
         message = message.replace(regex, replacement);
       }
-      const assetsDir = settings2.global.easSettings.easDirectory;
       if (!assetsDir) {
         utils_default.warn(definitions.messages.eas_no_directory);
         return resolve(null);
       }
-      const rngFile = `${vtec.replace(/[^a-zA-Z0-9]/g, `_`)}`.substring(0, 32).replace(/^_+|_+$/g, "");
       if (!packages.fs.existsSync(assetsDir)) {
         packages.fs.mkdirSync(assetsDir);
       }
@@ -2776,8 +2781,10 @@ var EAS = class {
       if (!packages.fs.existsSync(packages.path.join(assetsDir, `/output`))) {
         packages.fs.mkdirSync(packages.path.join(assetsDir, `/output`), { recursive: true });
       }
-      packages.say.export(message, voice, 1, tmpTTS);
-      yield utils_default.sleep(2500);
+      if (os2 === "win32") {
+        packages.say.export(message, voice, 1, tmpTTS);
+      }
+      yield utils_default.sleep(3500);
       let ttsBuffer = null;
       while (!packages.fs.existsSync(tmpTTS) || (ttsBuffer = packages.fs.readFileSync(tmpTTS)).length === 0) {
         yield utils_default.sleep(500);
@@ -3267,6 +3274,7 @@ var AlertManager = class {
    * - onReconnect: Emitted when the XMPP client is attempting to reconnect
    * - onOccupant: Emitted when an occupant joins or leaves the XMPP MUC room (NWWS only)
    * - onAnyEventType (Ex. onTornadoWarning) Emitted when a specific alert event type is received
+   * - log: Emitted for general log messages from the parser
    * 
    * @public
    * @param {string} event 

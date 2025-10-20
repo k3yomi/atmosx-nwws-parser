@@ -21,7 +21,7 @@ import TextAlerts from './types/text';
 import CAPAlerts from './types/cap';
 import APIAlerts from './types/api';
 import Utils from '../utils';
-import EAS from '../eas';
+
 
 export class EventParser {
 
@@ -140,7 +140,6 @@ export class EventParser {
      */
     public static validateEvents(events: unknown[]) {
         if (events.length == 0) return;
-        const originalEvents = JSON.parse(JSON.stringify(events));
         const filteringSettings = loader.settings?.global?.alertFiltering;
         const locationSettings = filteringSettings?.locationFiltering;
         const easSettings = loader.settings?.global?.easSettings;
@@ -162,7 +161,7 @@ export class EventParser {
             originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools?.betterEventParsing, bools?.useParentEvents);
             originalEvent.hash = loader.packages.crypto.createHash('md5').update(JSON.stringify(eventWithoutPerformance)).digest('hex');
             originalEvent.properties.distance = this.getLocationDistances(props, bools?.filter, locationSettings?.maxDistance, locationSettings?.unit);
-            if (!originalEvent.properties.distance?.in_range) { return false; }
+            if (!originalEvent.properties.distance?.in_range && bools?.filter) { return false; }
             if (originalEvent.properties.is_test == true && bools?.ignoreTestProducts) return false;
             if (bools?.checkExpired && originalEvent.properties.is_cancelled == true) return false;
             for (const key in sets) {
@@ -315,7 +314,7 @@ export class EventParser {
         const props = event.properties ?? {};
         const statusCorrelation = loader.definitions.correlations.find((c: { type: string }) => c.type === props.action_type);
         const defEventTags = loader.definitions.tags;
-        const tags = Object.entries(defEventTags).filter(([key]) => props?.description.includes(key.toLowerCase())).map(([, value]) => value)
+        const tags = Object.entries(defEventTags).filter(([key]) => props?.description.toLowerCase().includes(key.toLowerCase())).map(([, value]) => value)
         props.tags = tags.length > 0 ? tags : [`N/A`];
         const setAction = (type: `C` | `U` | `I`) => { 
             props.is_cancelled = type === `C`; 

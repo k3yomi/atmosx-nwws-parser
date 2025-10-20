@@ -24,6 +24,7 @@ import axios from 'axios';
 import crypto from 'crypto';
 import os from 'os';
 import say from 'say';
+import child from 'child_process';
 
 
 import * as dictEvents from './dictionaries/events';
@@ -45,7 +46,8 @@ export const packages = {
     axios, 
     crypto, 
     os, 
-    say
+    say,
+    child,
 };
 
 export const cache = {
@@ -116,6 +118,7 @@ export const settings = {
         easSettings: {
             easDirectory: null,
             easIntroWav: null,
+            festivalVoice: `kal_diphone`,
         }
     }
 }
@@ -182,5 +185,6 @@ export const definitions = {
         reconnect_too_fast: `The client is attempting to reconnect too fast. This may be due to network instability. Reconnection attempt has been halted for safety.`,
         dump_cache: `Found {count} cached alert files and will begin dumping them shortly...`,
         dump_cache_complete: `Completed dumping all cached alert files.`,
+        eas_missing_festival: `Festival TTS engine is not installed or not found in PATH. Please install Festival to enable EAS audio generation on Linux and macOS systems.`,
     }
 };

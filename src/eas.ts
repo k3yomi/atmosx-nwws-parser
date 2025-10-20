@@ -32,10 +32,11 @@ export class EAS {
     public static generateEASAudio(message: string, vtec: string) {
         return new Promise(async (resolve) => {
             const settings = loader.settings as types.ClientSettings;
-            for (const { regex, replacement } of loader.definitions.messageSignatures) { message = message.replace(regex, replacement); }
             const assetsDir = settings.global.easSettings.easDirectory;
-            if (!assetsDir) { Utils.warn(loader.definitions.messages.eas_no_directory); return resolve(null); }
             const rngFile = `${vtec.replace(/[^a-zA-Z0-9]/g, `_`)}`.substring(0, 32).replace(/^_+|_+$/g, '');
+            const os = loader.packages.os.platform();
+            for (const { regex, replacement } of loader.definitions.messageSignatures) { message = message.replace(regex, replacement); }
+            if (!assetsDir) { Utils.warn(loader.definitions.messages.eas_no_directory); return resolve(null); }
             if (!loader.packages.fs.existsSync(assetsDir)) { loader.packages.fs.mkdirSync(assetsDir); }
 
             const tmpTTS = loader.packages.path.join(assetsDir, `/tmp/${rngFile}.wav`);
@@ -45,10 +46,8 @@ export class EAS {
 
             if (!loader.packages.fs.existsSync(loader.packages.path.join(assetsDir, `/tmp`))) { loader.packages.fs.mkdirSync(loader.packages.path.join(assetsDir, `/tmp`), { recursive: true }); }
             if (!loader.packages.fs.existsSync(loader.packages.path.join(assetsDir, `/output`))) { loader.packages.fs.mkdirSync(loader.packages.path.join(assetsDir, `/output`), { recursive: true }); }
-
-            loader.packages.say.export(message, voice, 1.0, tmpTTS);
-            await Utils.sleep(2500);
-
+            if (os === 'win32') { loader.packages.say.export(message, voice, 1.0, tmpTTS); }
+            await Utils.sleep(3500);
             let ttsBuffer: Buffer = null;
             while (!loader.packages.fs.existsSync(tmpTTS) || (ttsBuffer = loader.packages.fs.readFileSync(tmpTTS)).length === 0) {
                 await Utils.sleep(500); // Wait for 500ms before retrying

@@ -17,6 +17,7 @@ interface GlobalSettings {
     easSettings: { 
         easDirectory: string, 
         easIntroWav: string | null 
+        festivalVoice: string
     },  
     alertFiltering: { 
         filteredEvents: string[], 
