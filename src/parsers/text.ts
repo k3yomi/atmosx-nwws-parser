@@ -11,7 +11,6 @@
     Written by: KiyoWx (k3yomi)                
 */
 
-import * as loader from '../bootstrap';
 
 export class TextParser {
     
@@ -26,15 +25,9 @@ export class TextParser {
      *
      * @static
      * @param {string} message
-     *     The raw text product message to search.
      * @param {string} value
-     *     The string to search for within each line of the message.
      * @param {string[]} [removal=[]]
-     *     Optional array of substrings to remove from the extracted result.
-     *
      * @returns {string | null}
-     *     The cleaned-up extracted string if found, or `null` if the value does
-     *     not exist in the message.
      */
     public static textProductToString(message: string,value: string,removal: string[] = []): string | null {
         const lines = message.split('\n');
@@ -59,11 +52,7 @@ export class TextParser {
      *
      * @static
      * @param {string} message
-     *     The raw text product message containing LAT...LON coordinate data.
-     *
      * @returns {[number, number][]}
-     *     An array of [latitude, longitude] coordinate pairs forming the polygon.
-     *     Returns an empty array if no valid coordinates are found.
      */
     public static textProductToPolygon(message: string): [number, number][] {
         const coordinates: [number, number][] = [];
@@ -88,12 +77,8 @@ export class TextParser {
      *
      * @static
      * @param {string} message
-     *     The raw text product message to process.
      * @param {string | null} [handle=null]
-     *     An optional handle string to remove from the message.
-     *
      * @returns {string}
-     *     The extracted description text from the message.
      */
     public static textProductToDescription(message: string, handle: string = null): string {
         const original = message;
@@ -123,30 +108,6 @@ export class TextParser {
         }
         return message.replace(/\s+/g, ' ').trim().startsWith('STANZA ATTRIBUTES...') ? original : message.split('STANZA ATTRIBUTES...')[0].trim();
     }
-
-    /**
-     * @function awipTextToEvent
-     * @description
-     *     Maps the beginning of a message string to a known AWIPS event type based on
-     *     predefined prefixes. Returns a default value if no matching prefix is found.
-     *
-     * @static
-     * @param {string} message
-     *     The message string to analyze for an AWIPS prefix.
-     *
-     * @returns {Record<string, string>}
-     *     An object containing:
-     *       - `type`: The mapped AWIPS event type (or 'XX' if not found).
-     *       - `prefix`: The matched prefix (or 'XX' if not found).
-     */
-    public static awipTextToEvent(message: string): Record<string, string> {
-        for (const [prefix, type] of Object.entries(loader.definitions.awips)) {
-            if (message.startsWith(prefix)) {
-                return {type: type, prefix: prefix};
-            }
-        }
-        return {type: `XX`, prefix: `XX`};
-    }
     
     /**
      * @function getXmlValues
@@ -159,12 +120,8 @@ export class TextParser {
      *
      * @static
      * @param {any} parsed
-     *     The parsed XML object, typically resulting from an XML-to-JS parser.
      * @param {string[]} valuesToExtract
-     *     Array of key names to extract values for from the parsed object.
-     *
      * @returns {Record<string, string | string[] | null>}
-     *     An object mapping each requested key to its extracted value(s) or `null`.
      */
     public static getXmlValues(parsed: any, valuesToExtract: string[]): Record<string, string> {
         const extracted: Record<string, any> = {};   

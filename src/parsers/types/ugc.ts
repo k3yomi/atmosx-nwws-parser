@@ -31,7 +31,7 @@ export class UGCAlerts {
      * @returns {string} 
      */
     private static getTracking(baseProperties: types.EventProperties) {
-        return `${baseProperties.sender_icao}-${baseProperties.attributes.ttaaii}-${baseProperties.attributes.id.slice(-4)}`
+        return `${baseProperties.sender_icao}-${baseProperties.metadata.attributes.ttaaii}-${baseProperties.metadata.attributes.id.slice(-4)}`
     }
 
     /**
@@ -46,18 +46,13 @@ export class UGCAlerts {
      * @private
      * @static
      * @param {string} message
-     *     The raw message text to parse for event identification.
      * @param {Record<string, any>} attributes
-     *     The AWIPS-related attributes, expected to include a `type` field.
-     *
      * @returns {string}
-     *     The derived event name, either the matched offshore event or a formatted
-     *     attribute-based string.
      */
-    private static getEvent(message: string, attributes: Record<string, any>) {
+    private static getEvent(message: string, metadata: types.StanzaAttributes) {
         const offshoreEvent = Object.keys(loader.definitions.offshore).find(event => message.toLowerCase().includes(event.toLowerCase()));
         if (offshoreEvent != undefined ) return Object.keys(loader.definitions.offshore).find(event => message.toLowerCase().includes(event.toLowerCase()));
-        return attributes.type.split(`-`).map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(` `)
+        return metadata.awipsType.type.split(`-`).map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(` `)
     }
 
     /**
@@ -71,45 +66,34 @@ export class UGCAlerts {
      * @static
      * @async
      * @param {types.StanzaCompiled} validated
-     *     The validated stanza object containing message text, attributes,
-     *     and metadata.
-     *
      * @returns {Promise<void>}
-     *     This method does not return a value. It processes events and
-     *     invokes `EventParser.validateEvents` to filter and emit them.
-     *
-     * @remarks
-     *     - Splits multi-stanza messages using `$$`, `ISSUED TIME...`, or
-     *       `=================================================` as delimiters.
-     *     - Extracts UGC entries using `UgcParser.ugcExtractor`.
-     *     - Calls `EventParser.getBaseProperties` to compile core event properties.
-     *     - Computes an EAS header using `EventParser.getHeader`.
-     *     - Generates a human-readable event name via `this.getEvent`.
-     *     - Computes a tracking string via `this.getTracking`.
-     *     - Tracks performance timing for each processed message.
-     *     - Calls `EventParser.validateEvents` to filter and emit final events.
      */
     public static async event(validated: types.StanzaCompiled) {
         let processed = [] as unknown[];
-        const messages = validated.message.split(/(?=\$\$|ISSUED TIME...|=================================================)/g)?.map(msg => msg.trim());
-        if (!messages || messages.length == 0) return;
-        for (let i = 0; i < messages.length; i++) {
-            const tick = performance.now();
-            const message = messages[i]
-            const getUGC = await UgcParser.ugcExtractor(message) as types.UGCEntry
-            if (getUGC != null) {
-                const getBaseProperties = await EventParser.getBaseProperties(message, validated, getUGC) as types.EventProperties;
-                const getHeader = EventParser.getHeader({ ...validated.attributes, ...getBaseProperties.attributes } as types.StanzaAttributes, getBaseProperties);
-                const getEvent = this.getEvent(message, getBaseProperties.attributes.getAwip);
-                processed.push({
-                    performance: performance.now() - tick,
-                    source: `ugc-parser`,
-                    tracking: this.getTracking(getBaseProperties),
-                    header: getHeader,
-                    vtec: `N/A`,
-                    history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: `Issued` }],
-                    properties: { event: getEvent, parent: getEvent, action_type: `Issued`, ...getBaseProperties, }
-                })
+        const blocks = validated.message.split(/\[SoF\]/gim)?.map(msg => msg.trim());
+        for (const block of blocks) {
+            const cachedAttribute = block.match(/STANZA ATTRIBUTES\.\.\.(\{.*\})/);
+            const messages = block.split(/(?=\$\$)/g)?.map(msg => msg.trim());
+            if (!messages || messages.length == 0) return;
+            for (let i = 0; i < messages.length; i++) {
+                const tick = performance.now();
+                const message = messages[i]
+                const getUGC = await UgcParser.ugcExtractor(message) as types.UGCEntry
+                if (getUGC != null) {
+                    const attributes = cachedAttribute != null ? JSON.parse(cachedAttribute[1]) : validated;
+                    const getBaseProperties = await EventParser.getBaseProperties(message, attributes, getUGC) as types.EventProperties;
+                    const getHeader = EventParser.getHeader({ ...attributes, ...getBaseProperties.metadata } as types.StanzaAttributes, getBaseProperties);
+                    const getEvent = this.getEvent(message, attributes);
+                    processed.push({
+                        performance: performance.now() - tick,
+                        source: `ugc-parser`,
+                        tracking: this.getTracking(getBaseProperties),
+                        header: getHeader,
+                        vtec: `N/A`,
+                        history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: `Issued` }],
+                        properties: { event: getEvent, parent: getEvent, action_type: `Issued`, ...getBaseProperties, }
+                    })
+                }
             }
         }
         EventParser.validateEvents(processed);

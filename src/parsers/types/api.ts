@@ -31,7 +31,7 @@ export class APIAlerts {
      * @param {Record<string, string>} extracted 
      * @returns {string} 
      */
-    private static getTracking(extracted: Record<string, string>, attributes: types.StanzaAttributes) {
+    private static getTracking(extracted: Record<string, string>) {
         return extracted.vtec ? (() => {
             const vtecValue = Array.isArray(extracted.vtec) ? extracted.vtec[0] : extracted.vtec;
             const splitVTEC = vtecValue.split('.');
@@ -83,7 +83,7 @@ export class APIAlerts {
             processed.push({
                 performance: performance.now() - tick,
                 source: `api-parser`,
-                tracking: this.getTracking({ vtec: getVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }, validated.attributes),
+                tracking: this.getTracking({ vtec: getVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
                 header: getHeader,
                 vtec: getVTEC || `N/A`,
                 history: [{

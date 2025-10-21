@@ -13,7 +13,7 @@ import Utils from '../utils';
 
 
 export class EventParser {
-
+    
     /**
      * @function getBaseProperties
      * @description
@@ -25,46 +25,12 @@ export class EventParser {
      * @static
      * @async
      * @param {string} message
-     *     The raw text of the weather alert or CAP/TEXT product.
-     *
      * @param {types.StanzaCompiled} validated
-     *     The validated stanza object containing attributes,
-     *     flags, and metadata.
-     *
      * @param {types.UGCEntry} [ugc=null]
-     *     Optional UGC entry object providing zones, locations, and
-     *     expiry information.
-     *
      * @param {types.VtecEntry} [vtec=null]
-     *     Optional VTEC entry object for extracting tracking,
-     *     type, and expiration information.
-     *
      * @returns {Promise<Record<string, any>>}
-     *     A promise resolving to a fully structured object with:
-     *     - locations: string of all UGC locations.
-     *     - issued: ISO string of the issued timestamp.
-     *     - expires: ISO string of the expiry timestamp.
-     *     - geocode: Object with UGC zone identifiers.
-     *     - description: Parsed description of the alert.
-     *     - sender_name: Name of issuing office.
-     *     - sender_icao: ICAO code of issuing office.
-     *     - attributes: Combined stanza attributes with AWIP info.
-     *     - parameters: Extracted hazard parameters (tornado, hail, wind, flood, etc.).
-     *     - geometry: Polygon coordinates if available or derived from shapefiles.
-     *
-     * @remarks
-     *     - Falls back to shapefile coordinates if no polygon is in the message
-     *       and shapefile preferences are enabled.
-     *     - Uses multiple helper methods including:
-     *       - `TextParser.textProductToString`
-     *       - `TextParser.textProductToPolygon`
-     *       - `TextParser.textProductToDescription`
-     *       - `this.getICAO`
-     *       - `this.getCorrectIssuedDate`
-     *       - `this.getCorrectExpiryDate`
-     *       - `TextParser.awipTextToEvent`
      */
-    public static async getBaseProperties(message: string, validated: types.StanzaCompiled, ugc: types.UGCEntry = null, vtec: types.VtecEntry = null) {
+    public static async getBaseProperties(message: string, metadata: types.DefaultAttributesType, ugc: types.UGCEntry = null, vtec: types.VtecEntry = null) {
         const settings = loader.settings as types.ClientSettingsTypes;
         const definitions = {
             tornado: TextParser.textProductToString(message, `TORNADO...`) || TextParser.textProductToString(message, `WATERSPOUT...`) || `N/A`,
@@ -73,7 +39,6 @@ export class EventParser {
             flood: TextParser.textProductToString(message, `FLASH FLOOD...`) || `N/A`,
             damage: TextParser.textProductToString(message, `DAMAGE THREAT...`) || `N/A`,
             source: TextParser.textProductToString(message, `SOURCE...`, [`.`]) || `N/A`,
-            attributes: TextParser.textProductToString(message, `STANZA ATTRIBUTES...`) ? JSON.parse(TextParser.textProductToString(message, `STANZA ATTRIBUTES...`)) : null,
             polygon: TextParser.textProductToPolygon(message),
             description: TextParser.textProductToDescription(message, vtec?.raw ?? null),
             wmo: message.match(new RegExp(loader.definitions.expressions.wmo, 'imu')),
@@ -81,10 +46,9 @@ export class EventParser {
             mdWindGusts: TextParser.textProductToString(message, `MOST PROBABLE PEAK WIND GUST...`) || `N/A`,
             mdHailSize: TextParser.textProductToString(message, `MOST PROBABLE PEAK HAIL SIZE...`) || `N/A`,
         };
-        const getOffice = this.getICAO(vtec, validated.attributes ?? definitions.attributes ?? {}, definitions.wmo);
-        const getCorrectIssued = this.getCorrectIssuedDate(definitions.attributes ?? validated.attributes  ?? {});
+        const getOffice = this.getICAO(vtec, metadata, definitions.wmo);
+        const getCorrectIssued = this.getCorrectIssuedDate(metadata);
         const getCorrectExpiry = this.getCorrectExpiryDate(vtec, ugc);
-        const getAwip = TextParser.awipTextToEvent(definitions.attributes?.awipsid ?? validated.awipsType.prefix);
         const base = { 
             locations: ugc?.locations.join(`; `) || `No Location Specified (UGC Missing)`,
             issued: getCorrectIssued,
@@ -93,10 +57,8 @@ export class EventParser {
             description: definitions.description,
             sender_name: getOffice.name,
             sender_icao: getOffice.icao,
-            attributes: {
-                ...validated.attributes,
-                ...definitions.attributes,
-                getAwip,
+            metadata: {
+                ...Object.fromEntries(Object.entries(metadata).filter(([key]) => key !== 'message'))
             },
             parameters: {
                 wmo: Array.isArray(definitions.wmo) ? definitions.wmo[0] : (definitions.wmo ?? `N/A`),
@@ -128,25 +90,9 @@ export class EventParser {
      *
      * @static
      * @param {types.EventCompiled} event
-     *     The event object containing properties such as `event`,
-     *     `description`, and `parameters` to analyze for better parsing.
-     *
      * @param {boolean} [betterParsing=false]
-     *     Whether to attempt enhanced parsing using `enhancedEvents` definitions.
-     *
      * @param {boolean} [useParentEvents=false]
-     *     If true, returns the original parent event name instead of
-     *     the parsed/enhanced name.
-     *
      * @returns {string}
-     *     Returns the improved or original event name based on the
-     *     parsing rules and flags.
-     *
-     * @remarks
-     *     - Uses `loader.definitions.enhancedEvents` to map base events to
-     *       more specific event names depending on conditions.
-     *     - Appends `(TPROB)` for certain Severe Thunderstorm Warning events
-     *       if `damage_threat` indicates a possible tornado.
      */
     public static betterParsedEventName(event: types.EventCompiled, betterParsing?: boolean, useParentEvents?: boolean) {
         let eventName = event?.properties?.event ?? `Unknown Event`;
@@ -181,20 +127,7 @@ export class EventParser {
      *
      * @static
      * @param {unknown[]} events
-     *     An array of events to validate and filter. Each event is
-     *     expected to conform to the internal structure of a compiled alert.
-     *
      * @returns {void}
-     *     This function does not return a value. Valid and filtered events
-     *     are emitted via the event system (`loader.cache.events`).
-     *
-     * @remarks
-     *     - Events are augmented with default signatures and computed
-     *       distances before filtering.
-     *     - Supports multiple filter categories, including events, ignored
-     *       events, ICAO, UGC codes, and state codes.
-     *     - Emits events for each valid alert, both by parent and by
-     *       specific event name.
      */
     public static validateEvents(events: unknown[]) {
         if (events.length == 0) return;
@@ -246,14 +179,9 @@ export class EventParser {
      *
      * @static
      * @param {types.StanzaAttributes} attributes
-     *     The stanza attributes containing AWIPS type and related metadata.
      * @param {types.EventProperties} [properties]
-     *     Optional event properties, such as geocode, issued time, and sender ICAO.
      * @param {types.VtecEntry} [vtec]
-     *     Optional VTEC entry providing status information for the alert.
-     *
      * @returns {string}
-     *     A formatted alert header string following the ZCZC header convention.
      */
     public static getHeader(attributes: types.StanzaAttributes, properties?: types.EventProperties, vtec?: types.VtecEntry) {
         const parent = `ATSX`
@@ -274,17 +202,14 @@ export class EventParser {
      *
      * @static
      * @param {types.StanzaCompiled} validated
-     *     The validated stanza object containing flags and message details
-     *     used to determine the correct alert processing pipeline.
-     *
      * @returns {void}
      */
-    public static eventHandler(validated: types.StanzaCompiled) {
-        if (validated.isApi) return APIAlerts.event(validated)
-        if (validated.isCap) return CAPAlerts.event(validated)
-        if (!validated.isCap && validated.isVtec && validated.isUGC) return VTECAlerts.event(validated);
-        if (!validated.isCap && !validated.isVtec && validated.isUGC) return UGCAlerts.event(validated); 
-        if (!validated.isCap && !validated.isVtec && !validated.isUGC) return TextAlerts.event(validated);
+    public static eventHandler(metadata: types.StanzaCompiled) {
+        if (metadata.isApi) return APIAlerts.event(metadata)
+        if (metadata.isCap) return CAPAlerts.event(metadata)
+        if (!metadata.isCap && metadata.isVtec && metadata.isUGC) return VTECAlerts.event(metadata);
+        if (!metadata.isCap && !metadata.isVtec && metadata.isUGC) return UGCAlerts.event(metadata); 
+        if (!metadata.isCap && !metadata.isVtec && !metadata.isUGC) return TextAlerts.event(metadata);
     }
 
     /**
@@ -297,17 +222,12 @@ export class EventParser {
      * @private
      * @static
      * @param {types.VtecEntry | null} vtec
-     *     The VTEC entry object, which may contain tracking information.
      * @param {Record<string, string>} attributes
-     *     Event attributes object, potentially containing a `cccc` field.
      * @param {RegExpMatchArray | string | null} WMO
-     *     WMO code or match array, used as a fallback if VTEC and attributes do not provide a code.
-     *
      * @returns {{ icao: string; name: string }}
-     *     An object containing the ICAO code and its human-readable name.
      */
-    private static getICAO(vtec: types.VtecEntry, attributes: Record<string, string>, WMO: RegExpMatchArray | string | null) {
-        const icao = vtec != null ? vtec?.tracking.split(`-`)[0] : (attributes?.cccc ?? (WMO != null ? (Array.isArray(WMO) ? WMO[0] : WMO) : `N/A`));
+    private static getICAO(vtec: types.VtecEntry, metadata: types.DefaultAttributesType, WMO: RegExpMatchArray | string | null) {
+        const icao = vtec != null ? vtec?.tracking.split(`-`)[0] : (metadata.attributes?.cccc ?? (WMO != null ? (Array.isArray(WMO) ? WMO[0] : WMO) : `N/A`));
         const name = loader.definitions.ICAO?.[icao] ?? `N/A`;
         return { icao, name };
     }
@@ -321,15 +241,12 @@ export class EventParser {
      * @private
      * @static
      * @param {Record<string, string>} attributes
-     *     The event attributes object, expected to contain an `issue` property.
-     *
      * @returns {string}
-     *     A locale-formatted string representing the calculated issued date and time.
      */
-    private static getCorrectIssuedDate(attributes: Record<string, string>) {
-        const time = attributes.issue != null ? 
-            new Date(attributes.issue).toLocaleString() : (attributes?.issue != null ? 
-            new Date(attributes.issue).toLocaleString() : 
+    private static getCorrectIssuedDate(metadata: types.DefaultAttributesType) {
+        const time = metadata.attributes.issue != null ? 
+            new Date(metadata.attributes.issue).toLocaleString() : (metadata.attributes?.issue != null ? 
+            new Date(metadata.attributes.issue).toLocaleString() : 
             new Date().toLocaleString());
         if (time == `Invalid Date`) return new Date().toLocaleString();
         return time;
@@ -344,12 +261,8 @@ export class EventParser {
      * @private
      * @static
      * @param {types.VtecEntry} vtec
-     *     The VTEC entry containing a potential `expires` date.
      * @param {types.UGCEntry} ugc
-     *     The UGC entry containing a potential `expiry` date.
-     *
      * @returns {string}
-     *     A locale-formatted string representing the calculated expiry date and time.
      */
     private static getCorrectExpiryDate(vtec: types.VtecEntry, ugc: types.UGCEntry) {
         const time =  vtec?.expires && !isNaN(new Date(vtec.expires).getTime()) ? 
@@ -369,18 +282,10 @@ export class EventParser {
      * @private
      * @static
      * @param {types.EventProperties} [properties]
-     *     Event properties object which must contain a `geometry` field with coordinates.
-     *     Distances will be added to `properties.distance` keyed by location names.
      * @param {boolean} [isFiltered=false]
-     *     If true, the returned `in_range` value reflects whether any location is within `maxDistance`.
      * @param {number} [maxDistance]
-     *     Maximum distance to consider a location "in range" when `isFiltered` is true.
      * @param {string} [unit='miles']
-     *     Unit of distance measurement: either 'miles' or 'kilometers'. Defaults to 'miles'.
-     *
      * @returns {{ range?: Record<string, {unit: string, distance: number}>, in_range: boolean }}
-     *     - `range`: Optional object containing distances for each location (unit + distance).
-     *     - `in_range`: True if at least one location is within `maxDistance` or if no filtering is applied.
      */
     private static getLocationDistances(properties?: types.EventProperties, isFiltered?: boolean, maxDistance?: number, unit?: string) {
         let inRange = false;
@@ -414,16 +319,7 @@ export class EventParser {
      * @private
      * @static
      * @param {any} event
-     *     The event object to process. Expected to have a `properties` object and optionally `vtec`.
-     *
      * @returns {any}
-     *     The event object with updated `properties`:
-     *       - `is_cancelled`: True if the event is cancelled.
-     *       - `is_updated`: True if the event is updated.
-     *       - `is_issued`: True if the event is newly issued.
-     *       - `tags`: Array of tags derived from the event description.
-     *       - `is_test` (optional): True if the event is a test product.
-     *       - `action_type`: Updated action type after correlation processing.
      */
     private static buildDefaultSignature(event: any) {
         const props = event.properties ?? {};

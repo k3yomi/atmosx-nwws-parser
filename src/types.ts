@@ -89,18 +89,6 @@ export interface ClientSettingsTypes {
 
 
 // ----------- Alert / Events ----------- //
-interface LocalDefaultAttributes {
-    xmlns?: string; 
-    id?: string; 
-    issue?: string; 
-    ttaaii?: string; 
-    cccc?: string; 
-    awipsid?: string; 
-    getAwip?: Record<string, string>;
-    awipsType?: Record<string, string>;
-    isCap?: boolean;
-    raw?: boolean;
-}
 
 
 interface LocalEventHistory { 
@@ -149,7 +137,7 @@ interface LocalEventProperties {
     description?: string;
     sender_name?: string;
     sender_icao?: string;
-    attributes?: LocalDefaultAttributes;
+    metadata?: DefaultAttributesType;
     parameters?: LocalEventParameters;
     geometry?: LocalGeoJSON | null;
     messageType?: string;
@@ -159,9 +147,33 @@ interface LocalEventProperties {
 }
 
 // --- Exports --- //
+
+export interface StanzaAttributesType {
+    xmlns?: string; 
+    id?: string; 
+    issue?: string; 
+    ttaaii?: string; 
+    cccc?: string; 
+    awipsid?: string; 
+}
+export interface DefaultAttributesType {
+    attributes?: {
+        xmlns?: string; 
+        id?: string; 
+        issue?: string; 
+        ttaaii?: string; 
+        cccc?: string; 
+        awipsid?: string; 
+    }
+    getAwip?: Record<string, string>;
+    awipsType?: Record<string, string>;
+    isCap?: boolean;
+    raw?: boolean;
+}
+
 export interface StanzaCompiled { 
     message?: string;
-    attributes?: LocalDefaultAttributes;
+    attributes?: DefaultAttributesType;
     isCap?: boolean;
     isApi?: boolean;
     isCapDescription?: boolean;
@@ -171,6 +183,7 @@ export interface StanzaCompiled {
     awipsType?: Record<string, string>;
     awipsPrefix?: string;
     ignore?: boolean;
+    awipsid?: string;
 }
 
 export interface VtecEntry { 
@@ -201,7 +214,7 @@ export interface EventCompiled {
 }
 
 export type EventProperties = LocalEventProperties;
-export type StanzaAttributes = LocalDefaultAttributes;
+export type StanzaAttributes = DefaultAttributesType;
 
 
 // ----------- Generic ----------- //

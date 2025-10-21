@@ -16,7 +16,7 @@ import * as loader from '../../bootstrap';
 import EventParser from '../events';
 
 
-export class UGCAlerts {
+export class TextAlerts {
 
     /**
      * @function getTracking
@@ -30,7 +30,7 @@ export class UGCAlerts {
      * @returns {string} 
      */
     private static getTracking(baseProperties: types.EventProperties) {
-        return `${baseProperties.sender_icao}-${baseProperties.attributes.ttaaii}-${baseProperties.attributes.id.slice(-4)}`
+        return `${baseProperties.sender_icao}-${baseProperties.metadata.attributes.ttaaii}-${baseProperties.metadata.attributes.id.slice(-4)}`
     }
 
     /**
@@ -44,19 +44,13 @@ export class UGCAlerts {
      * @private
      * @static
      * @param {string} message
-     *     The raw text of the message to parse for event information.
-     * @param {Record<string, any>} attributes
-     *     The AWIPS attributes associated with the message, typically containing
-     *     the `type` property.
-     *
+     * @param {types.StanzaAttributes} metadata
      * @returns {string}
-     *     The determined event name, either an offshore event or formatted
-     *     AWIPS type.
      */
-    private static getEvent(message: string, attributes: Record<string, any>) {
+    private static getEvent(message: string, metadata: types.StanzaAttributes) {
         const offshoreEvent = Object.keys(loader.definitions.offshore).find(event => message.toLowerCase().includes(event.toLowerCase()));
-        if (offshoreEvent) return Object.keys(loader.definitions.offshore).find(event => message.toLowerCase().includes(event.toLowerCase()));
-        return attributes.type.split(`-`).map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(` `)
+        if (offshoreEvent != undefined ) return Object.keys(loader.definitions.offshore).find(event => message.toLowerCase().includes(event.toLowerCase()));
+        return metadata.awipsType.type.split(`-`).map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(` `)
     }
 
     /**
@@ -72,35 +66,35 @@ export class UGCAlerts {
      * @static
      * @async
      * @param {types.StanzaCompiled} validated
-     *     The validated compiled stanza object containing the original message
-     *     and its attributes.
-     *
      * @returns {Promise<void>}
-     *     Resolves after all segments of the message have been processed and
-     *     events have been validated and emitted.
      */
     public static async event(validated: types.StanzaCompiled) {
         let processed = [] as unknown[];
-        const messages = validated.message.split(/(?=\$\$|ISSUED TIME...|=================================================)/g)?.map(msg => msg.trim());
-        if (!messages || messages.length == 0) return;
-        for (let i = 0; i < messages.length; i++) {
-            const tick = performance.now();
-            const message = messages[i]
-            const getBaseProperties = await EventParser.getBaseProperties(message, validated) as types.EventProperties;
-            const getHeader = EventParser.getHeader({ ...validated.attributes, ...getBaseProperties.attributes } as types.StanzaAttributes, getBaseProperties);
-            const getEvent = this.getEvent(message, getBaseProperties.attributes.getAwip);
-            processed.push({
-                performance: performance.now() - tick,
-                source: `text-parser`,
-                tracking: this.getTracking(getBaseProperties),
-                header: getHeader,
-                vtec: `N/A`,
-                history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: `Issued` }],
-                properties: { event: getEvent, parent: getEvent, action_type: `Issued`, ...getBaseProperties, }
-            })
+        const blocks = validated.message.split(/\[SoF\]/gim)?.map(msg => msg.trim());
+        for (const block of blocks) {
+            const cachedAttribute = block.match(/STANZA ATTRIBUTES\.\.\.(\{.*\})/);
+            const messages = block.split(/(?=\$\$)/g)?.map(msg => msg.trim());
+            if (!messages || messages.length == 0) return;
+            for (let i = 0; i < messages.length; i++) {
+                const tick = performance.now();
+                const message = messages[i]
+                const attributes = cachedAttribute != null ? JSON.parse(cachedAttribute[1]) : validated;
+                const getBaseProperties = await EventParser.getBaseProperties(message, attributes) as types.EventProperties;
+                const getHeader = EventParser.getHeader({ ...validated.attributes, ...getBaseProperties.metadata } as types.StanzaAttributes, getBaseProperties);
+                const getEvent = this.getEvent(message, attributes);
+                processed.push({
+                    performance: performance.now() - tick,
+                    source: `text-parser`,
+                    tracking: this.getTracking(getBaseProperties),
+                    header: getHeader,
+                    vtec: `N/A`,
+                    history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: `Issued` }],
+                    properties: { event: getEvent, parent: getEvent, action_type: `Issued`, ...getBaseProperties, }
+                })
+            }
         }
         EventParser.validateEvents(processed);
     }
 }
 
-export default UGCAlerts;
+export default TextAlerts;

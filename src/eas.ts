@@ -32,19 +32,8 @@ export class EAS {
      * @static
      * @async
      * @param {string} message
-     *     The text message to be converted into EAS TTS audio.
      * @param {string} vtec
-     *     The SAME/VTEC code used for generating SAME headers.
-     *
      * @returns {Promise<string | null>}
-     *     Resolves with the path to the generated WAV file, or `null` if generation fails.
-     *
-     * @example
-     *     const outputFile = await EAS.generateEASAudio(
-     *         "Severe Thunderstorm Warning in effect for your area.",
-     *         "TO.WSW.KXYZ.SV.W.0001.230102T1234Z-230102T1300Z"
-     *     );
-     *     console.log(`EAS audio saved to: ${outputFile}`);
      */
     public static generateEASAudio(message: string, vtec: string) {
         return new Promise(async (resolve) => {
@@ -63,11 +52,16 @@ export class EAS {
 
             if (!loader.packages.fs.existsSync(loader.packages.path.join(assetsDir, `/tmp`))) { loader.packages.fs.mkdirSync(loader.packages.path.join(assetsDir, `/tmp`), { recursive: true }); }
             if (!loader.packages.fs.existsSync(loader.packages.path.join(assetsDir, `/output`))) { loader.packages.fs.mkdirSync(loader.packages.path.join(assetsDir, `/output`), { recursive: true }); }
-            if (os === 'win32') { loader.packages.say.export(message, voice, 1.0, tmpTTS); }
+            if (os == 'win32') { loader.packages.say.export(message, voice, 1.0, tmpTTS); }
+            if (os == 'linux') {
+                message = message.replace(/[\r\n]+/g, ' ');
+                const festivalCommand = `echo "${message.replace(/"/g, '\\"')}" | text2wave -o "${tmpTTS}"`;
+                loader.packages.child.execSync(festivalCommand);
+            }
             await Utils.sleep(3500);
             let ttsBuffer: Buffer = null;
             while (!loader.packages.fs.existsSync(tmpTTS) || (ttsBuffer = loader.packages.fs.readFileSync(tmpTTS)).length === 0) {
-                await Utils.sleep(500); // Wait for 500ms before retrying
+                await Utils.sleep(25);
             }
 
             const ttsWav = this.parseWavPCM16(ttsBuffer);
@@ -114,13 +108,8 @@ export class EAS {
      * @private
      * @static
      * @param {Record<string, number>[]} samples
-     *     An array of objects each containing a numeric `value` representing a
-     *     16-bit PCM audio sample.
      * @param {number} [sampleRate=8000]
-     *     The audio sample rate in Hz. Defaults to 8000 Hz.
-     *
      * @returns {Buffer}
-     *     A Node.js Buffer containing the WAV file bytes.
      */
     private static encodeWavPCM16(samples: Record<string, number>[], sampleRate: number = 8000) {
         const bytesPerSample = 2;
@@ -166,11 +155,7 @@ export class EAS {
      * @private
      * @static
      * @param {Buffer} buffer
-     *     The WAV file data to parse.
-     *
      * @returns { { samples: Int16Array; sampleRate: number; channels: number; bitsPerSample: number } | null }
-     *     Returns an object with the extracted audio samples and format
-     *     information, or `null` if parsing fails or format is unsupported.
      */
 
     private static parseWavPCM16(buffer: Buffer) {
@@ -206,10 +191,7 @@ export class EAS {
      * @private
      * @static
      * @param {Int16Array[]} arrays
-     *     An array of Int16Array buffers to concatenate.
-     *
      * @returns {Int16Array}
-     *     A single Int16Array containing all input buffers in sequence.
      */
     private static concatPCM16(arrays: Int16Array[]) {
         let total = 0;
@@ -232,10 +214,7 @@ export class EAS {
      * @private
      * @static
      * @param {Int16Array} int16
-     *     The input PCM16 Int16Array buffer.
-     *
      * @returns {Float32Array}
-     *     A Float32Array containing normalized audio samples.
      */
     private static pcm16toFloat(int16: Int16Array) {
         const out = new Float32Array(int16.length);
@@ -252,10 +231,7 @@ export class EAS {
      * @private
      * @static
      * @param {Float32Array} float32
-     *     The input Float32Array containing normalized audio samples.
-     *
      * @returns {Int16Array}
-     *     A PCM16 Int16Array with values scaled to the [-32767, 32767] range.
      */
 
     private static floatToPcm16(float32: Float32Array) {
@@ -276,14 +252,9 @@ export class EAS {
      * @private
      * @static
      * @param {Int16Array} int16
-     *     The original PCM16 audio buffer to resample.
      * @param {number} originalRate
-     *     The sample rate (in Hz) of the original audio buffer.
      * @param {number} targetRate
-     *     The desired sample rate (in Hz) for the output buffer.
-     *
      * @returns {Int16Array}
-     *     A new PCM16 buffer resampled to the target sample rate.
      */
     private static resamplePCM16(int16: Int16Array, originalRate: number, targetRate: number) {
         if (originalRate === targetRate) return int16;
@@ -310,12 +281,8 @@ export class EAS {
      * @private
      * @static
      * @param {number} ms
-     *     Duration of the silence in milliseconds.
      * @param {number} [sampleRate=8000]
-     *     Sample rate in Hz for the generated PCM16 audio.
-     *
      * @returns {Int16Array}
-     *     A PCM16 buffer filled with zeros representing silence.
      */
     private static generateSilence(ms: number, sampleRate:number = 8000) { 
         return new Int16Array(Math.floor(ms * sampleRate));
@@ -330,12 +297,8 @@ export class EAS {
      * @private
      * @static
      * @param {number} ms
-     *     Duration of the tone in milliseconds.
      * @param {number} [sampleRate=8000]
-     *     Sample rate in Hz for the generated PCM16 audio.
-     *
      * @returns {Int16Array}
-     *     A PCM16 buffer containing the generated Attention Tone.
      */
     private static generateAttentionTone(ms, sampleRate: number = 8000) {
         const len = Math.floor(ms * sampleRate);
@@ -368,12 +331,8 @@ export class EAS {
      * @private
      * @static
      * @param {Int16Array} int16
-     *     The input PCM16 audio data.
      * @param {number} [sampleRate=8000]
-     *     The sample rate in Hz of the input audio.
-     *
      * @returns {Int16Array}
-     *     A new PCM16 buffer with the NWR-style audio effect applied.
      */
     private static applyNWREffect(int16: Int16Array, sampleRate: number = 8000) {
         const hpCut = 3555;
@@ -415,12 +374,8 @@ export class EAS {
      * @private
      * @static
      * @param {Int16Array} int16
-     *     The input PCM16 audio data.
      * @param {number} [noiseLevel=0.02]
-     *     The amplitude of noise to add (0.0–1.0 scale).
-     *
      * @returns {Int16Array}
-     *     A new PCM16 buffer with added noise and normalized amplitude.
      */
     private static addNoise(int16: Int16Array, noiseLevel: number = 0.02) {
         const x = this.pcm16toFloat(int16);
@@ -441,10 +396,7 @@ export class EAS {
      * @private
      * @static
      * @param {string} str
-     *     The ASCII string to convert into a bit sequence.
-     *
      * @returns {number[]}
-     *     An array of 0s and 1s representing the framed bit sequence for each character.
      */
     private static asciiTo8N1Bits(str: string) { 
         const bits = [];
@@ -467,12 +419,8 @@ export class EAS {
      * @private
      * @static
      * @param {number[]} bits
-     *     Array of 0 and 1 representing the bit sequence to encode.
      * @param {number} [sampleRate=8000]
-     *     Sample rate in Hz for the generated audio.
-     *
      * @returns {Int16Array}
-     *     The PCM16 audio data representing the AFSK-modulated bit sequence.
      */
     private static generateAFSK(bits: number[], sampleRate: number = 8000) {
         const baud = 520.83;
@@ -516,18 +464,10 @@ export class EAS {
      * @private
      * @static
      * @param {string} vtec
-     *     The VTEC code string to encode into the SAME header.
      * @param {number} repeats
-     *     Number of times to repeat the SAME burst sequence.
      * @param {number} [sampleRate=8000]
-     *     Sample rate in Hz for the generated audio.
      * @param {{preMarkSec?: number, gapSec?: number}} [options={}]
-     *     Optional timing adjustments:
-     *       - preMarkSec: Duration of the pre-mark tone before the data (seconds).
-     *       - gapSec: Silence gap between bursts (seconds).
-     *
      * @returns {Int16Array}
-     *     The concatenated PCM16 audio data representing the SAME header.
      */ 
     private static generateSAMEHeader(vtec: string, repeats: number, sampleRate: number = 8000, options: {preMarkSec?: number, gapSec?: number} = {}) {
         const preMarkSec = options.preMarkSec ?? 0.3;

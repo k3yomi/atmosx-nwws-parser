@@ -22,7 +22,7 @@ import EventParser from './parsers/events';
 
 export class Xmpp { 
 
-    /**
+    /** 
      * @function isSessionReconnectionEligible
      * @description
      *     Checks if the XMPP session has been inactive longer than the given interval
@@ -31,10 +31,7 @@ export class Xmpp {
      * @async
      * @static
      * @param {number} currentInterval
-     *     The inactivity threshold in seconds before reconnection is triggered.
-     *
      * @returns {Promise<void>}
-     *     Resolves after reconnection logic completes or no action is needed.
      */
     public static async isSessionReconnectionEligible(currentInterval: number): Promise<void> {
         const settings = loader.settings as types.ClientSettingsTypes;
@@ -71,7 +68,6 @@ export class Xmpp {
      * @async
      * @static
      * @returns {Promise<void>}
-     *     Resolves once the XMPP session has started or fails gracefully on error.
      */
     public static async deploySession(): Promise<void> {
         const settings = loader.settings as types.ClientSettingsTypes;

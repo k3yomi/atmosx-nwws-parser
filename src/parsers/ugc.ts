@@ -27,11 +27,7 @@ export class UGCParser {
      * @static
      * @async
      * @param {string} message
-     *     The message string containing UGC data.
-     *
      * @returns {Promise<types.UGCEntry | null>}
-     *     Resolves with a `UGCEntry` object containing `zones`, `locations`, and
-     *     `expiry` if parsing is successful; otherwise `null`.
      */
     public static async ugcExtractor(message: string): Promise<types.UGCEntry | null> {
         const header = this.getHeader(message);
@@ -56,10 +52,7 @@ export class UGCParser {
      *
      * @static
      * @param {string} message
-     *     The message string containing a UGC header.
-     *
      * @returns {string | null}
-     *     The extracted UGC header as a string, or `null` if no valid header is found.
      */
     public static getHeader(message: string): string | null {
         const start = message.search(new RegExp(loader.definitions.expressions.ugc1, "gimu"));
@@ -81,11 +74,7 @@ export class UGCParser {
      *
      * @static
      * @param {string} message
-     *     The message string containing a UGC3-formatted expiration timestamp.
-     *
      * @returns {Date | null}
-     *     A JavaScript Date object representing the expiration time, or `null` if
-     *     the expiration could not be parsed.
      */
     public static getExpiry(message: string): Date | null {
         const start = message.match(new RegExp(loader.definitions.expressions.ugc3, "gimu"));
@@ -110,10 +99,7 @@ export class UGCParser {
      * @static
      * @async
      * @param {string[]} zones
-     *     An array of zone identifiers to look up in the shapefiles database.
-     *
      * @returns {Promise<string[]>}
-     *     A sorted array of unique location names corresponding to the given zones.
      */
     public static async getLocations (zones: String[]): Promise<string[]> {
         const locations: string[] = [];
@@ -136,11 +122,7 @@ export class UGCParser {
      *
      * @static
      * @param {string[]} zones
-     *     An array of zone identifiers to look up in the shapefiles database.
-     *
      * @returns {[number, number][]}
-     *     An array of latitude-longitude coordinate pairs corresponding to
-     *     the first polygon found for the given zones.
      */
     public static getCoordinates (zones: String[]): [number, number][] {
         let coordinates: [number, number][] = [];
@@ -169,10 +151,7 @@ export class UGCParser {
      *
      * @static
      * @param {string} header
-     *     The UGC header string containing one or more zone codes or ranges.
-     *
      * @returns {string[]}
-     *     An array of zone identifiers extracted from the header.
      */
     public static getZones(header: string): string[] {
         const ugcSplit = header.split('-');

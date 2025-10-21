@@ -28,9 +28,7 @@ export class Utils {
      * @static
      * @async
      * @param {number} ms
-     *     The number of milliseconds to sleep.
      * @returns {Promise<void>}
-     *     Resolves after the specified delay.
      */
     public static async sleep(ms: number) {
         return new Promise(resolve => setTimeout(resolve, ms));
@@ -44,9 +42,7 @@ export class Utils {
      *
      * @static
      * @param {string} message
-     *     The warning message to log and display.
      * @param {boolean} [force=false]
-     *     If `true`, bypasses throttling and forces the warning to be displayed.
      */
     public static warn(message: string, force: boolean = false) {
         loader.cache.events.emit('log', message)
@@ -83,13 +79,13 @@ export class Utils {
                     const isCap = readFile.includes(`<?xml`);
                     if (isCap && !settings.noaa_weather_wire_service_settings.preferences.cap_only) continue;
                     if (!isCap && settings.noaa_weather_wire_service_settings.preferences.cap_only) continue;
-                    const validate = StanzaParser.validate(readFile, { awipsid: file, isCap: isCap, raw: true, issue: undefined });
+                    const validate = StanzaParser.validate(readFile, { isCap: isCap, raw: true });
                     await EventParser.eventHandler(validate);
                 }
                 this.warn(loader.definitions.messages.dump_cache_complete, true);
             }
         } catch (error: any) {
-            Utils.warn(`Failed to load cache: ${error.message}`);
+            Utils.warn(`Failed to load cache: ${error.stack}`);
         }
     }
 
@@ -135,13 +131,8 @@ export class Utils {
      * @static
      * @template T
      * @param {string} url
-     *     The URL to send the GET request to.
      * @param {types.HTTPSettings} [options]
-     *     Optional HTTP settings to override defaults such as headers and timeout.
-     *
      * @returns {Promise<{ error: boolean; message: T | string }>}
-     *     Resolves with an object containing `error` status and either the
-     *     response data (`message`) or an error message string.
      */
     public static async createHttpRequest<T = unknown>(url: string, options?: types.HTTPSettings): Promise<{ error: boolean; message: T | string }> {
         const defaultOptions = { 
@@ -180,8 +171,6 @@ export class Utils {
      *
      * @static
      * @param {number} maxFileMegabytes
-     *     Maximum allowed file size in megabytes. Files exceeding this limit
-     *     will be deleted.
      */
     public static garbageCollectionCache(maxFileMegabytes: number) {
         try {
@@ -219,8 +208,6 @@ export class Utils {
      *
      * @static
      * @param {boolean} isWire
-     *     If `true`, executes NWWS-related maintenance tasks such as cache cleanup
-     *     and reconnection checks. If `false`, loads GeoJSON data.
      */
     public static handleCronJob(isWire: boolean) {
         try {
@@ -251,12 +238,8 @@ export class Utils {
      *
      * @static
      * @param {Record<string, unknown>} target
-     *     The target object to merge settings into.
      * @param {types.ClientSettingsTypes} settings
-     *     The settings object containing values to merge.
-     *
      * @returns {Record<string, unknown>}
-     *     The updated target object with merged settings.
      */
     public static mergeClientSettings(target: Record<string, unknown>, settings: types.ClientSettingsTypes): Record<string, unknown> {
         for (const key in settings) {
@@ -282,14 +265,9 @@ export class Utils {
      *
      * @static
      * @param {types.Coordinates} coord1
-     *     The first coordinate, containing `lat` and `lon` properties.
      * @param {types.Coordinates} coord2
-     *     The second coordinate, containing `lat` and `lon` properties.
      * @param {'miles' | 'kilometers'} [unit='miles']
-     *     The distance unit to return.
-     *
      * @returns {number}
-     *     The computed distance between the two points, rounded to two decimals.
      */
     public static calculateDistance(coord1: types.Coordinates, coord2: types.Coordinates, unit: 'miles' | 'kilometers' = 'miles'): number {
         if (!coord1 || !coord2) return 0;
@@ -316,10 +294,7 @@ export class Utils {
      *
      * @static
      * @param {boolean} isFiltering
-     *     Whether location-based filtering is currently active.
-     *
      * @returns {boolean}
-     *     `true` if processing should proceed, otherwise `false`.
      */
     public static isReadyToProcess(isFiltering: boolean): boolean {
         const totalTracks = Object.keys(loader.cache.currentLocations).length;

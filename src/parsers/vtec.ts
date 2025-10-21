@@ -25,11 +25,7 @@ export class VtecParser {
      *
      * @static
      * @param {string} message
-     *     The raw message string potentially containing one or more VTEC codes.
-     *
      * @returns {Promise<types.VtecEntry[] | null>}
-     *     Resolves with an array of VTEC entry objects if any are found,
-     *     otherwise resolves with `null`.
      */
     public static async vtecExtractor(message: string): Promise<types.VtecEntry[] | null> {
         const matches = message.match(new RegExp(loader.definitions.expressions.vtec, 'g'));
@@ -62,12 +58,7 @@ export class VtecParser {
      * @private
      * @static
      * @param {string[]} args
-     *     The arguments array where `args[1]` is expected to be the expiry timestamp
-     *     in VTEC format.
-     * 
      * @returns {string}
-     *     The formatted expiry date string in local time with `-04:00` offset, or
-     *     `Invalid Date Format` if the input is invalid.
      */
     private static parseExpiryDate(args: String[]): string {
         if (args[1] == `000000T0000Z`) return `Invalid Date Format`;

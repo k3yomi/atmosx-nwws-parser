@@ -36,7 +36,6 @@ export class AlertManager {
      *     name and validates it, emitting a warning if the name is empty or invalid.
      *
      * @param {string} [name]
-     *     The desired display name or nickname.
      */
     public setDisplayName(name?: string) {
         const settings = loader.settings as types.ClientSettingsTypes;
@@ -56,9 +55,7 @@ export class AlertManager {
      *     if values are missing or invalid.
      *
      * @param {string} locationName
-     *     The name of the location to set.
      * @param {types.Coordinates} [coordinates]
-     *     The latitude and longitude of the location.
      */
     public setCurrentLocation(locationName: string, coordinates?: types.Coordinates): void {
         if (!coordinates) {
@@ -81,12 +78,8 @@ export class AlertManager {
      *
      * @async
      * @param {string} description
-     *     The main content of the alert to include in the audio.
      * @param {string} header
-     *     The header of the alert.
-     *
      * @returns {Promise<Buffer>}
-     *     Resolves with a Buffer containing the generated audio data.
      */
     public async createEasAudio(description: string, header: string) {
         return await EAS.generateEASAudio(description, header);
@@ -99,7 +92,6 @@ export class AlertManager {
      *     event names with action names.
      *
      * @returns {string[]}
-     *     An array of strings representing all possible event-action alert types.
      */
     public getAllAlertTypes(): string[] {
         const events = new Set(Object.values(loader.definitions.events));
@@ -118,12 +110,8 @@ export class AlertManager {
      *
      * @async
      * @param {string} query
-     *     The search string to look for in the stanza content.
      * @param {number} [limit=250]
-     *     Maximum number of results to return.
-     *
      * @returns {Promise<any[]>}
-     *     Resolves with an array of matching database rows.
      */
     public async searchStanzaDatabase(query: string, limit: number = 250) {
         const escapeLike = (s: string) => s.replace(/[%_]/g, '\\$&');
@@ -141,9 +129,7 @@ export class AlertManager {
      *
      * @async
      * @param {types.ClientSettingsTypes} settings
-     *     The settings to merge into the current client configuration.
      * @returns {Promise<void>}
-     *     Resolves once the settings have been merged.
      */
     public async setSettings(settings: types.ClientSettingsTypes) {
         Utils.mergeClientSettings(loader.settings, settings);
@@ -156,12 +142,8 @@ export class AlertManager {
      *     to unregister the listener.
      *
      * @param {string} event
-     *     The name of the event to listen for.
      * @param {(...args: any[]) => void} callback
-     *     The function to call when the event is emitted.
-     *
      * @returns {() => void}
-     *     A function that removes the registered event listener when called.
      */
     public on(event: string, callback: (...args: any[]) => void) {
         loader.cache.events.on(event, callback);
@@ -177,9 +159,7 @@ export class AlertManager {
      *
      * @async
      * @param {types.ClientSettingsTypes} metadata
-     *     Client settings used to configure session, caching, and filtering behavior.
      * @returns {Promise<void>}
-     *     Resolves once initialization and scheduling are complete.
      */
     public async start(metadata: types.ClientSettingsTypes): Promise<void> {
         if (!loader.cache.isReady) { 
@@ -223,7 +203,6 @@ export class AlertManager {
      *
      * @async
      * @returns {Promise<void>}
-     *     Resolves once all tasks and the session have been stopped.
      */
     public async stop(): Promise<void> {
         loader.cache.isReady = true;
