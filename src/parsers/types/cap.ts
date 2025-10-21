@@ -52,10 +52,11 @@ export class CapAlerts {
      */
     public static async event(validated: types.StanzaCompiled) {
         let processed = [] as unknown[];
-        const messages = validated.message.match(/<\?xml[\s\S]*?<\/alert>/g)?.map(msg => msg.trim());
+        const messages = validated.message.match(/<\?xml[\s\S]*?ISSUED TIME.../g)?.map(msg => msg.trim());
         if (messages == null || messages.length === 0) return;
         for (let message of messages) {
             const tick = performance.now();
+            const attributes = TextParser.textProductToString(message, `STANZA ATTRIBUTES...`) ? JSON.parse(TextParser.textProductToString(message, `STANZA ATTRIBUTES...`)) : null
             message = message.substring(message.indexOf(`<?xml version="1.0"`), message.lastIndexOf(`>`) + 1);
             const parser = new loader.packages.xml2js.Parser({ explicitArray: false, mergeAttrs: true, trim: true })
             const parsed = await parser.parseStringPromise(message);
@@ -72,7 +73,7 @@ export class CapAlerts {
             processed.push({
                 performance: performance.now() - tick,
                 source: `cap-parser`,
-                tracking: this.getTracking(extracted, validated.attributes),
+                tracking: this.getTracking(extracted, attributes),
                 header: getHeader,
                 vtec: extracted.vtec || `N/A`,
                 history: [{ description: extracted.description || `N/A`, issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`, type: extracted.msgtype || `N/A` }],

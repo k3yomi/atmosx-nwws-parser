@@ -1965,10 +1965,11 @@ var CapAlerts = class {
     return __async(this, null, function* () {
       var _a;
       let processed = [];
-      const messages = (_a = validated.message.match(/<\?xml[\s\S]*?<\/alert>/g)) == null ? void 0 : _a.map((msg) => msg.trim());
+      const messages = (_a = validated.message.match(/<\?xml[\s\S]*?ISSUED TIME.../g)) == null ? void 0 : _a.map((msg) => msg.trim());
       if (messages == null || messages.length === 0) return;
       for (let message of messages) {
         const tick = performance.now();
+        const attributes = text_default.textProductToString(message, `STANZA ATTRIBUTES...`) ? JSON.parse(text_default.textProductToString(message, `STANZA ATTRIBUTES...`)) : null;
         message = message.substring(message.indexOf(`<?xml version="1.0"`), message.lastIndexOf(`>`) + 1);
         const parser = new packages.xml2js.Parser({ explicitArray: false, mergeAttrs: true, trim: true });
         const parsed = yield parser.parseStringPromise(message);
@@ -1998,7 +1999,7 @@ var CapAlerts = class {
         processed.push({
           performance: performance.now() - tick,
           source: `cap-parser`,
-          tracking: this.getTracking(extracted, validated.attributes),
+          tracking: this.getTracking(extracted, attributes),
           header: getHeader,
           vtec: extracted.vtec || `N/A`,
           history: [{ description: extracted.description || `N/A`, issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`, type: extracted.msgtype || `N/A` }],
