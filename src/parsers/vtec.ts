@@ -15,15 +15,21 @@ import * as loader from '../bootstrap';
 import * as types from '../types';
 
 export class VtecParser {
-
+    
     /**
-     * vtecExtractor extracts and parses VTEC codes from a given message string.
+     * @function vtecExtractor
+     * @description
+     *     Extracts VTEC entries from a raw NWWS message string and returns
+     *     structured objects containing type, tracking, event, status,
+     *     WMO identifiers, and expiry date.
      *
-     * @public
      * @static
-     * @async
-     * @param {string} message 
-     * @returns {unknown} 
+     * @param {string} message
+     *     The raw message string potentially containing one or more VTEC codes.
+     *
+     * @returns {Promise<types.VtecEntry[] | null>}
+     *     Resolves with an array of VTEC entry objects if any are found,
+     *     otherwise resolves with `null`.
      */
     public static async vtecExtractor(message: string): Promise<types.VtecEntry[] | null> {
         const matches = message.match(new RegExp(loader.definitions.expressions.vtec, 'g'));
@@ -47,12 +53,21 @@ export class VtecParser {
     }
 
     /**
-     * parseExpiryDate converts VTEC expiry date format to a standard ISO 8601 format with timezone adjustment.
+     * @function parseExpiryDate
+     * @description
+     *     Converts a NWWS VTEC/expiry timestamp string into a formatted local ISO date string
+     *     with an Eastern Time offset (-04:00). Returns `Invalid Date Format` if the input
+     *     is `000000T0000Z`.
      *
      * @private
      * @static
-     * @param {String[]} args 
-     * @returns {string} 
+     * @param {string[]} args
+     *     The arguments array where `args[1]` is expected to be the expiry timestamp
+     *     in VTEC format.
+     * 
+     * @returns {string}
+     *     The formatted expiry date string in local time with `-04:00` offset, or
+     *     `Invalid Date Format` if the input is invalid.
      */
     private static parseExpiryDate(args: String[]): string {
         if (args[1] == `000000T0000Z`) return `Invalid Date Format`;

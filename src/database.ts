@@ -20,23 +20,33 @@ import Utils from './utils';
 export class Database {
 
     /**
-     * handleAlertCache stores a unique alert in the SQLite database and ensures the total number of alerts does not exceed 5000.
+     * @function stanzaCacheImport
+     * @description
+     *     Inserts a single NWWS stanza into the database cache. If the total number
+     *     of stanzas exceeds the configured maximum history, it deletes the oldest
+     *     entries to maintain the limit. Duplicate stanzas are ignored.
      *
-     * @public
      * @static
      * @async
-     * @param {*} alert 
-     * @returns {*} 
+     * @param {string} stanza
+     *     The raw stanza XML or text to store in the database.
+     * 
+     * @returns {Promise<void>}
+     *     Resolves when the stanza has been inserted and any necessary pruning
+     *     of old stanzas has been performed.
+     *
+     * @example
+     *     await Database.stanzaCacheImport("<alert>...</alert>");
      */
     public static async stanzaCacheImport(stanza: string): Promise<void> {
-        const settings = loader.settings as types.ClientSettings;
+        const settings = loader.settings as types.ClientSettingsTypes;
         try {
             const db = loader.cache.db;
             if (!db) return;
             db.prepare(`INSERT OR IGNORE INTO stanzas (stanza) VALUES (?)`).run(stanza);
             const countRow = db.prepare(`SELECT COUNT(*) AS total FROM stanzas`).get() as { total: number };
             const totalRows = countRow.total;
-            const maxHistory = settings.NoaaWeatherWireService.cache.maxHistory;
+            const maxHistory = settings.noaa_weather_wire_service_settings.cache.max_db_history;
             if (totalRows > maxHistory) {
                 const rowsToDelete = Math.floor((totalRows - maxHistory) / 2);
                 if (rowsToDelete > 0) {
@@ -57,17 +67,25 @@ export class Database {
         }
     }
 
-
     /**
-     * loadDatabase initializes the SQLite database and imports shapefile data if the database or table does not exist.
+     * @function loadDatabase
+     * @description
+     *     Initializes the application's SQLite database, creating necessary tables
+     *     for storing stanzas and shapefiles. If the shapefiles table is empty,
+     *     it imports predefined shapefiles from disk, processes their features,
+     *     and populates the database. Emits warnings during the import process.
      *
-     * @public
      * @static
      * @async
-     * @returns {Promise<void>} 
+     * @returns {Promise<void>}
+     *     Resolves when the database and shapefiles have been initialized.
+     *
+     * @example
+     *     await Database.loadDatabase();
+     *     console.log('Database initialized and shapefiles imported.');
      */
     public static async loadDatabase(): Promise<void> {
-        const settings = loader.settings as types.ClientSettings;
+        const settings = loader.settings as types.ClientSettingsTypes;
         try {
             const { fs, path, sqlite3, shapefile } = loader.packages;
             if (!fs.existsSync(settings.database)) fs.writeFileSync(settings.database, '');

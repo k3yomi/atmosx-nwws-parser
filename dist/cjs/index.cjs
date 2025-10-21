@@ -944,55 +944,55 @@ var cache = {
 };
 var settings = {
   database: path.join(process.cwd(), "shapefiles.db"),
-  isNWWS: true,
+  is_wire: true,
   journal: true,
-  NoaaWeatherWireService: {
-    clientReconnections: {
-      canReconnect: true,
-      currentInterval: 60
+  noaa_weather_wire_service_settings: {
+    reconnection_settings: {
+      enabled: true,
+      interval: 60
     },
-    clientCredentials: {
+    credentials: {
       username: null,
       password: null,
       nickname: "AtmosphericX Standalone Parser"
     },
     cache: {
-      read: false,
-      maxSizeMB: 5,
-      maxHistory: 5e3,
+      enabled: false,
+      max_file_size: 5,
+      max_db_history: 5e3,
       directory: null
     },
-    alertPreferences: {
-      isCapOnly: false,
-      isShapefileUGC: false
+    preferences: {
+      cap_only: false,
+      shapefile_coordinates: false
     }
   },
-  NationalWeatherService: {
-    checkInterval: 15,
+  national_weather_service_settings: {
+    interval: 15,
     endpoint: `https://api.weather.gov/alerts/active`
   },
-  global: {
-    useParentEvents: true,
-    betterEventParsing: true,
-    alertFiltering: {
-      filteredEvents: [],
-      filteredICOAs: [],
-      ignoredICOAs: [`KWNS`],
-      ignoredEvents: [`Xx`, `Test Message`],
-      ugcFilter: [],
-      stateFilter: [],
-      checkExpired: true,
-      ignoreTestProducts: true,
-      locationFiltering: {
-        maxDistance: 100,
+  global_settings: {
+    parent_events_only: true,
+    better_event_parsing: true,
+    filtering: {
+      events: [],
+      filtered_icoa: [],
+      ignored_icoa: [`KWNS`],
+      ignored_events: [`Xx`, `Test Message`],
+      ugc_filter: [],
+      state_filter: [],
+      check_expired: true,
+      ignore_text_products: true,
+      location: {
+        max_distance: 100,
         unit: `miles`,
         filter: false
       }
     },
-    easSettings: {
-      easDirectory: null,
-      easIntroWav: null,
-      festivalVoice: `kal_diphone`
+    eas_settings: {
+      directory: null,
+      intro_wav: null,
+      festival_tts_voice: `kal_diphone`
     }
   }
 };
@@ -1056,7 +1056,7 @@ var definitions = {
     shapefile_creation_finished: `SHAPEFILES HAVE BEEN SUCCESSFULLY CREATED AND THE DATABASE IS READY FOR USE!`,
     not_ready: `You can NOT create another instance without shutting down the current one first, please make sure to call the stop() method first!`,
     invalid_nickname: `The nickname you provided is invalid, please provide a valid nickname to continue.`,
-    eas_no_directory: `You have not set a directory for EAS audio files to be saved to, please set the 'easDirectory' setting in the global settings to enable EAS audio generation.`,
+    eas_no_directory: `You have not set a directory for EAS audio files to be saved to, please set the 'directory' setting in the global settings to enable EAS audio generation.`,
     invalid_coordinates: `The coordinates you provided are invalid, please provide valid latitude and longitude values. Attempted: {lat}, {lon}.`,
     no_current_locations: `No current location has been set, operations will be haulted until a location is set or location filtering is disabled.`,
     disabled_location_warning: `Exceeded maximum warnings for invalid or missing lat/lon coordinates. Location filtering has been ignored until you set valid coordinates or disable location filtering.`,
@@ -1070,15 +1070,41 @@ var definitions = {
 // src/parsers/stanza.ts
 var StanzaParser = class {
   /**
-   * validate handles the validation of incoming XMPP stanzas to ensure they contain valid alert data.
-   * You can also feed debug / cache data directly into this function by specifying the second parameter
-   * which is the attributes object that would normally be parsed from the XMPP stanza.
+   * @function validate
+   * @description
+   *     Validates and parses a stanza message, extracting its attributes and metadata.
+   *     Handles both raw message strings (for debug/testing) and actual stanza objects.
+   *     Determines whether the message is a CAP alert, contains VTEC codes, or contains UGCs,
+   *     and identifies the AWIPS product type and prefix.
    *
-   * @public
    * @static
-   * @param {*} stanza 
-   * @param {(boolean | types.TypeAttributes)} [isDebug=false] 
-   * @returns {{ message: any; attributes: types.TypeAttributes; isCap: any; isVtec: boolean; isCapDescription: any; awipsType: any; isApi: boolean; ignore: boolean; }} 
+   * @param {any} stanza
+   *     The stanza message to validate. Can be a string, XML message object, or stanza object.
+   * @param {boolean | types.StanzaAttributes} [isDebug=false]
+   *     If `true` or a `StanzaAttributes` object, parses the stanza as a debug/test message
+   *     instead of an XMPP stanza.
+   *
+   * @returns {{
+   *     message: any;
+   *     attributes: types.StanzaAttributes;
+   *     isCap: any;
+   *     isVtec: boolean;
+   *     isCapDescription: any;
+   *     awipsType: any;
+   *     isApi: boolean;
+   *     ignore: boolean;
+   *     isUGC?: boolean;
+   * }}
+   *     An object containing the parsed stanza data:
+   *       - `message`: The raw message string or XML.
+   *       - `attributes`: Extracted attributes from the stanza.
+   *       - `isCap`: Whether the message is a CAP alert.
+   *       - `isVtec`: Whether the message contains VTEC codes.
+   *       - `isCapDescription`: Whether the message contains a CAP `<areaDesc>`.
+   *       - `awipsType`: The AWIPS type and prefix info.
+   *       - `isApi`: Whether this message came from the API.
+   *       - `ignore`: Whether the stanza should be ignored.
+   *       - `isUGC` (optional): Whether the message contains UGC information.
    */
   static validate(stanza, isDebug = false) {
     var _a;
@@ -1113,13 +1139,21 @@ var StanzaParser = class {
     return { message: null, attributes: null, isApi: null, isCap: null, isVtec: null, isUGC: null, isCapDescription: null, awipsType: null, ignore: true };
   }
   /**
-   * getType determines the AWIPS type of the alert based on its attributes, specifically the awipsid.
-   * If no matching type is found, it defaults to 'default'.
+   * @function getType
+   * @description
+   *     Determines the AWIPS product type and prefix from a stanza's attributes.
+   *     Returns a default type of 'XX' if the attributes are missing or the AWIPS ID
+   *     does not match any known definitions.
    *
    * @private
    * @static
-   * @param {unknown} attributes 
-   * @returns {*} 
+   * @param {unknown} attributes
+   *     The stanza attributes object, expected to conform to `types.StanzaAttributes`.
+   *
+   * @returns {Record<string, string>}
+   *     An object containing:
+   *       - `type`: The AWIPS product type (e.g., 'TOR', 'SVR') or 'XX' if unknown.
+   *       - `prefix`: The AWIPS prefix associated with the type, or 'XX' if unknown.
    */
   static getType(attributes) {
     const attrs = attributes;
@@ -1133,11 +1167,21 @@ var StanzaParser = class {
     return { type: "XX", prefix: "XX" };
   }
   /**
-   * cache stores the compiled alert data into a cache file if caching is enabled in the settings.
+   * @function cache
+   * @description
+   *     Saves a compiled stanza message to the local cache directory.
+   *     Ensures the message contains "STANZA ATTRIBUTES..." metadata and timestamps,
+   *     and appends the formatted entry to both a category-specific file and a general cache file.
    *
    * @private
    * @static
-   * @param {unknown} compiled 
+   * @async
+   * @param {unknown} compiled
+   *     The compiled stanza data object, expected to conform to `types.StanzaCompiled`.
+   *     If null or invalid, the function will return early.
+   *
+   * @returns {Promise<void>}
+   *     Resolves when the message has been successfully written to the cache files.
    */
   static cache(compiled) {
     return __async(this, null, function* () {
@@ -1145,8 +1189,8 @@ var StanzaParser = class {
       const data = compiled;
       const settings2 = settings;
       const { fs: fs2, path: path2 } = packages;
-      if (!data.message || !settings2.NoaaWeatherWireService.cache.directory) return;
-      const cacheDir = settings2.NoaaWeatherWireService.cache.directory;
+      if (!data.message || !settings2.noaa_weather_wire_service_settings.cache.directory) return;
+      const cacheDir = settings2.noaa_weather_wire_service_settings.cache.directory;
       if (!fs2.existsSync(cacheDir)) fs2.mkdirSync(cacheDir, { recursive: true });
       let msg = data.message.replace(/\$\$/g, "");
       if (!msg.includes("STANZA ATTRIBUTES...")) {
@@ -1178,14 +1222,25 @@ var stanza_default = StanzaParser;
 // src/parsers/text.ts
 var TextParser = class {
   /**
-   * textProductToString extracts a specific value from a text-based weather product message based on a given key and optional removal strings.
+   * @function textProductToString
+   * @description
+   *     Searches a text product message for a line containing a specific value,
+   *     extracts the substring immediately following that value, and optionally
+   *     removes additional specified strings. Cleans up the extracted string by
+   *     trimming whitespace and removing any remaining occurrences of the search
+   *     value or '<' characters.
    *
-   * @public
    * @static
-   * @param {string} message 
-   * @param {string} value 
-   * @param {string[]} [removal=[]] 
-   * @returns {(string | null)} 
+   * @param {string} message
+   *     The raw text product message to search.
+   * @param {string} value
+   *     The string to search for within each line of the message.
+   * @param {string[]} [removal=[]]
+   *     Optional array of substrings to remove from the extracted result.
+   *
+   * @returns {string | null}
+   *     The cleaned-up extracted string if found, or `null` if the value does
+   *     not exist in the message.
    */
   static textProductToString(message, value, removal = []) {
     const lines = message.split("\n");
@@ -1202,12 +1257,20 @@ var TextParser = class {
     return null;
   }
   /**
-   * textProductToPolygon extracts geographical coordinates from a text-based weather product message and returns them as an array of [longitude, latitude] pairs.
+   * @function textProductToPolygon
+   * @description
+   *     Parses a text product message to extract polygon coordinates based on
+   *     LAT...LON data. Coordinates are converted to [latitude, longitude] pairs
+   *     with longitude negated (assumes Western Hemisphere). If the polygon has
+   *     more than two points, the first point is repeated at the end to close it.
    *
-   * @public
    * @static
-   * @param {string} message 
-   * @returns {[number, number][]} 
+   * @param {string} message
+   *     The raw text product message containing LAT...LON coordinate data.
+   *
+   * @returns {[number, number][]}
+   *     An array of [latitude, longitude] coordinate pairs forming the polygon.
+   *     Returns an empty array if no valid coordinates are found.
    */
   static textProductToPolygon(message) {
     const coordinates = [];
@@ -1227,13 +1290,20 @@ var TextParser = class {
     return coordinates;
   }
   /**
-   * textProductToDescription extracts the main description from a text-based weather product message.
+   * @function textProductToDescription
+   * @description
+   *     Extracts a clean description portion from a text product message, optionally
+   *     removing a handle and any extra metadata such as "STANZA ATTRIBUTES...".
+   *     Also trims and normalizes whitespace.
    *
-   * @public
    * @static
-   * @param {string} message 
-   * @param {string} [handle=null] 
-   * @returns {string} 
+   * @param {string} message
+   *     The raw text product message to process.
+   * @param {string | null} [handle=null]
+   *     An optional handle string to remove from the message.
+   *
+   * @returns {string}
+   *     The extracted description text from the message.
    */
   static textProductToDescription(message, handle = null) {
     const original = message;
@@ -1264,12 +1334,19 @@ var TextParser = class {
     return message.replace(/\s+/g, " ").trim().startsWith("STANZA ATTRIBUTES...") ? original : message.split("STANZA ATTRIBUTES...")[0].trim();
   }
   /**
-   * awipTextToEvent converts an AWIPS ID prefix from a text-based weather product message to its corresponding event type and prefix.
+   * @function awipTextToEvent
+   * @description
+   *     Maps the beginning of a message string to a known AWIPS event type based on
+   *     predefined prefixes. Returns a default value if no matching prefix is found.
    *
-   * @public
    * @static
-   * @param {string} message 
-   * @returns {{ type: any; prefix: any; }} 
+   * @param {string} message
+   *     The message string to analyze for an AWIPS prefix.
+   *
+   * @returns {Record<string, string>}
+   *     An object containing:
+   *       - `type`: The mapped AWIPS event type (or 'XX' if not found).
+   *       - `prefix`: The matched prefix (or 'XX' if not found).
    */
   static awipTextToEvent(message) {
     for (const [prefix, type] of Object.entries(definitions.awips)) {
@@ -1280,13 +1357,22 @@ var TextParser = class {
     return { type: `XX`, prefix: `XX` };
   }
   /**
-   * getXmlValues recursively searches a parsed XML object for specified keys and extracts their values.
+   * @function getXmlValues
+   * @description
+   *     Recursively extracts specified values from a parsed XML-like object.
+   *     Searches both object keys and array items for matching keys (case-insensitive)
+   *     and returns the corresponding values. If multiple unique values are found for
+   *     a key, an array is returned; if one value is found, it returns that value; 
+   *     if none are found, returns `null`.
    *
-   * @public
    * @static
-   * @param {*} parsed 
-   * @param {string[]} valuesToExtract 
-   * @returns {Record<string, any>} 
+   * @param {any} parsed
+   *     The parsed XML object, typically resulting from an XML-to-JS parser.
+   * @param {string[]} valuesToExtract
+   *     Array of key names to extract values for from the parsed object.
+   *
+   * @returns {Record<string, string | string[] | null>}
+   *     An object mapping each requested key to its extracted value(s) or `null`.
    */
   static getXmlValues(parsed, valuesToExtract) {
     const extracted = {};
@@ -1331,13 +1417,20 @@ var text_default = TextParser;
 // src/parsers/ugc.ts
 var UGCParser = class {
   /**
-   * ugcExtractor extracts and parses UGC codes from a given message string.
+   * @function ugcExtractor
+   * @description
+   *     Extracts UGC (Universal Geographic Code) information from a message.
+   *     This includes parsing the header, resolving zones, calculating the expiry
+   *     date, and retrieving associated location names from the database.
    *
-   * @public
    * @static
    * @async
-   * @param {string} message 
-   * @returns {unknown} 
+   * @param {string} message
+   *     The message string containing UGC data.
+   *
+   * @returns {Promise<types.UGCEntry | null>}
+   *     Resolves with a `UGCEntry` object containing `zones`, `locations`, and
+   *     `expiry` if parsing is successful; otherwise `null`.
    */
   static ugcExtractor(message) {
     return __async(this, null, function* () {
@@ -1355,12 +1448,18 @@ var UGCParser = class {
     });
   }
   /**
-   * getHeader extracts the UGC header from a UGC message string.
+   * @function getHeader
+   * @description
+   *     Extracts the UGC header from a message by locating patterns defined in
+   *     `ugc1` and `ugc2` regular expressions. Removes all whitespace and the
+   *     trailing character from the matched header.
    *
-   * @public
    * @static
-   * @param {string} message 
-   * @returns {*} 
+   * @param {string} message
+   *     The message string containing a UGC header.
+   *
+   * @returns {string | null}
+   *     The extracted UGC header as a string, or `null` if no valid header is found.
    */
   static getHeader(message) {
     const start = message.search(new RegExp(definitions.expressions.ugc1, "gimu"));
@@ -1372,12 +1471,20 @@ var UGCParser = class {
     return full || null;
   }
   /**
-   * getExpiry extracts the expiry date and time from a UGC message and returns it as a Date object.
+   * @function getExpiry
+   * @description
+   *     Extracts an expiration date from a message using the UGC3 format.
+   *     The function parses day, hour, and minute from the message and constructs
+   *     a Date object in the current month and year. Returns `null` if no valid
+   *     expiration is found.
    *
-   * @public
    * @static
-   * @param {string} message 
-   * @returns {*} 
+   * @param {string} message
+   *     The message string containing a UGC3-formatted expiration timestamp.
+   *
+   * @returns {Date | null}
+   *     A JavaScript Date object representing the expiration time, or `null` if
+   *     the expiration could not be parsed.
    */
   static getExpiry(message) {
     const start = message.match(new RegExp(definitions.expressions.ugc3, "gimu"));
@@ -1392,13 +1499,19 @@ var UGCParser = class {
     return null;
   }
   /**
-   * getLocations retrieves unique location names for the provided UGC zone codes from the database.
+   * @function getLocations
+   * @description
+   *     Retrieves human-readable location names for an array of zone identifiers
+   *     from the shapefiles database. If a zone is not found, the zone ID itself
+   *     is returned. Duplicate locations are removed and the result is sorted.
    *
-   * @public
    * @static
    * @async
-   * @param {String[]} zones 
-   * @returns {unknown} 
+   * @param {string[]} zones
+   *     An array of zone identifiers to look up in the shapefiles database.
+   *
+   * @returns {Promise<string[]>}
+   *     A sorted array of unique location names corresponding to the given zones.
    */
   static getLocations(zones) {
     return __async(this, null, function* () {
@@ -1415,12 +1528,19 @@ var UGCParser = class {
     });
   }
   /**
-   * getCoordinates retrieves geographical coordinates for the provided UGC zone codes from the database.
+   * @function getCoordinates
+   * @description
+   *     Retrieves geographic coordinates for an array of zone identifiers
+   *     from the shapefiles database. Returns the coordinates of the first
+   *     polygon found for any matching zone.
    *
-   * @public
    * @static
-   * @param {String[]} zones 
-   * @returns {{}} 
+   * @param {string[]} zones
+   *     An array of zone identifiers to look up in the shapefiles database.
+   *
+   * @returns {[number, number][]}
+   *     An array of latitude-longitude coordinate pairs corresponding to
+   *     the first polygon found for the given zones.
    */
   static getCoordinates(zones) {
     let coordinates = [];
@@ -1440,12 +1560,18 @@ var UGCParser = class {
     return coordinates;
   }
   /**
-   * getZones parses a UGC header string and returns an array of individual UGC zone codes.
+   * @function getZones
+   * @description
+   *     Parses a UGC header string and returns an array of individual zone
+   *     identifiers. Handles ranges indicated with `>` and preserves the
+   *     state and format prefixes.
    *
-   * @public
    * @static
-   * @param {string} header 
-   * @returns {*} 
+   * @param {string} header
+   *     The UGC header string containing one or more zone codes or ranges.
+   *
+   * @returns {string[]}
+   *     An array of zone identifiers extracted from the header.
    */
   static getZones(header) {
     const ugcSplit = header.split("-");
@@ -1486,13 +1612,19 @@ var ugc_default = UGCParser;
 // src/parsers/vtec.ts
 var VtecParser = class {
   /**
-   * vtecExtractor extracts and parses VTEC codes from a given message string.
+   * @function vtecExtractor
+   * @description
+   *     Extracts VTEC entries from a raw NWWS message string and returns
+   *     structured objects containing type, tracking, event, status,
+   *     WMO identifiers, and expiry date.
    *
-   * @public
    * @static
-   * @async
-   * @param {string} message 
-   * @returns {unknown} 
+   * @param {string} message
+   *     The raw message string potentially containing one or more VTEC codes.
+   *
+   * @returns {Promise<types.VtecEntry[] | null>}
+   *     Resolves with an array of VTEC entry objects if any are found,
+   *     otherwise resolves with `null`.
    */
   static vtecExtractor(message) {
     return __async(this, null, function* () {
@@ -1518,12 +1650,21 @@ var VtecParser = class {
     });
   }
   /**
-   * parseExpiryDate converts VTEC expiry date format to a standard ISO 8601 format with timezone adjustment.
+   * @function parseExpiryDate
+   * @description
+   *     Converts a NWWS VTEC/expiry timestamp string into a formatted local ISO date string
+   *     with an Eastern Time offset (-04:00). Returns `Invalid Date Format` if the input
+   *     is `000000T0000Z`.
    *
    * @private
    * @static
-   * @param {String[]} args 
-   * @returns {string} 
+   * @param {string[]} args
+   *     The arguments array where `args[1]` is expected to be the expiry timestamp
+   *     in VTEC format.
+   * 
+   * @returns {string}
+   *     The formatted expiry date string in local time with `-04:00` offset, or
+   *     `Invalid Date Format` if the input is invalid.
    */
   static parseExpiryDate(args) {
     if (args[1] == `000000T0000Z`) return `Invalid Date Format`;
@@ -1538,13 +1679,31 @@ var vtec_default = VtecParser;
 // src/parsers/types/vtec.ts
 var VTECAlerts = class {
   /**
-   * event processes validated VTEC alert messages, extracting relevant information and compiling it into structured event objects.
+   * @function event
+   * @description
+   *     Processes a validated stanza message, extracting VTEC and UGC entries,
+   *     computing base properties, generating headers, and preparing structured
+   *     event objects for downstream handling. Each extracted event is enriched
+   *     with metadata, performance timing, and history information.
    *
-   * @public
    * @static
    * @async
-   * @param {types.TypeCompiled} validated 
-   * @returns {*} 
+   * @param {types.StanzaCompiled} validated
+   *     The validated stanza object containing message text, attributes,
+   *     and metadata.
+   *
+   * @returns {Promise<void>}
+   *     This method does not return a value. It processes events and
+   *     invokes `EventParser.validateEvents` to filter and emit them.
+   *
+   * @remarks
+   *     - Splits multi-stanza messages using `$$` as a delimiter.
+   *     - Extracts VTEC entries using `VtecParser.vtecExtractor`.
+   *     - Extracts UGC entries using `UgcParser.ugcExtractor`.
+   *     - Calls `EventParser.getBaseProperties` to compile core event properties.
+   *     - Computes an EAS header using `EventParser.getHeader`.
+   *     - Tracks performance timing for each processed message.
+   *     - Calls `EventParser.validateEvents` to filter and emit final events.
    */
   static event(validated) {
     return __async(this, null, function* () {
@@ -1583,25 +1742,38 @@ var vtec_default2 = VTECAlerts;
 // src/parsers/types/ugc.ts
 var UGCAlerts = class {
   /**
-   * getTracking generates a unique tracking identifier based on the sender's ICAO code and a hash of the UGC zones.
+   * @function getTracking
+   * @description
+   *    Generates a unique tracking identifier for an event using the sender's ICAO
+   *    and some attributes.
    *
    * @private
    * @static
-   * @param {types.BaseProperties} baseProperties 
-   * @param {string[]} zones 
+   * @param {types.EventProperties} baseProperties 
    * @returns {string} 
    */
-  static getTracking(baseProperties, zones) {
-    return `${baseProperties.sender_icao} (${packages.crypto.createHash("md5").update(zones.join(``)).digest("hex")})`;
+  static getTracking(baseProperties) {
+    return `${baseProperties.sender_icao}-${baseProperties.attributes.ttaaii}-${baseProperties.attributes.id.slice(-4)}`;
   }
   /**
-   * getEvent determines the event name based on offshore definitions or formats it from the attributes.
+   * @function getEvent
+   * @description
+   *     Determines the human-readable event name from a message and AWIPS attributes.
+   *     - Checks if the message contains any predefined offshore event keywords
+   *       and returns the matching offshore event if found.
+   *     - Otherwise, returns a formatted event type string from the provided attributes,
+   *       capitalizing the first letter of each word.
    *
    * @private
    * @static
-   * @param {string} message 
-   * @param {Record<string, any>} attributes 
-   * @returns {*} 
+   * @param {string} message
+   *     The raw message text to parse for event identification.
+   * @param {Record<string, any>} attributes
+   *     The AWIPS-related attributes, expected to include a `type` field.
+   *
+   * @returns {string}
+   *     The derived event name, either the matched offshore event or a formatted
+   *     attribute-based string.
    */
   static getEvent(message, attributes) {
     const offshoreEvent = Object.keys(definitions.offshore).find((event) => message.toLowerCase().includes(event.toLowerCase()));
@@ -1609,13 +1781,33 @@ var UGCAlerts = class {
     return attributes.type.split(`-`).map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(` `);
   }
   /**
-   * event processes validated UGC alert messages, extracting relevant information and compiling it into structured event objects.
+   * @function event
+   * @description
+   *     Processes a validated stanza message, extracting UGC entries and
+   *     computing base properties for non-VTEC events. Each extracted event
+   *     is enriched with metadata, performance timing, and history information,
+   *     then filtered and emitted via `EventParser.validateEvents`.
    *
-   * @public
    * @static
    * @async
-   * @param {types.TypeCompiled} validated 
-   * @returns {*} 
+   * @param {types.StanzaCompiled} validated
+   *     The validated stanza object containing message text, attributes,
+   *     and metadata.
+   *
+   * @returns {Promise<void>}
+   *     This method does not return a value. It processes events and
+   *     invokes `EventParser.validateEvents` to filter and emit them.
+   *
+   * @remarks
+   *     - Splits multi-stanza messages using `$$`, `ISSUED TIME...`, or
+   *       `=================================================` as delimiters.
+   *     - Extracts UGC entries using `UgcParser.ugcExtractor`.
+   *     - Calls `EventParser.getBaseProperties` to compile core event properties.
+   *     - Computes an EAS header using `EventParser.getHeader`.
+   *     - Generates a human-readable event name via `this.getEvent`.
+   *     - Computes a tracking string via `this.getTracking`.
+   *     - Tracks performance timing for each processed message.
+   *     - Calls `EventParser.validateEvents` to filter and emit final events.
    */
   static event(validated) {
     return __async(this, null, function* () {
@@ -1634,7 +1826,7 @@ var UGCAlerts = class {
           processed.push({
             performance: performance.now() - tick,
             source: `ugc-parser`,
-            tracking: this.getTracking(getBaseProperties, getUGC.zones),
+            tracking: this.getTracking(getBaseProperties),
             header: getHeader,
             vtec: `N/A`,
             history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: `Issued` }],
@@ -1651,24 +1843,38 @@ var ugc_default2 = UGCAlerts;
 // src/parsers/types/text.ts
 var UGCAlerts2 = class {
   /**
-   * Generates a tracking identifier based on the sender's ICAO code.
+   * @function getTracking
+   * @description
+   *    Generates a unique tracking identifier for an event using the sender's ICAO
+   *    and some attributes.
    *
    * @private
    * @static
-   * @param {types.BaseProperties} baseProperties
-   * @returns {string}
+   * @param {types.EventProperties} baseProperties 
+   * @returns {string} 
    */
   static getTracking(baseProperties) {
-    return `${baseProperties.sender_icao}`;
+    return `${baseProperties.sender_icao}-${baseProperties.attributes.ttaaii}-${baseProperties.attributes.id.slice(-4)}`;
   }
   /**
-   * Determines the event type based on the message content and provided attributes.
+   * @function getEvent
+   * @description
+   *     Determines the event name from a text message and its AWIPS attributes.
+   *     If the message contains a known offshore event keyword, that offshore
+   *     event is returned. Otherwise, the event type from the AWIPS attributes
+   *     is formatted into a human-readable string with each word capitalized.
    *
    * @private
    * @static
    * @param {string} message
+   *     The raw text of the message to parse for event information.
    * @param {Record<string, any>} attributes
-   * @returns {*}
+   *     The AWIPS attributes associated with the message, typically containing
+   *     the `type` property.
+   *
+   * @returns {string}
+   *     The determined event name, either an offshore event or formatted
+   *     AWIPS type.
    */
   static getEvent(message, attributes) {
     const offshoreEvent = Object.keys(definitions.offshore).find((event) => message.toLowerCase().includes(event.toLowerCase()));
@@ -1676,13 +1882,24 @@ var UGCAlerts2 = class {
     return attributes.type.split(`-`).map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(` `);
   }
   /**
-   * event processes validated UGC alert messages, extracting relevant information and compiling it into structured event objects.
+   * @function event
+   * @description
+   *     Processes a compiled text-based NOAA Stanza message and extracts relevant
+   *     event information. Splits the message into multiple segments based on
+   *     markers such as "$$", "ISSUED TIME...", or separator lines, generates
+   *     base properties, headers, event names, and tracking information for
+   *     each segment, then validates and emits the processed events.
    *
    * @public
    * @static
    * @async
-   * @param {types.TypeCompiled} validated 
-   * @returns {*} 
+   * @param {types.StanzaCompiled} validated
+   *     The validated compiled stanza object containing the original message
+   *     and its attributes.
+   *
+   * @returns {Promise<void>}
+   *     Resolves after all segments of the message have been processed and
+   *     events have been validated and emitted.
    */
   static event(validated) {
     return __async(this, null, function* () {
@@ -1715,27 +1932,33 @@ var text_default2 = UGCAlerts2;
 // src/parsers/types/cap.ts
 var CapAlerts = class {
   /**
-   * getTracking generates a unique tracking identifier for a CAP alert based on extracted XML values.
-   * 
+   * @function getTracking
+   * @description
+   *   Generates a unique tracking identifier for a CAP alert based on extracted XML values.
+   *   If VTEC information is available, it constructs the tracking ID from the VTEC components.
+   *   Otherwise, it uses the WMO identifier along with TTAI and CCCC attributes.
+   *
    * @private
    * @static
    * @param {Record<string, string>} extracted 
    * @returns {string} 
    */
-  static getTracking(extracted) {
+  static getTracking(extracted, attributes) {
     return extracted.vtec ? (() => {
       const vtecValue = Array.isArray(extracted.vtec) ? extracted.vtec[0] : extracted.vtec;
       const splitVTEC = vtecValue.split(".");
       return `${splitVTEC[2]}-${splitVTEC[3]}-${splitVTEC[4]}-${splitVTEC[5]}`;
-    })() : `${extracted.wmoidentifier} (${extracted.ugc})`;
+    })() : `${extracted.wmoidentifier.substring(extracted.wmoidentifier.length - 4)}-${attributes.ttaaii}-${attributes.id.slice(-4)}`;
   }
   /**
-   * event processes validated CAP alert messages, extracting relevant information and compiling it into structured event objects.
+   * @function event
+   * @description
+   *    Processes validated CAP alert messages, extracting relevant information and compiling it into structured event objects.   
    *
    * @public
    * @static
    * @async
-   * @param {types.TypeCompiled} validated 
+   * @param {types.StanzaCompiled} validated 
    * @returns {*} 
    */
   static event(validated) {
@@ -1775,7 +1998,7 @@ var CapAlerts = class {
         processed.push({
           performance: performance.now() - tick,
           source: `cap-parser`,
-          tracking: this.getTracking(extracted),
+          tracking: this.getTracking(extracted, validated.attributes),
           header: getHeader,
           vtec: extracted.vtec || `N/A`,
           history: [{ description: extracted.description || `N/A`, issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`, type: extracted.msgtype || `N/A` }],
@@ -1824,22 +2047,28 @@ var cap_default = CapAlerts;
 // src/parsers/types/api.ts
 var APIAlerts = class {
   /**
-   * getTracking generates a unique tracking identifier for an API alert based on extracted JSON values.
+   * @function getTracking
+   * @description
+   *   Generates a unique tracking identifier for a CAP alert based on extracted XML values.
+   *   If VTEC information is available, it constructs the tracking ID from the VTEC components.
+   *   Otherwise, it uses the WMO identifier along with TTAI and CCCC attributes.
    *
    * @private
    * @static
    * @param {Record<string, string>} extracted 
    * @returns {string} 
    */
-  static getTracking(extracted) {
+  static getTracking(extracted, attributes) {
     return extracted.vtec ? (() => {
       const vtecValue = Array.isArray(extracted.vtec) ? extracted.vtec[0] : extracted.vtec;
       const splitVTEC = vtecValue.split(".");
       return `${splitVTEC[2]}-${splitVTEC[3]}-${splitVTEC[4]}-${splitVTEC[5]}`;
-    })() : `${extracted.wmoidentifier} (${extracted.ugc})`;
+    })() : `${extracted.wmoidentifier}`;
   }
   /**
-   * getICAO extracts the ICAO code and corresponding name from a VTEC string.
+   * @function getICAO
+   * @description
+   *    Extracts the sender's ICAO code and corresponding name from a VTEC string.    
    *
    * @private
    * @static
@@ -1853,12 +2082,14 @@ var APIAlerts = class {
     return { icao, name };
   }
   /**
-   * event processes validated API alert messages, extracting relevant information and compiling it into structured event objects.
+   * @function event
+   * @description
+   *   Processes validated API alert messages, extracting relevant information and compiling it into structured event objects.
    *
    * @public
    * @static
    * @async
-   * @param {types.TypeCompiled} validated 
+   * @param {types.StanzaCompiled} validated 
    * @returns {*} 
    */
   static event(validated) {
@@ -1880,7 +2111,7 @@ var APIAlerts = class {
         processed.push({
           performance: performance.now() - tick,
           source: `api-parser`,
-          tracking: this.getTracking({ vtec: getVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
+          tracking: this.getTracking({ vtec: getVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }, validated.attributes),
           header: getHeader,
           vtec: getVTEC || `N/A`,
           history: [{
@@ -1933,16 +2164,54 @@ var api_default = APIAlerts;
 // src/parsers/events.ts
 var EventParser = class {
   /**
-   * getBaseProperties extracts and compiles the base properties of an alert message, including location, timing, description, sender information, and various parameters.
+   * @function getBaseProperties
+   * @description
+   *     Extracts and compiles the core properties of a weather
+   *     alert message into a structured object. Combines parsed
+   *     textual data, UGC information, VTEC entries, and additional
+   *     metadata for downstream use.
    *
-   * @public
    * @static
    * @async
-   * @param {string} message 
-   * @param {types.TypeCompiled} validated 
-   * @param {types.UGCEntry} [ugc=null] 
-   * @param {types.VtecEntry} [vtec=null] 
-   * @returns {Promise<types.BaseProperties>} 
+   * @param {string} message
+   *     The raw text of the weather alert or CAP/TEXT product.
+   *
+   * @param {types.StanzaCompiled} validated
+   *     The validated stanza object containing attributes,
+   *     flags, and metadata.
+   *
+   * @param {types.UGCEntry} [ugc=null]
+   *     Optional UGC entry object providing zones, locations, and
+   *     expiry information.
+   *
+   * @param {types.VtecEntry} [vtec=null]
+   *     Optional VTEC entry object for extracting tracking,
+   *     type, and expiration information.
+   *
+   * @returns {Promise<Record<string, any>>}
+   *     A promise resolving to a fully structured object with:
+   *     - locations: string of all UGC locations.
+   *     - issued: ISO string of the issued timestamp.
+   *     - expires: ISO string of the expiry timestamp.
+   *     - geocode: Object with UGC zone identifiers.
+   *     - description: Parsed description of the alert.
+   *     - sender_name: Name of issuing office.
+   *     - sender_icao: ICAO code of issuing office.
+   *     - attributes: Combined stanza attributes with AWIP info.
+   *     - parameters: Extracted hazard parameters (tornado, hail, wind, flood, etc.).
+   *     - geometry: Polygon coordinates if available or derived from shapefiles.
+   *
+   * @remarks
+   *     - Falls back to shapefile coordinates if no polygon is in the message
+   *       and shapefile preferences are enabled.
+   *     - Uses multiple helper methods including:
+   *       - `TextParser.textProductToString`
+   *       - `TextParser.textProductToPolygon`
+   *       - `TextParser.textProductToDescription`
+   *       - `this.getICAO`
+   *       - `this.getCorrectIssuedDate`
+   *       - `this.getCorrectExpiryDate`
+   *       - `TextParser.awipTextToEvent`
    */
   static getBaseProperties(message, validated, ugc = null, vtec = null) {
     return __async(this, null, function* () {
@@ -1992,7 +2261,7 @@ var EventParser = class {
         },
         geometry: definitions2.polygon.length > 0 ? { type: "Polygon", coordinates: definitions2.polygon } : null
       };
-      if (settings2.NoaaWeatherWireService.alertPreferences.isShapefileUGC && base.geometry == null && ugc != null) {
+      if (settings2.noaa_weather_wire_service_settings.preferences.shapefile_coordinates && base.geometry == null && ugc != null) {
         const coordinates = yield ugc_default.getCoordinates(ugc.zones);
         base.geometry = { type: "Polygon", coordinates };
       }
@@ -2000,14 +2269,33 @@ var EventParser = class {
     });
   }
   /**
-   * betterParsedEventName refines the event name based on specific conditions and tags found in the event's description and parameters.
+   * @function betterParsedEventName
+   * @description
+   *     Enhances the parsing of an event name using additional criteria
+   *     from its description and parameters. Can optionally use
+   *     the original parent event name instead.
    *
-   * @public
    * @static
-   * @param {types.TypeAlert} event 
+   * @param {types.EventCompiled} event
+   *     The event object containing properties such as `event`,
+   *     `description`, and `parameters` to analyze for better parsing.
+   *
    * @param {boolean} [betterParsing=false]
+   *     Whether to attempt enhanced parsing using `enhancedEvents` definitions.
+   *
    * @param {boolean} [useParentEvents=false]
-   * @returns {{ eventName: any }}
+   *     If true, returns the original parent event name instead of
+   *     the parsed/enhanced name.
+   *
+   * @returns {string}
+   *     Returns the improved or original event name based on the
+   *     parsing rules and flags.
+   *
+   * @remarks
+   *     - Uses `loader.definitions.enhancedEvents` to map base events to
+   *       more specific event names depending on conditions.
+   *     - Appends `(TPROB)` for certain Severe Thunderstorm Warning events
+   *       if `damage_threat` indicates a possible tornado.
    */
   static betterParsedEventName(event, betterParsing, useParentEvents) {
     var _a, _b, _c, _d, _e, _f;
@@ -2038,24 +2326,37 @@ var EventParser = class {
     return useParentEvents ? (_f = event == null ? void 0 : event.properties) == null ? void 0 : _f.event : eventName;
   }
   /**
-   * validateEvents determines the correct expiration date for an alert based on VTEC information or UGC zones.
-   * This will filter incoming alerts based on the user's settings and emit events accordingly.
-   * This will also emit specific events based on the alert type for easier handling.
-   * For exmaple, a "Tornado Warning" will emit both "onTornadoWarning" and "onRadarIndicatedTornadoWarning" events.
-   * Then the user can listen to those events individually as needed.
-   * If you want to listen to all alerts, use the "onAlerts" event.
+   * @function validateEvents
+   * @description
+   *     Processes an array of event objects and filters them based on
+   *     global and EAS filtering settings, location constraints, and
+   *     other criteria such as expired or test products. Valid events
+   *     trigger relevant event emitters.
    *
-   * @public
    * @static
-   * @param {unknown[]} events 
+   * @param {unknown[]} events
+   *     An array of events to validate and filter. Each event is
+   *     expected to conform to the internal structure of a compiled alert.
+   *
+   * @returns {void}
+   *     This function does not return a value. Valid and filtered events
+   *     are emitted via the event system (`loader.cache.events`).
+   *
+   * @remarks
+   *     - Events are augmented with default signatures and computed
+   *       distances before filtering.
+   *     - Supports multiple filter categories, including events, ignored
+   *       events, ICAO, UGC codes, and state codes.
+   *     - Emits events for each valid alert, both by parent and by
+   *       specific event name.
    */
   static validateEvents(events2) {
     var _a, _b, _c, _d, _e;
     if (events2.length == 0) return;
-    const filteringSettings = (_b = (_a = settings) == null ? void 0 : _a.global) == null ? void 0 : _b.alertFiltering;
-    const locationSettings = filteringSettings == null ? void 0 : filteringSettings.locationFiltering;
-    const easSettings = (_d = (_c = settings) == null ? void 0 : _c.global) == null ? void 0 : _d.easSettings;
-    const globalSettings = (_e = settings) == null ? void 0 : _e.global;
+    const filteringSettings = (_b = (_a = settings) == null ? void 0 : _a.global_settings) == null ? void 0 : _b.filtering;
+    const locationSettings = filteringSettings == null ? void 0 : filteringSettings.location;
+    const easSettings = (_d = (_c = settings) == null ? void 0 : _c.global_settings) == null ? void 0 : _d.eas_settings;
+    const globalSettings = (_e = settings) == null ? void 0 : _e.global_settings;
     const sets = {};
     const bools = {};
     const megered = __spreadValues(__spreadValues(__spreadValues(__spreadValues({}, filteringSettings), easSettings), globalSettings), locationSettings);
@@ -2075,22 +2376,22 @@ var EventParser = class {
       const ugcs = (_b2 = (_a2 = props == null ? void 0 : props.geocode) == null ? void 0 : _a2.UGC) != null ? _b2 : [];
       const _c2 = originalEvent, { performance: performance2, header } = _c2, eventWithoutPerformance = __objRest(_c2, ["performance", "header"]);
       originalEvent.properties.parent = originalEvent.properties.event;
-      originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools == null ? void 0 : bools.betterEventParsing, bools == null ? void 0 : bools.useParentEvents);
+      originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools == null ? void 0 : bools.better_event_parsing, bools == null ? void 0 : bools.parent_events_only);
       originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(eventWithoutPerformance)).digest("hex");
-      originalEvent.properties.distance = this.getLocationDistances(props, bools == null ? void 0 : bools.filter, locationSettings == null ? void 0 : locationSettings.maxDistance, locationSettings == null ? void 0 : locationSettings.unit);
+      originalEvent.properties.distance = this.getLocationDistances(props, bools == null ? void 0 : bools.filter, locationSettings == null ? void 0 : locationSettings.max_distance, locationSettings == null ? void 0 : locationSettings.unit);
       if (!((_d2 = originalEvent.properties.distance) == null ? void 0 : _d2.in_range) && (bools == null ? void 0 : bools.filter)) {
         return false;
       }
-      if (originalEvent.properties.is_test == true && (bools == null ? void 0 : bools.ignoreTestProducts)) return false;
-      if ((bools == null ? void 0 : bools.checkExpired) && originalEvent.properties.is_cancelled == true) return false;
+      if (originalEvent.properties.is_test == true && (bools == null ? void 0 : bools.ignore_text_products)) return false;
+      if ((bools == null ? void 0 : bools.check_expired) && originalEvent.properties.is_cancelled == true) return false;
       for (const key in sets) {
         const setting = sets[key];
-        if (key === "filteredEvents" && setting.size > 0 && !setting.has(originalEvent.properties.event.toLowerCase())) return false;
-        if (key === "ignoredEvents" && setting.size > 0 && setting.has(originalEvent.properties.event.toLowerCase())) return false;
-        if (key === "filteredICOAs" && setting.size > 0 && props.sender_icao != null && !setting.has(props.sender_icao.toLowerCase())) return false;
-        if (key === "ignoredICOAs" && setting.size > 0 && props.sender_icao != null && setting.has(props.sender_icao.toLowerCase())) return false;
-        if (key === "ugcFilter" && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc) => setting.has(ugc.toLowerCase()))) return false;
-        if (key === "stateFilter" && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc) => setting.has(ugc.substring(0, 2).toLowerCase()))) return false;
+        if (key === "events" && setting.size > 0 && !setting.has(originalEvent.properties.event.toLowerCase())) return false;
+        if (key === "ignored_events" && setting.size > 0 && setting.has(originalEvent.properties.event.toLowerCase())) return false;
+        if (key === "filtered_icoa" && setting.size > 0 && props.sender_icao != null && !setting.has(props.sender_icao.toLowerCase())) return false;
+        if (key === "ignored_icoa" && setting.size > 0 && props.sender_icao != null && setting.has(props.sender_icao.toLowerCase())) return false;
+        if (key === "ugc_filter" && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc) => setting.has(ugc.toLowerCase()))) return false;
+        if (key === "state_filter" && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc) => setting.has(ugc.substring(0, 2).toLowerCase()))) return false;
       }
       cache.events.emit(`on${originalEvent.properties.parent.replace(/\s+/g, "")}`);
       cache.events.emit(`on${originalEvent.properties.event.replace(/\s+/g, "")}`);
@@ -2101,14 +2402,21 @@ var EventParser = class {
     }
   }
   /**
-   * getHeader constructs a standardized alert header string based on provided attributes, properties, and VTEC information.
+   * @function getHeader
+   * @description
+   *     Constructs a standardized alert header string using provided
+   *     stanza attributes, event properties, and optional VTEC data.
    *
-   * @public
    * @static
-   * @param {types.TypeAttributes} attributes 
-   * @param {?types.BaseProperties} [properties] 
-   * @param {?types.VtecEntry} [vtec] 
-   * @returns {string} 
+   * @param {types.StanzaAttributes} attributes
+   *     The stanza attributes containing AWIPS type and related metadata.
+   * @param {types.EventProperties} [properties]
+   *     Optional event properties, such as geocode, issued time, and sender ICAO.
+   * @param {types.VtecEntry} [vtec]
+   *     Optional VTEC entry providing status information for the alert.
+   *
+   * @returns {string}
+   *     A formatted alert header string following the ZCZC header convention.
    */
   static getHeader(attributes, properties, vtec) {
     var _a, _b, _c, _d, _e, _f, _g;
@@ -2122,12 +2430,17 @@ var EventParser = class {
     return header;
   }
   /**
-   * eventHandler routes the validated alert message to the appropriate event parser based on its type (API, CAP, VTEC, UGC, or plain text).
+   * @function eventHandler
+   * @description
+   *     Routes a validated stanza object to the appropriate alert handler
+   *     based on its type flags: API, CAP, VTEC, UGC, or plain text.
    *
-   * @public
    * @static
-   * @param {types.TypeCompiled} validated 
-   * @returns {*} 
+   * @param {types.StanzaCompiled} validated
+   *     The validated stanza object containing flags and message details
+   *     used to determine the correct alert processing pipeline.
+   *
+   * @returns {void}
    */
   static eventHandler(validated) {
     if (validated.isApi) return api_default.event(validated);
@@ -2137,14 +2450,23 @@ var EventParser = class {
     if (!validated.isCap && !validated.isVtec && !validated.isUGC) return text_default2.event(validated);
   }
   /**
-   * getICAO retrieves the ICAO code and corresponding office name based on VTEC tracking information, message attributes, or WMO code.
+   * @function getICAO
+   * @description
+   *     Determines the ICAO code and corresponding name for an event.
+   *     Priority is given to the VTEC tracking code, then the attributes' `cccc` property, 
+   *     and finally the WMO code if available. Returns "N/A" if none are found.
    *
    * @private
    * @static
-   * @param {types.VtecEntry} vtec 
-   * @param {Record<string, string>} attributes 
-   * @param {(RegExpMatchArray | string | null)} WMO 
-   * @returns {{ icao: any; name: any; }} 
+   * @param {types.VtecEntry | null} vtec
+   *     The VTEC entry object, which may contain tracking information.
+   * @param {Record<string, string>} attributes
+   *     Event attributes object, potentially containing a `cccc` field.
+   * @param {RegExpMatchArray | string | null} WMO
+   *     WMO code or match array, used as a fallback if VTEC and attributes do not provide a code.
+   *
+   * @returns {{ icao: string; name: string }}
+   *     An object containing the ICAO code and its human-readable name.
    */
   static getICAO(vtec, attributes, WMO) {
     var _a, _b, _c;
@@ -2153,12 +2475,18 @@ var EventParser = class {
     return { icao, name };
   }
   /**
-   * getCorrectIssuedDate ensures the issued date is valid and falls back to the current date if not.
+   * @function getCorrectIssuedDate
+   * @description
+   *     Determines the issued date for an event based on the provided attributes.
+   *     Falls back to the current date and time if no valid issue date is available.
    *
    * @private
    * @static
-   * @param {Record<string, string>} attributes 
-   * @returns {*} 
+   * @param {Record<string, string>} attributes
+   *     The event attributes object, expected to contain an `issue` property.
+   *
+   * @returns {string}
+   *     A locale-formatted string representing the calculated issued date and time.
    */
   static getCorrectIssuedDate(attributes) {
     const time = attributes.issue != null ? new Date(attributes.issue).toLocaleString() : (attributes == null ? void 0 : attributes.issue) != null ? new Date(attributes.issue).toLocaleString() : (/* @__PURE__ */ new Date()).toLocaleString();
@@ -2166,13 +2494,20 @@ var EventParser = class {
     return time;
   }
   /**
-   * getCorrectExpiryDate determines the correct expiration date for an alert based on VTEC information or UGC zones.
+   * @function getCorrectExpiryDate
+   * @description
+   *     Determines the most appropriate expiry date for an event using VTEC or UGC data.
+   *     Falls back to one hour from the current time if no valid expiry is available.
    *
    * @private
    * @static
-   * @param {types.VtecEntry} vtec 
-   * @param {types.UGCEntry} ugc 
-   * @returns {*} 
+   * @param {types.VtecEntry} vtec
+   *     The VTEC entry containing a potential `expires` date.
+   * @param {types.UGCEntry} ugc
+   *     The UGC entry containing a potential `expiry` date.
+   *
+   * @returns {string}
+   *     A locale-formatted string representing the calculated expiry date and time.
    */
   static getCorrectExpiryDate(vtec, ugc) {
     const time = (vtec == null ? void 0 : vtec.expires) && !isNaN(new Date(vtec.expires).getTime()) ? new Date(vtec.expires).toLocaleString() : (ugc == null ? void 0 : ugc.expiry) != null ? new Date(ugc.expiry).toLocaleString() : new Date((/* @__PURE__ */ new Date()).getTime() + 1 * 60 * 60 * 1e3).toLocaleString();
@@ -2180,15 +2515,26 @@ var EventParser = class {
     return time;
   }
   /**
-   * getLocationDistances calculates distances from current locations to the alert's geometry and determines if it's within a specified range.
+   * @function getLocationDistances
+   * @description
+   *     Calculates distances from an event's geometry to all current tracked locations.
+   *     Optionally filters locations by a maximum distance.
    *
    * @private
    * @static
-   * @param {?types.BaseProperties} [properties] 
-   * @param {?boolean} [isFiltered] 
-   * @param {?number} [maxDistance] 
-   * @param {?string} [unit] 
-   * @returns {*} 
+   * @param {types.EventProperties} [properties]
+   *     Event properties object which must contain a `geometry` field with coordinates.
+   *     Distances will be added to `properties.distance` keyed by location names.
+   * @param {boolean} [isFiltered=false]
+   *     If true, the returned `in_range` value reflects whether any location is within `maxDistance`.
+   * @param {number} [maxDistance]
+   *     Maximum distance to consider a location "in range" when `isFiltered` is true.
+   * @param {string} [unit='miles']
+   *     Unit of distance measurement: either 'miles' or 'kilometers'. Defaults to 'miles'.
+   *
+   * @returns {{ range?: Record<string, {unit: string, distance: number}>, in_range: boolean }}
+   *     - `range`: Optional object containing distances for each location (unit + distance).
+   *     - `in_range`: True if at least one location is within `maxDistance` or if no filtering is applied.
    */
   static getLocationDistances(properties, isFiltered, maxDistance, unit) {
     let inRange = false;
@@ -2218,13 +2564,25 @@ var EventParser = class {
     return { in_range: false };
   }
   /**
-   * buildDefaultSignature processes and standardizes the event's properties, ensuring proper status correlation, cancellation detection, and expiry handling.
-   * C = Cancelled, U = Updated, I = Issued
-   * 
+   * @function buildDefaultSignature
+   * @description
+   *     Populates default properties for an event object, including action type flags,
+   *     tags, and status updates. Determines if the event is issued, updated, or cancelled
+   *     based on correlations, description content, VTEC codes, and expiration time.
+   *
    * @private
    * @static
-   * @param {*} event The event object to process.
-   * @returns {*} The processed event with updated properties.
+   * @param {any} event
+   *     The event object to process. Expected to have a `properties` object and optionally `vtec`.
+   *
+   * @returns {any}
+   *     The event object with updated `properties`:
+   *       - `is_cancelled`: True if the event is cancelled.
+   *       - `is_updated`: True if the event is updated.
+   *       - `is_issued`: True if the event is newly issued.
+   *       - `tags`: Array of tags derived from the event description.
+   *       - `is_test` (optional): True if the event is a test product.
+   *       - `action_type`: Updated action type after correlation processing.
    */
   static buildDefaultSignature(event) {
     var _a, _b;
@@ -2271,13 +2629,23 @@ var events_default = EventParser;
 // src/database.ts
 var Database = class {
   /**
-   * handleAlertCache stores a unique alert in the SQLite database and ensures the total number of alerts does not exceed 5000.
+   * @function stanzaCacheImport
+   * @description
+   *     Inserts a single NWWS stanza into the database cache. If the total number
+   *     of stanzas exceeds the configured maximum history, it deletes the oldest
+   *     entries to maintain the limit. Duplicate stanzas are ignored.
    *
-   * @public
    * @static
    * @async
-   * @param {*} alert 
-   * @returns {*} 
+   * @param {string} stanza
+   *     The raw stanza XML or text to store in the database.
+   * 
+   * @returns {Promise<void>}
+   *     Resolves when the stanza has been inserted and any necessary pruning
+   *     of old stanzas has been performed.
+   *
+   * @example
+   *     await Database.stanzaCacheImport("<alert>...</alert>");
    */
   static stanzaCacheImport(stanza) {
     return __async(this, null, function* () {
@@ -2288,7 +2656,7 @@ var Database = class {
         db.prepare(`INSERT OR IGNORE INTO stanzas (stanza) VALUES (?)`).run(stanza);
         const countRow = db.prepare(`SELECT COUNT(*) AS total FROM stanzas`).get();
         const totalRows = countRow.total;
-        const maxHistory = settings2.NoaaWeatherWireService.cache.maxHistory;
+        const maxHistory = settings2.noaa_weather_wire_service_settings.cache.max_db_history;
         if (totalRows > maxHistory) {
           const rowsToDelete = Math.floor((totalRows - maxHistory) / 2);
           if (rowsToDelete > 0) {
@@ -2310,12 +2678,21 @@ var Database = class {
     });
   }
   /**
-   * loadDatabase initializes the SQLite database and imports shapefile data if the database or table does not exist.
+   * @function loadDatabase
+   * @description
+   *     Initializes the application's SQLite database, creating necessary tables
+   *     for storing stanzas and shapefiles. If the shapefiles table is empty,
+   *     it imports predefined shapefiles from disk, processes their features,
+   *     and populates the database. Emits warnings during the import process.
    *
-   * @public
    * @static
    * @async
-   * @returns {Promise<void>} 
+   * @returns {Promise<void>}
+   *     Resolves when the database and shapefiles have been initialized.
+   *
+   * @example
+   *     await Database.loadDatabase();
+   *     console.log('Database initialized and shapefiles imported.');
    */
   static loadDatabase() {
     return __async(this, null, function* () {
@@ -2383,14 +2760,18 @@ var database_default = Database;
 // src/xmpp.ts
 var Xmpp = class {
   /**
-   * isSessionReconnectionEligible checks if the XMPP session is eligible for reconnection based on the last 
-   * received stanza time and current interval.
+   * @function isSessionReconnectionEligible
+   * @description
+   *     Checks if the XMPP session has been inactive longer than the given interval
+   *     and, if so, attempts a controlled reconnection.
    *
-   * @public
-   * @static
    * @async
-   * @param {number} currentInterval 
-   * @returns {Promise<void>} 
+   * @static
+   * @param {number} currentInterval
+   *     The inactivity threshold in seconds before reconnection is triggered.
+   *
+   * @returns {Promise<void>}
+   *     Resolves after reconnection logic completes or no action is needed.
    */
   static isSessionReconnectionEligible(currentInterval) {
     return __async(this, null, function* () {
@@ -2413,7 +2794,7 @@ var Xmpp = class {
         cache.events.emit("onReconnection", {
           reconnects: cache.totalReconnects,
           lastStanza: lastStanzaElapsed,
-          lastName: settings2.NoaaWeatherWireService.clientCredentials.nickname
+          lastName: settings2.noaa_weather_wire_service_settings.credentials.nickname
         });
         yield cache.session.stop().catch(() => {
         });
@@ -2427,25 +2808,27 @@ var Xmpp = class {
     });
   }
   /**
-   * deploySession initializes and starts the XMPP client session, setting up event listeners for 
-   * connection management and message handling. This function is specifically tailored for
-   * NoaaWeatherWireService and connects to their XMPP server.
+   * @function deploySession
+   * @description
+   *     Initializes the NOAA Weather Wire Service (NWWS-OI) XMPP client session and
+   *     manages its lifecycle events including connection, disconnection, errors,
+   *     and message handling.
    *
-   * @public
-   * @static
    * @async
-   * @returns {Promise<void>} 
+   * @static
+   * @returns {Promise<void>}
+   *     Resolves once the XMPP session has started or fails gracefully on error.
    */
   static deploySession() {
     return __async(this, null, function* () {
       var _a, _b;
       const settings2 = settings;
-      (_b = (_a = settings2.NoaaWeatherWireService.clientCredentials).nickname) != null ? _b : _a.nickname = settings2.NoaaWeatherWireService.clientCredentials.username;
+      (_b = (_a = settings2.noaa_weather_wire_service_settings.credentials).nickname) != null ? _b : _a.nickname = settings2.noaa_weather_wire_service_settings.credentials.username;
       cache.session = packages.xmpp.client({
         service: "xmpp://nwws-oi.weather.gov",
         domain: "nwws-oi.weather.gov",
-        username: settings2.NoaaWeatherWireService.clientCredentials.username,
-        password: settings2.NoaaWeatherWireService.clientCredentials.password
+        username: settings2.noaa_weather_wire_service_settings.credentials.username,
+        password: settings2.noaa_weather_wire_service_settings.credentials.password
       });
       cache.session.on("online", (address) => __async(null, null, function* () {
         const now = Date.now();
@@ -2461,10 +2844,10 @@ var Xmpp = class {
         cache.sigHalt = false;
         cache.lastConnect = now;
         cache.session.send(packages.xmpp.xml("presence", {
-          to: `nwws@conference.nwws-oi.weather.gov/${settings2.NoaaWeatherWireService.clientCredentials.nickname}`,
+          to: `nwws@conference.nwws-oi.weather.gov/${settings2.noaa_weather_wire_service_settings.credentials.nickname}`,
           xmlns: "http://jabber.org/protocol/muc"
         }));
-        cache.events.emit("onConnection", settings2.NoaaWeatherWireService.clientCredentials.nickname);
+        cache.events.emit("onConnection", settings2.noaa_weather_wire_service_settings.credentials.nickname);
         if (cache.attemptingReconnect) return;
         cache.attemptingReconnect = true;
         yield utils_default.sleep(15e3);
@@ -2486,7 +2869,7 @@ var Xmpp = class {
           cache.lastStanza = Date.now();
           if (stanza.is("message")) {
             const validate = stanza_default.validate(stanza);
-            const skipMessage = validate.ignore || validate.isCap && !settings2.NoaaWeatherWireService.alertPreferences.isCapOnly || !validate.isCap && settings2.NoaaWeatherWireService.alertPreferences.isCapOnly || validate.isCap && !validate.isCapDescription;
+            const skipMessage = validate.ignore || validate.isCap && !settings2.noaa_weather_wire_service_settings.preferences.cap_only || !validate.isCap && settings2.noaa_weather_wire_service_settings.preferences.cap_only || validate.isCap && !validate.isCapDescription;
             if (skipMessage) return;
             events_default.eventHandler(validate);
             database_default.stanzaCacheImport(JSON.stringify(validate));
@@ -2516,13 +2899,16 @@ var xmpp_default = Xmpp;
 // src/utils.ts
 var Utils = class _Utils {
   /**
-   * Zzzzzzz... yeah not much to explain here. Simple sleep function that returns a promise after the specified milliseconds.
+   * @function sleep
+   * @description
+   *     Pauses execution for a specified number of milliseconds.
    *
-   * @public
    * @static
    * @async
-   * @param {number} ms 
-   * @returns {Promise<void>} 
+   * @param {number} ms
+   *     The number of milliseconds to sleep.
+   * @returns {Promise<void>}
+   *     Resolves after the specified delay.
    */
   static sleep(ms) {
     return __async(this, null, function* () {
@@ -2530,11 +2916,16 @@ var Utils = class _Utils {
     });
   }
   /**
-   * warn logs a warning message to the console with a standardized format.
+   * @function warn
+   * @description
+   *     Emits a log event and prints a warning to the console. Throttles repeated
+   *     warnings within a short interval unless `force` is `true`.
    *
-   * @public
    * @static
-   * @param {string} message 
+   * @param {string} message
+   *     The warning message to log and display.
+   * @param {boolean} [force=false]
+   *     If `true`, bypasses throttling and forces the warning to be displayed.
    */
   static warn(message, force = false) {
     cache.events.emit("log", message);
@@ -2544,20 +2935,22 @@ var Utils = class _Utils {
     console.warn(`\x1B[33m[ATMOSX-PARSER]\x1B[0m [${(/* @__PURE__ */ new Date()).toLocaleString()}] ${message}`);
   }
   /**
-   * loadCollectionCache reads cached alert files from the specified cache directory and processes them.
+   * @function loadCollectionCache
+   * @description
+   *     Loads cached NWWS messages from disk, validates them, and passes them
+   *     to the event parser. Honors CAP preferences and ignores empty or
+   *     incompatible files.
    *
-   * @public
    * @static
    * @async
-   * @returns {Promise<void>} 
    */
   static loadCollectionCache() {
     return __async(this, null, function* () {
       try {
         const settings2 = settings;
-        if (settings2.NoaaWeatherWireService.cache.read && settings2.NoaaWeatherWireService.cache.directory) {
-          if (!packages.fs.existsSync(settings2.NoaaWeatherWireService.cache.directory)) return;
-          const cacheDir = settings2.NoaaWeatherWireService.cache.directory;
+        if (settings2.noaa_weather_wire_service_settings.cache.enabled && settings2.noaa_weather_wire_service_settings.cache.directory) {
+          if (!packages.fs.existsSync(settings2.noaa_weather_wire_service_settings.cache.directory)) return;
+          const cacheDir = settings2.noaa_weather_wire_service_settings.cache.directory;
           const getAllFiles = packages.fs.readdirSync(cacheDir).filter((file) => file.endsWith(".bin") && file.startsWith("cache-"));
           this.warn(definitions.messages.dump_cache.replace(`{count}`, getAllFiles.length.toString()), true);
           yield this.sleep(2e3);
@@ -2569,8 +2962,8 @@ var Utils = class _Utils {
               continue;
             }
             const isCap = readFile.includes(`<?xml`);
-            if (isCap && !settings2.NoaaWeatherWireService.alertPreferences.isCapOnly) continue;
-            if (!isCap && settings2.NoaaWeatherWireService.alertPreferences.isCapOnly) continue;
+            if (isCap && !settings2.noaa_weather_wire_service_settings.preferences.cap_only) continue;
+            if (!isCap && settings2.noaa_weather_wire_service_settings.preferences.cap_only) continue;
             const validate = stanza_default.validate(readFile, { awipsid: file, isCap, raw: true, issue: void 0 });
             yield events_default.eventHandler(validate);
           }
@@ -2582,19 +2975,20 @@ var Utils = class _Utils {
     });
   }
   /**
-   * loadGeoJsonData fetches GeoJSON data from the National Weather Service endpoint and processes each alert.
+   * @function loadGeoJsonData
+   * @description
+   *     Fetches GeoJSON data from the National Weather Service endpoint and
+   *     passes it to the event parser for processing.
    *
-   * @public
    * @static
    * @async
-   * @returns {Promise<void>} 
    */
   static loadGeoJsonData() {
     return __async(this, null, function* () {
       try {
         const settings2 = settings;
         const response = yield this.createHttpRequest(
-          settings2.NationalWeatherService.endpoint
+          settings2.national_weather_service_settings.endpoint
         );
         if (response.error) return;
         events_default.eventHandler({
@@ -2615,14 +3009,21 @@ var Utils = class _Utils {
     });
   }
   /**
-   * createHttpRequest performs an HTTP GET request to the specified URL with optional settings.
+   * @function createHttpRequest
+   * @description
+   *     Performs an HTTP GET request with default headers and timeout, returning
+   *     either the response data or an error message.
    *
-   * @public
    * @static
-   * @async
-   * @param {string} url 
-   * @param {?types.HTTPSettings} [options] 
-   * @returns {unknown} 
+   * @template T
+   * @param {string} url
+   *     The URL to send the GET request to.
+   * @param {types.HTTPSettings} [options]
+   *     Optional HTTP settings to override defaults such as headers and timeout.
+   *
+   * @returns {Promise<{ error: boolean; message: T | string }>}
+   *     Resolves with an object containing `error` status and either the
+   *     response data (`message`) or an error message string.
    */
   static createHttpRequest(url, options) {
     return __async(this, null, function* () {
@@ -2653,16 +3054,21 @@ var Utils = class _Utils {
     });
   }
   /**
-   * garbageCollectionCache removes files from the cache directory that exceed the specified maximum file size in megabytes.
+   * @function garbageCollectionCache
+   * @description
+   *     Deletes cache files exceeding the specified size limit to free disk space.
+   *     Recursively traverses the cache directory and removes files larger than
+   *     the given maximum.
    *
-   * @public
    * @static
-   * @param {number} maxFileMegabytes 
+   * @param {number} maxFileMegabytes
+   *     Maximum allowed file size in megabytes. Files exceeding this limit
+   *     will be deleted.
    */
   static garbageCollectionCache(maxFileMegabytes) {
     try {
       const settings2 = settings;
-      const cacheDir = settings2.NoaaWeatherWireService.cache.directory;
+      const cacheDir = settings2.noaa_weather_wire_service_settings.cache.directory;
       if (!cacheDir) return;
       const { fs: fs2, path: path2 } = packages;
       if (!fs2.existsSync(cacheDir)) return;
@@ -2687,39 +3093,50 @@ var Utils = class _Utils {
     }
   }
   /**
-   * handleCronJob performs periodic tasks based on whether the client is connected to NWWS or fetching data from NWS.
+   * @function handleCronJob
+   * @description
+   *     Performs scheduled tasks for NWWS XMPP session maintenance or GeoJSON data
+   *     updates depending on the job type.
    *
-   * @public
    * @static
-   * @param {boolean} isNwws 
+   * @param {boolean} isWire
+   *     If `true`, executes NWWS-related maintenance tasks such as cache cleanup
+   *     and reconnection checks. If `false`, loads GeoJSON data.
    */
-  static handleCronJob(isNwws) {
+  static handleCronJob(isWire) {
     try {
       const settings2 = settings;
-      const cache2 = settings2.NoaaWeatherWireService.cache;
-      const reconnections = settings2.NoaaWeatherWireService.clientReconnections;
-      if (isNwws) {
-        if (cache2.read) {
-          void this.garbageCollectionCache(cache2.maxSizeMB);
+      const cache2 = settings2.noaa_weather_wire_service_settings.cache;
+      const reconnections = settings2.noaa_weather_wire_service_settings.reconnection_settings;
+      if (isWire) {
+        if (cache2.enabled) {
+          void this.garbageCollectionCache(cache2.max_file_size);
         }
-        if (reconnections.canReconnect) {
-          void xmpp_default.isSessionReconnectionEligible(reconnections.currentInterval);
+        if (reconnections.enabled) {
+          void xmpp_default.isSessionReconnectionEligible(reconnections.interval);
         }
       } else {
         void this.loadGeoJsonData();
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      _Utils.warn(`Failed to perform scheduled tasks (${isNwws ? "NWWS" : "GeoJSON"}): ${msg}`);
+      _Utils.warn(`Failed to perform scheduled tasks (${isWire ? "NWWS" : "GeoJSON"}): ${msg}`);
     }
   }
   /**
-   * mergeClientSettings merges user-provided settings into the existing client settings, allowing for nested objects to be merged correctly.
+   * @function mergeClientSettings
+   * @description
+   *     Recursively merges a ClientSettings object into a target object,
+   *     preserving nested structures and overriding existing values.
    *
-   * @public
    * @static
-   * @param {Record<string, any>} target 
-   * @param {Record<string, any>} settings 
+   * @param {Record<string, unknown>} target
+   *     The target object to merge settings into.
+   * @param {types.ClientSettingsTypes} settings
+   *     The settings object containing values to merge.
+   *
+   * @returns {Record<string, unknown>}
+   *     The updated target object with merged settings.
    */
   static mergeClientSettings(target, settings2) {
     for (const key in settings2) {
@@ -2737,15 +3154,21 @@ var Utils = class _Utils {
     return target;
   }
   /**
-   * Calculate the distance between 2 given coordinates.
+   * @function calculateDistance
+   * @description
+   *     Calculates the great-circle distance between two geographic coordinates
+   *     using the haversine formula.
    *
-   * @public
    * @static
-   * @async
-   * @param {types.Coordinates} coord1 
-   * @param {types.Coordinates} coord2 
-   * @param {('miles' | 'kilometers')} [unit='miles'] 
-   * @returns {Promise<number>} 
+   * @param {types.Coordinates} coord1
+   *     The first coordinate, containing `lat` and `lon` properties.
+   * @param {types.Coordinates} coord2
+   *     The second coordinate, containing `lat` and `lon` properties.
+   * @param {'miles' | 'kilometers'} [unit='miles']
+   *     The distance unit to return.
+   *
+   * @returns {number}
+   *     The computed distance between the two points, rounded to two decimals.
    */
   static calculateDistance(coord1, coord2, unit = "miles") {
     if (!coord1 || !coord2) return 0;
@@ -2761,12 +3184,18 @@ var Utils = class _Utils {
     return Math.round(R * c * 100) / 100;
   }
   /**
-   * validateEventReady checks if there are current locations set when location filtering is enabled, and manages warning messages accordingly.
+   * @function isReadyToProcess
+   * @description
+   *     Determines whether processing can continue based on the current
+   *     tracked locations and filter state. Emits limited warnings if no
+   *     locations are available.
    *
-   * @public
    * @static
-   * @param {boolean} isFiltering 
-   * @returns {boolean} 
+   * @param {boolean} isFiltering
+   *     Whether location-based filtering is currently active.
+   *
+   * @returns {boolean}
+   *     `true` if processing should proceed, otherwise `false`.
    */
   static isReadyToProcess(isFiltering) {
     const totalTracks = Object.keys(cache.currentLocations).length;
@@ -2789,18 +3218,35 @@ var utils_default = Utils;
 // src/eas.ts
 var EAS = class {
   /**
-   * generateEASAudio creates an EAS-compliant audio file in WAV format containing the provided message and VTEC header.
+   * @function generateEASAudio
+   * @description
+   *     Generates an EAS (Emergency Alert System) audio file for a given message
+   *     and SAME/VTEC code. The audio is composed of optional intro tones, SAME
+   *     headers, attention tones, TTS narration of the message, and repeated
+   *     SAME headers. The resulting audio is processed for NWR-style broadcast
+   *     quality and saved as a WAV file.
    *
-   * @public
    * @static
-   * @param {string} message 
-   * @param {string} vtec 
-   * @returns {*} 
+   * @async
+   * @param {string} message
+   *     The text message to be converted into EAS TTS audio.
+   * @param {string} vtec
+   *     The SAME/VTEC code used for generating SAME headers.
+   *
+   * @returns {Promise<string | null>}
+   *     Resolves with the path to the generated WAV file, or `null` if generation fails.
+   *
+   * @example
+   *     const outputFile = await EAS.generateEASAudio(
+   *         "Severe Thunderstorm Warning in effect for your area.",
+   *         "TO.WSW.KXYZ.SV.W.0001.230102T1234Z-230102T1300Z"
+   *     );
+   *     console.log(`EAS audio saved to: ${outputFile}`);
    */
   static generateEASAudio(message, vtec) {
     return new Promise((resolve) => __async(this, null, function* () {
       const settings2 = settings;
-      const assetsDir = settings2.global.easSettings.easDirectory;
+      const assetsDir = settings2.global_settings.eas_settings.directory;
       const rngFile = `${vtec.replace(/[^a-zA-Z0-9]/g, `_`)}`.substring(0, 32).replace(/^_+|_+$/g, "");
       const os2 = packages.os.platform();
       for (const { regex, replacement } of definitions.messageSignatures) {
@@ -2834,8 +3280,8 @@ var EAS = class {
       const ttsSamples = this.resamplePCM16(ttsWav.samples, ttsWav.sampleRate, 8e3);
       const ttsRadio = this.applyNWREffect(ttsSamples, 8e3);
       let toneRadio = null;
-      if (packages.fs.existsSync(settings2.global.easSettings.easIntroWav)) {
-        const toneBuffer = packages.fs.readFileSync(settings2.global.easSettings.easIntroWav);
+      if (packages.fs.existsSync(settings2.global_settings.eas_settings.intro_wav)) {
+        const toneBuffer = packages.fs.readFileSync(settings2.global_settings.eas_settings.intro_wav);
         const toneWav = this.parseWavPCM16(toneBuffer);
         if (toneWav == null) {
           console.log(`[EAS] Intro tone WAV file is not valid PCM 16-bit format.`);
@@ -2865,13 +3311,24 @@ var EAS = class {
     }));
   }
   /**
-   * encodeWavPCM16 encodes an array of samples into a WAV PCM 16-bit Buffer.
+   * @function encodeWavPCM16
+   * @description
+   *     Encodes an array of 16-bit PCM samples into a standard WAV file buffer.
+   *     Produces mono audio with 16 bits per sample and a specified sample rate.
+   *
+   *     The input `samples` array should be an array of objects containing a
+   *     numeric `value` property representing the PCM sample.
    *
    * @private
    * @static
-   * @param {Record<string, number>[]} samples 
-   * @param {number} [sampleRate=8000] 
-   * @returns {Buffer} 
+   * @param {Record<string, number>[]} samples
+   *     An array of objects each containing a numeric `value` representing a
+   *     16-bit PCM audio sample.
+   * @param {number} [sampleRate=8000]
+   *     The audio sample rate in Hz. Defaults to 8000 Hz.
+   *
+   * @returns {Buffer}
+   *     A Node.js Buffer containing the WAV file bytes.
    */
   static encodeWavPCM16(samples, sampleRate = 8e3) {
     const bytesPerSample = 2;
@@ -2913,12 +3370,23 @@ var EAS = class {
     return buffer;
   }
   /**
-   * parseWavPCM16 decodes a WAV PCM 16-bit Buffer into its sample data and format information.
+   * @function parseWavPCM16
+   * @description
+   *     Parses a WAV buffer containing 16-bit PCM mono audio and extracts
+   *     the sample data along with format information.
+   *
+   *     Only supports PCM format (audioFormat = 1), 16 bits per sample,
+   *     and single-channel (mono) audio. Returns `null` if the buffer
+   *     is invalid or does not meet these requirements.
    *
    * @private
    * @static
-   * @param {Buffer} buffer 
-   * @returns {{ samples: any; sampleRate: any; channels: any; bitsPerSample: any; }} 
+   * @param {Buffer} buffer
+   *     The WAV file data to parse.
+   *
+   * @returns { { samples: Int16Array; sampleRate: number; channels: number; bitsPerSample: number } | null }
+   *     Returns an object with the extracted audio samples and format
+   *     information, or `null` if parsing fails or format is unsupported.
    */
   static parseWavPCM16(buffer) {
     if (buffer.toString("ascii", 0, 4) !== "RIFF" || buffer.toString("ascii", 8, 12) !== "WAVE") {
@@ -2948,12 +3416,18 @@ var EAS = class {
     return { samples: new Int16Array(samples), sampleRate, channels, bitsPerSample };
   }
   /**
-   * concatPCM16 concatenates multiple Int16Array buffers into a single Int16Array buffer.
+   * @function concatPCM16
+   * @description
+   *     Concatenates multiple Int16Array PCM audio buffers into a single
+   *     contiguous Int16Array.
    *
    * @private
    * @static
-   * @param {Int16Array[]} arrays 
-   * @returns {*} 
+   * @param {Int16Array[]} arrays
+   *     An array of Int16Array buffers to concatenate.
+   *
+   * @returns {Int16Array}
+   *     A single Int16Array containing all input buffers in sequence.
    */
   static concatPCM16(arrays) {
     let total = 0;
@@ -2967,12 +3441,18 @@ var EAS = class {
     return out;
   }
   /**
-   * pcm16toFloat converts an Int16Array of PCM 16-bit samples to a Float32Array of normalized float samples.
+   * @function pcm16toFloat
+   * @description
+   *     Converts a PCM16 Int16Array audio buffer to a Float32Array
+   *     with normalized values in the range [-1, 1).
    *
    * @private
    * @static
-   * @param {Int16Array} int16 
-   * @returns {*} 
+   * @param {Int16Array} int16
+   *     The input PCM16 Int16Array buffer.
+   *
+   * @returns {Float32Array}
+   *     A Float32Array containing normalized audio samples.
    */
   static pcm16toFloat(int16) {
     const out = new Float32Array(int16.length);
@@ -2980,12 +3460,18 @@ var EAS = class {
     return out;
   }
   /**
-   * floatToPcm16 converts a Float32Array of normalized float samples to an Int16Array of PCM 16-bit samples.
+   * @function floatToPcm16
+   * @description
+   *     Converts a Float32Array of audio samples in the range [-1, 1]
+   *     to a PCM16 Int16Array.
    *
    * @private
    * @static
-   * @param {Float32Array} float32 
-   * @returns {*} 
+   * @param {Float32Array} float32
+   *     The input Float32Array containing normalized audio samples.
+   *
+   * @returns {Int16Array}
+   *     A PCM16 Int16Array with values scaled to the [-32767, 32767] range.
    */
   static floatToPcm16(float32) {
     const out = new Int16Array(float32.length);
@@ -2996,14 +3482,22 @@ var EAS = class {
     return out;
   }
   /**
-   * resamplePCM16 resamples an Int16Array of PCM 16-bit samples from the original sample rate to the target sample rate using linear interpolation.
+   * @function resamplePCM16
+   * @description
+   *     Resamples a PCM16 audio buffer from an original sample rate to a
+   *     target sample rate using linear interpolation.
    *
    * @private
    * @static
-   * @param {Int16Array} int16 
-   * @param {number} originalRate 
-   * @param {number} targetRate 
-   * @returns {*} 
+   * @param {Int16Array} int16
+   *     The original PCM16 audio buffer to resample.
+   * @param {number} originalRate
+   *     The sample rate (in Hz) of the original audio buffer.
+   * @param {number} targetRate
+   *     The desired sample rate (in Hz) for the output buffer.
+   *
+   * @returns {Int16Array}
+   *     A new PCM16 buffer resampled to the target sample rate.
    */
   static resamplePCM16(int16, originalRate, targetRate) {
     if (originalRate === targetRate) return int16;
@@ -3021,25 +3515,39 @@ var EAS = class {
     return out;
   }
   /**
-   * generateSilence creates an Int16Array of PCM 16-bit samples representing silence for the specified duration in milliseconds.
+   * @function generateSilence
+   * @description
+   *     Generates a PCM16 audio buffer containing silence for a specified
+   *     duration.
    *
    * @private
    * @static
-   * @param {number} ms 
-   * @param {number} [sampleRate=8000] 
-   * @returns {*} 
+   * @param {number} ms
+   *     Duration of the silence in milliseconds.
+   * @param {number} [sampleRate=8000]
+   *     Sample rate in Hz for the generated PCM16 audio.
+   *
+   * @returns {Int16Array}
+   *     A PCM16 buffer filled with zeros representing silence.
    */
   static generateSilence(ms, sampleRate = 8e3) {
     return new Int16Array(Math.floor(ms * sampleRate));
   }
   /**
-   * generateAttentionTone creates an Int16Array of PCM 16-bit samples representing the EAS attention tone for the specified duration in milliseconds.
+   * @function generateAttentionTone
+   * @description
+   *     Generates a dual-frequency Attention Tone (853 Hz and 960 Hz) used in
+   *     EAS/SAME alerts. Produces a PCM16 buffer of the specified duration.
    *
    * @private
    * @static
-   * @param {*} ms 
-   * @param {number} [sampleRate=8000] 
-   * @returns {*} 
+   * @param {number} ms
+   *     Duration of the tone in milliseconds.
+   * @param {number} [sampleRate=8000]
+   *     Sample rate in Hz for the generated PCM16 audio.
+   *
+   * @returns {Int16Array}
+   *     A PCM16 buffer containing the generated Attention Tone.
    */
   static generateAttentionTone(ms, sampleRate = 8e3) {
     const len = Math.floor(ms * sampleRate);
@@ -3061,13 +3569,22 @@ var EAS = class {
     return out;
   }
   /**
-   * applyNWREffect applies a series of audio processing effects to simulate the sound characteristics of NOAA Weather Radio broadcasts.
+   * @function applyNWREffect
+   * @description
+   *     Applies a National Weather Radio (NWR)-style audio effect to a PCM16
+   *     buffer, including high-pass and low-pass filtering, soft clipping
+   *     compression, and optional bit reduction to simulate vintage broadcast
+   *     characteristics.
    *
    * @private
    * @static
-   * @param {Int16Array} int16 
-   * @param {number} [sampleRate=8000] 
-   * @returns {*} 
+   * @param {Int16Array} int16
+   *     The input PCM16 audio data.
+   * @param {number} [sampleRate=8000]
+   *     The sample rate in Hz of the input audio.
+   *
+   * @returns {Int16Array}
+   *     A new PCM16 buffer with the NWR-style audio effect applied.
    */
   static applyNWREffect(int16, sampleRate = 8e3) {
     const hpCut = 3555;
@@ -3099,13 +3616,21 @@ var EAS = class {
     return this.floatToPcm16(x);
   }
   /**
-   * addNoise adds low-level white noise to an Int16Array of PCM 16-bit samples to simulate analog broadcast imperfections.
+   * @function addNoise
+   * @description
+   *     Adds random noise to a PCM16 audio buffer and normalizes the signal
+   *     to prevent clipping. Useful for simulating real-world signal conditions
+   *     or reducing digital artifacts.
    *
    * @private
    * @static
-   * @param {Int16Array} int16 
-   * @param {number} [noiseLevel=0.02] 
-   * @returns {*} 
+   * @param {Int16Array} int16
+   *     The input PCM16 audio data.
+   * @param {number} [noiseLevel=0.02]
+   *     The amplitude of noise to add (0.0–1.0 scale).
+   *
+   * @returns {Int16Array}
+   *     A new PCM16 buffer with added noise and normalized amplitude.
    */
   static addNoise(int16, noiseLevel = 0.02) {
     const x = this.pcm16toFloat(int16);
@@ -3116,12 +3641,19 @@ var EAS = class {
     return this.floatToPcm16(x);
   }
   /**
-   * asciiTo8N1Bits converts an ASCII string to a sequence of bits using 8-N-1 encoding (8 data bits, no parity, 1 stop bit).
+   * @function asciiTo8N1Bits
+   * @description
+   *     Converts an ASCII string into a sequence of bits using the 8N1 framing
+   *     convention (1 start bit, 8 data bits, 2 stop bits) commonly used in
+   *     serial and EAS transmissions.
    *
    * @private
    * @static
-   * @param {string} str 
-   * @returns {{}} 
+   * @param {string} str
+   *     The ASCII string to convert into a bit sequence.
+   *
+   * @returns {number[]}
+   *     An array of 0s and 1s representing the framed bit sequence for each character.
    */
   static asciiTo8N1Bits(str) {
     const bits = [];
@@ -3134,13 +3666,21 @@ var EAS = class {
     return bits;
   }
   /**
-   * generateAFSK generates an Int16Array of PCM 16-bit samples representing AFSK modulation of the provided bit sequence.
+   * @function generateAFSK
+   * @description
+   *     Converts a sequence of bits into AFSK-modulated PCM16 audio data for EAS
+   *     alerts. Applies a fade-in and fade-out to reduce clicks and generates
+   *     the audio at the specified sample rate.
    *
    * @private
    * @static
-   * @param {number[]} bits 
-   * @param {number} [sampleRate=8000] 
-   * @returns {*} 
+   * @param {number[]} bits
+   *     Array of 0 and 1 representing the bit sequence to encode.
+   * @param {number} [sampleRate=8000]
+   *     Sample rate in Hz for the generated audio.
+   *
+   * @returns {Int16Array}
+   *     The PCM16 audio data representing the AFSK-modulated bit sequence.
    */
   static generateAFSK(bits, sampleRate = 8e3) {
     const baud = 520.83;
@@ -3173,15 +3713,27 @@ var EAS = class {
     return Int16Array.from(result);
   }
   /**
-   * generateSAMEHeader generates an Int16Array of PCM 16-bit samples representing the SAME header repeated the specified number of times.
+   * @function generateSAMEHeader
+   * @description
+   *     Generates a SAME (Specific Area Message Encoding) audio header for
+   *     EAS alerts. Converts a VTEC string into AFSK-modulated PCM16 audio,
+   *     optionally repeating the signal with pre-mark and gap intervals.
    *
    * @private
    * @static
-   * @param {string} vtec 
-   * @param {number} repeats 
-   * @param {number} [sampleRate=8000] 
-   * @param {{preMarkSec?: number, gapSec?: number}} [options={}] 
-   * @returns {*} 
+   * @param {string} vtec
+   *     The VTEC code string to encode into the SAME header.
+   * @param {number} repeats
+   *     Number of times to repeat the SAME burst sequence.
+   * @param {number} [sampleRate=8000]
+   *     Sample rate in Hz for the generated audio.
+   * @param {{preMarkSec?: number, gapSec?: number}} [options={}]
+   *     Optional timing adjustments:
+   *       - preMarkSec: Duration of the pre-mark tone before the data (seconds).
+   *       - gapSec: Silence gap between bursts (seconds).
+   *
+   * @returns {Int16Array}
+   *     The concatenated PCM16 audio data representing the SAME header.
    */
   static generateSAMEHeader(vtec, repeats, sampleRate = 8e3, options = {}) {
     var _a, _b;
@@ -3212,12 +3764,13 @@ var AlertManager = class {
     this.start(metadata);
   }
   /**
-   * setDisplayName allows you to set or update the nickname of the client for identification purposes.
-   * This does require you to restart the XMPP client if you are using NoaaWeatherWireService for primary data.
-   * Changing this setting does not affect the username used for authentication.
-   * 
-   * @public
-   * @param {?string} [name] 
+   * @function setDisplayName
+   * @description
+   *     Sets the display nickname for the NWWS XMPP session. Trims the provided
+   *     name and validates it, emitting a warning if the name is empty or invalid.
+   *
+   * @param {string} [name]
+   *     The desired display name or nickname.
    */
   setDisplayName(name) {
     const settings2 = settings;
@@ -3226,15 +3779,19 @@ var AlertManager = class {
       utils_default.warn(definitions.messages.invalid_nickname);
       return;
     }
-    settings2.NoaaWeatherWireService.clientCredentials.nickname = trimmed;
+    settings2.noaa_weather_wire_service_settings.credentials.nickname = trimmed;
   }
   /**
-   * This will set custom coordinates based on given paramters and key name. This will be used to 
-   * get the distance between each alert at a given coord in either miles or kilometers.
+   * @function setCurrentLocation
+   * @description
+   *     Sets the current location with a name and geographic coordinates.
+   *     Validates the coordinates before updating the cache, emitting warnings
+   *     if values are missing or invalid.
    *
-   * @public
-   * @param {string} locationName 
-   * @param {?types.Coordinates} [coordinates] 
+   * @param {string} locationName
+   *     The name of the location to set.
+   * @param {types.Coordinates} [coordinates]
+   *     The latitude and longitude of the location.
    */
   setCurrentLocation(locationName, coordinates) {
     if (!coordinates) {
@@ -3249,13 +3806,19 @@ var AlertManager = class {
     cache.currentLocations[locationName] = coordinates;
   }
   /**
-   * createEasAudio generates EAS audio files based on the provided description and header information.
+   * @function createEasAudio
+   * @description
+   *     Generates an EAS (Emergency Alert System) audio file using the provided
+   *     description and header.
    *
-   * @public
    * @async
-   * @param {string} description 
-   * @param {string} header 
-   * @returns {unknown} 
+   * @param {string} description
+   *     The main content of the alert to include in the audio.
+   * @param {string} header
+   *     The header of the alert.
+   *
+   * @returns {Promise<Buffer>}
+   *     Resolves with a Buffer containing the generated audio data.
    */
   createEasAudio(description, header) {
     return __async(this, null, function* () {
@@ -3263,10 +3826,13 @@ var AlertManager = class {
     });
   }
   /**
-   * getAllAlertTypes provides a comprehensive list of all possible alert event and action combinations
+   * @function getAllAlertTypes
+   * @description
+   *     Generates a list of all possible alert types by combining defined
+   *     event names with action names.
    *
-   * @public
-   * @returns {{}} 
+   * @returns {string[]}
+   *     An array of strings representing all possible event-action alert types.
    */
   getAllAlertTypes() {
     const events2 = new Set(Object.values(definitions.events));
@@ -3276,13 +3842,20 @@ var AlertManager = class {
     );
   }
   /**
-   * searchAlertDatbase allows you to search the internal alert database for previously received alerts up to 50,000 records.
+   * @function searchStanzaDatabase
+   * @description
+   *     Searches the stanza database for entries containing the specified query.
+   *     Escapes SQL wildcard characters and returns results in descending order
+   *     by ID, up to the specified limit.
    *
-   * @public
    * @async
-   * @param {string} query 
+   * @param {string} query
+   *     The search string to look for in the stanza content.
    * @param {number} [limit=250]
-   * @returns {unknown} 
+   *     Maximum number of results to return.
+   *
+   * @returns {Promise<any[]>}
+   *     Resolves with an array of matching database rows.
    */
   searchStanzaDatabase(query, limit = 250) {
     return __async(this, null, function* () {
@@ -3292,14 +3865,16 @@ var AlertManager = class {
     });
   }
   /**
-   * setSettings allow you to dynamically update the settings of the AlertManager instance. This doesn't
-   * require a refresh of the instance. However, if you are switching to NWWS->NWS or vice versa,
-   * you will need to call stop() and then start() for changes to take effect.
+   * @function setSettings
+   * @description
+   *     Merges the provided client settings into the current configuration,
+   *     preserving nested structures.
    *
-   * @public
    * @async
-   * @param {types.ClientSettings} settings 
-   * @returns {Promise<void>} 
+   * @param {types.ClientSettingsTypes} settings
+   *     The settings to merge into the current client configuration.
+   * @returns {Promise<void>}
+   *     Resolves once the settings have been merged.
    */
   setSettings(settings2) {
     return __async(this, null, function* () {
@@ -3307,33 +3882,35 @@ var AlertManager = class {
     });
   }
   /**
-   * "on" allows the client to listen for specific events emitted by the parser.
-   * Events include:
-   * - onAlerts: Emitted when a batch of new alerts have been fully parsed
-   * - onMessage: Emitted when a raw CAP/XML has been parsed by the StanzaParser
-   * - onConnection: Emitted when the XMPP client connects successfully
-   * - onReconnect: Emitted when the XMPP client is attempting to reconnect
-   * - onOccupant: Emitted when an occupant joins or leaves the XMPP MUC room (NWWS only)
-   * - onAnyEventType (Ex. onTornadoWarning) Emitted when a specific alert event type is received
-   * - log: Emitted for general log messages from the parser
-   * 
-   * @public
-   * @param {string} event 
-   * @param {(...args: any[]) => void} callback 
+   * @function on
+   * @description
+   *     Registers a callback for a specific event and returns a function
+   *     to unregister the listener.
+   *
+   * @param {string} event
+   *     The name of the event to listen for.
+   * @param {(...args: any[]) => void} callback
+   *     The function to call when the event is emitted.
+   *
    * @returns {() => void}
+   *     A function that removes the registered event listener when called.
    */
   on(event, callback) {
     cache.events.on(event, callback);
     return () => cache.events.off(event, callback);
   }
   /**
-   * start initializes the AlertManager instance, setting up necessary configurations and connections.
-   * This method must be called before the instance can begin processing alerts.
+   * @function start
+   * @description
+   *     Initializes the client with the provided settings, starts the NWWS XMPP
+   *     session if applicable, loads cached messages, and sets up scheduled
+   *     tasks (cron jobs) for ongoing processing.
    *
-   * @public
    * @async
-   * @param {Record<string, string>} [metadata={}] 
-   * @returns {Promise<void>} 
+   * @param {types.ClientSettingsTypes} metadata
+   *     Client settings used to configure session, caching, and filtering behavior.
+   * @returns {Promise<void>}
+   *     Resolves once initialization and scheduling are complete.
    */
   start(metadata) {
     return __async(this, null, function* () {
@@ -3344,9 +3921,9 @@ var AlertManager = class {
       }
       this.setSettings(metadata);
       const settings2 = settings;
-      this.isNoaaWeatherWireService = settings2.isNWWS;
+      this.isNoaaWeatherWireService = settings2.is_wire;
       cache.isReady = false;
-      while (!utils_default.isReadyToProcess((_b = (_a = settings2.global.alertFiltering.locationFiltering) == null ? void 0 : _a.filter) != null ? _b : false)) {
+      while (!utils_default.isReadyToProcess((_b = (_a = settings2.global_settings.filtering.location) == null ? void 0 : _a.filter) != null ? _b : false)) {
         yield utils_default.sleep(2e3);
       }
       if (this.isNoaaWeatherWireService) {
@@ -3368,18 +3945,22 @@ var AlertManager = class {
         }
         this.job = null;
       }
-      const interval = !this.isNoaaWeatherWireService ? settings2.NationalWeatherService.checkInterval : 5;
+      const interval = !this.isNoaaWeatherWireService ? settings2.national_weather_service_settings.interval : 5;
       this.job = new packages.jobs.Cron(`*/${interval} * * * * *`, () => {
         utils_default.handleCronJob(this.isNoaaWeatherWireService);
       });
     });
   }
   /**
-   * stop terminates the AlertManager instance, closing any active connections and cleaning up resources.
+   * @function stop
+   * @description
+   *     Stops active scheduled tasks (cron job) and, if connected, the NWWS
+   *     XMPP session. Updates relevant cache flags to indicate the session
+   *     is no longer active.
    *
-   * @public
    * @async
    * @returns {Promise<void>}
+   *     Resolves once all tasks and the session have been stopped.
    */
   stop() {
     return __async(this, null, function* () {

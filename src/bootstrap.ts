@@ -70,58 +70,58 @@ export const cache = {
 
 export const settings = { 
     database: path.join(process.cwd(), 'shapefiles.db'),
-    isNWWS: true,
+    is_wire: true,
     journal: true,
-    NoaaWeatherWireService: {
-        clientReconnections: {
-            canReconnect: true,
-            currentInterval: 60,
+    noaa_weather_wire_service_settings: {
+        reconnection_settings: {
+            enabled: true,
+            interval: 60,
         },
-        clientCredentials: {
+        credentials: {
             username: null,
             password: null,
             nickname: "AtmosphericX Standalone Parser",
         },   
         cache: {
-            read: false,
-            maxSizeMB: 5,
-            maxHistory: 5000,
+            enabled: false,
+            max_file_size: 5,
+            max_db_history: 5000,
             directory: null,
         },
-        alertPreferences: {
-            isCapOnly: false,
-            isShapefileUGC: false,
+        preferences: {
+            cap_only: false,
+            shapefile_coordinates: false,
         }
     },
-    NationalWeatherService: {
-        checkInterval: 15,
+    national_weather_service_settings: {
+        interval: 15,
         endpoint: `https://api.weather.gov/alerts/active`,
     },
-    global: {
-        useParentEvents: true,
-        betterEventParsing: true,
-        alertFiltering: {
-            filteredEvents: [],
-            filteredICOAs: [],
-            ignoredICOAs: [`KWNS`],
-            ignoredEvents: [`Xx`, `Test Message`],
-            ugcFilter: [],
-            stateFilter: [],
-            checkExpired: true,
-            ignoreTestProducts: true,
-            locationFiltering: {
-                maxDistance: 100,
+    global_settings: {
+        parent_events_only: true,
+        better_event_parsing: true,
+        filtering: {
+            events: [],
+            filtered_icoa: [],
+            ignored_icoa: [`KWNS`],
+            ignored_events: [`Xx`, `Test Message`],
+            ugc_filter: [],
+            state_filter: [],
+            check_expired: true,
+            ignore_text_products: true,
+            location: {
+                max_distance: 100,
                 unit: `miles`,
                 filter: false
             },
         },
-        easSettings: {
-            easDirectory: null,
-            easIntroWav: null,
-            festivalVoice: `kal_diphone`,
+        eas_settings: {
+            directory: null,
+            intro_wav: null,
+            festival_tts_voice: `kal_diphone`,
         }
     }
-}
+};
 
 
 export const definitions = {
@@ -178,7 +178,7 @@ export const definitions = {
         shapefile_creation_finished: `SHAPEFILES HAVE BEEN SUCCESSFULLY CREATED AND THE DATABASE IS READY FOR USE!`,
         not_ready: `You can NOT create another instance without shutting down the current one first, please make sure to call the stop() method first!`,
         invalid_nickname: `The nickname you provided is invalid, please provide a valid nickname to continue.`,
-        eas_no_directory: `You have not set a directory for EAS audio files to be saved to, please set the 'easDirectory' setting in the global settings to enable EAS audio generation.`,
+        eas_no_directory: `You have not set a directory for EAS audio files to be saved to, please set the 'directory' setting in the global settings to enable EAS audio generation.`,
         invalid_coordinates: `The coordinates you provided are invalid, please provide valid latitude and longitude values. Attempted: {lat}, {lon}.`,
         no_current_locations: `No current location has been set, operations will be haulted until a location is set or location filtering is disabled.`,
         disabled_location_warning: `Exceeded maximum warnings for invalid or missing lat/lon coordinates. Location filtering has been ignored until you set valid coordinates or disable location filtering.`,

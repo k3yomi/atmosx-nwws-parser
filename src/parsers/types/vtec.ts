@@ -20,15 +20,33 @@ import EventParser from '../events';
 export class VTECAlerts {
 
     /**
-     * event processes validated VTEC alert messages, extracting relevant information and compiling it into structured event objects.
+     * @function event
+     * @description
+     *     Processes a validated stanza message, extracting VTEC and UGC entries,
+     *     computing base properties, generating headers, and preparing structured
+     *     event objects for downstream handling. Each extracted event is enriched
+     *     with metadata, performance timing, and history information.
      *
-     * @public
      * @static
      * @async
-     * @param {types.TypeCompiled} validated 
-     * @returns {*} 
+     * @param {types.StanzaCompiled} validated
+     *     The validated stanza object containing message text, attributes,
+     *     and metadata.
+     *
+     * @returns {Promise<void>}
+     *     This method does not return a value. It processes events and
+     *     invokes `EventParser.validateEvents` to filter and emit them.
+     *
+     * @remarks
+     *     - Splits multi-stanza messages using `$$` as a delimiter.
+     *     - Extracts VTEC entries using `VtecParser.vtecExtractor`.
+     *     - Extracts UGC entries using `UgcParser.ugcExtractor`.
+     *     - Calls `EventParser.getBaseProperties` to compile core event properties.
+     *     - Computes an EAS header using `EventParser.getHeader`.
+     *     - Tracks performance timing for each processed message.
+     *     - Calls `EventParser.validateEvents` to filter and emit final events.
      */
-    public static async event(validated: types.TypeCompiled) {
+    public static async event(validated: types.StanzaCompiled) {
         let processed = [] as unknown[];
         const messages = validated.message.split(/(?=\$\$)/g)?.map(msg => msg.trim());
         if (!messages || messages.length == 0) return;
@@ -40,8 +58,8 @@ export class VTECAlerts {
             if (getVTEC != null && getUGC != null) {
                 for (let j = 0; j < getVTEC.length; j++) {
                     const vtec = getVTEC[j];
-                    const getBaseProperties = await EventParser.getBaseProperties(message, validated, getUGC, vtec) as types.BaseProperties;
-                    const getHeader = EventParser.getHeader({ ...validated.attributes, ...getBaseProperties.attributes } as types.TypeAttributes, getBaseProperties, vtec);
+                    const getBaseProperties = await EventParser.getBaseProperties(message, validated, getUGC, vtec) as types.EventProperties;
+                    const getHeader = EventParser.getHeader({ ...validated.attributes, ...getBaseProperties.attributes } as types.StanzaAttributes, getBaseProperties, vtec);
                     processed.push({
                         performance: performance.now() - tick,
                         source: `vtec-parser`,

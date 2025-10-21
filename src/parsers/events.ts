@@ -1,15 +1,4 @@
-/*
-                                            _               _     __   __
-         /\  | |                           | |             (_)    \ \ / /
-        /  \ | |_ _ __ ___   ___  ___ _ __ | |__   ___ _ __ _  ___ \ V / 
-       / /\ \| __| "_ ` _ \ / _ \/ __| "_ \| "_ \ / _ \ "__| |/ __| > <  
-      / ____ \ |_| | | | | | (_) \__ \ |_) | | | |  __/ |  | | (__ / . \ 
-     /_/    \_\__|_| |_| |_|\___/|___/ .__/|_| |_|\___|_|  |_|\___/_/ \_\
-                                     | |                                 
-                                     |_|                                                                                                                
-    
-    Written by: KiyoWx (k3yomi)                
-*/
+
 
 import * as loader from '../bootstrap';
 import * as types from '../types';
@@ -25,21 +14,58 @@ import Utils from '../utils';
 
 export class EventParser {
 
-    
     /**
-     * getBaseProperties extracts and compiles the base properties of an alert message, including location, timing, description, sender information, and various parameters.
+     * @function getBaseProperties
+     * @description
+     *     Extracts and compiles the core properties of a weather
+     *     alert message into a structured object. Combines parsed
+     *     textual data, UGC information, VTEC entries, and additional
+     *     metadata for downstream use.
      *
-     * @public
      * @static
      * @async
-     * @param {string} message 
-     * @param {types.TypeCompiled} validated 
-     * @param {types.UGCEntry} [ugc=null] 
-     * @param {types.VtecEntry} [vtec=null] 
-     * @returns {Promise<types.BaseProperties>} 
+     * @param {string} message
+     *     The raw text of the weather alert or CAP/TEXT product.
+     *
+     * @param {types.StanzaCompiled} validated
+     *     The validated stanza object containing attributes,
+     *     flags, and metadata.
+     *
+     * @param {types.UGCEntry} [ugc=null]
+     *     Optional UGC entry object providing zones, locations, and
+     *     expiry information.
+     *
+     * @param {types.VtecEntry} [vtec=null]
+     *     Optional VTEC entry object for extracting tracking,
+     *     type, and expiration information.
+     *
+     * @returns {Promise<Record<string, any>>}
+     *     A promise resolving to a fully structured object with:
+     *     - locations: string of all UGC locations.
+     *     - issued: ISO string of the issued timestamp.
+     *     - expires: ISO string of the expiry timestamp.
+     *     - geocode: Object with UGC zone identifiers.
+     *     - description: Parsed description of the alert.
+     *     - sender_name: Name of issuing office.
+     *     - sender_icao: ICAO code of issuing office.
+     *     - attributes: Combined stanza attributes with AWIP info.
+     *     - parameters: Extracted hazard parameters (tornado, hail, wind, flood, etc.).
+     *     - geometry: Polygon coordinates if available or derived from shapefiles.
+     *
+     * @remarks
+     *     - Falls back to shapefile coordinates if no polygon is in the message
+     *       and shapefile preferences are enabled.
+     *     - Uses multiple helper methods including:
+     *       - `TextParser.textProductToString`
+     *       - `TextParser.textProductToPolygon`
+     *       - `TextParser.textProductToDescription`
+     *       - `this.getICAO`
+     *       - `this.getCorrectIssuedDate`
+     *       - `this.getCorrectExpiryDate`
+     *       - `TextParser.awipTextToEvent`
      */
-    public static async getBaseProperties(message: string, validated: types.TypeCompiled, ugc: types.UGCEntry = null, vtec: types.VtecEntry = null) {
-        const settings = loader.settings as types.ClientSettings;
+    public static async getBaseProperties(message: string, validated: types.StanzaCompiled, ugc: types.UGCEntry = null, vtec: types.VtecEntry = null) {
+        const settings = loader.settings as types.ClientSettingsTypes;
         const definitions = {
             tornado: TextParser.textProductToString(message, `TORNADO...`) || TextParser.textProductToString(message, `WATERSPOUT...`) || `N/A`,
             hail: TextParser.textProductToString(message, `MAX HAIL SIZE...`, [`IN`]) || TextParser.textProductToString(message, `HAIL...`, [`IN`]) || `N/A`,
@@ -86,24 +112,43 @@ export class EventParser {
             },
             geometry: definitions.polygon.length > 0 ? { type: "Polygon", coordinates: definitions.polygon } : null
         };
-        if (settings.NoaaWeatherWireService.alertPreferences.isShapefileUGC && base.geometry == null && ugc != null) {
+        if (settings.noaa_weather_wire_service_settings.preferences.shapefile_coordinates && base.geometry == null && ugc != null) {
             const coordinates = await UGCParser.getCoordinates(ugc.zones);
             base.geometry = { type: "Polygon", coordinates };
         }
         return base;
     }
-
+    
     /**
-     * betterParsedEventName refines the event name based on specific conditions and tags found in the event's description and parameters.
+     * @function betterParsedEventName
+     * @description
+     *     Enhances the parsing of an event name using additional criteria
+     *     from its description and parameters. Can optionally use
+     *     the original parent event name instead.
      *
-     * @public
      * @static
-     * @param {types.TypeAlert} event 
+     * @param {types.EventCompiled} event
+     *     The event object containing properties such as `event`,
+     *     `description`, and `parameters` to analyze for better parsing.
+     *
      * @param {boolean} [betterParsing=false]
+     *     Whether to attempt enhanced parsing using `enhancedEvents` definitions.
+     *
      * @param {boolean} [useParentEvents=false]
-     * @returns {{ eventName: any }}
+     *     If true, returns the original parent event name instead of
+     *     the parsed/enhanced name.
+     *
+     * @returns {string}
+     *     Returns the improved or original event name based on the
+     *     parsing rules and flags.
+     *
+     * @remarks
+     *     - Uses `loader.definitions.enhancedEvents` to map base events to
+     *       more specific event names depending on conditions.
+     *     - Appends `(TPROB)` for certain Severe Thunderstorm Warning events
+     *       if `damage_threat` indicates a possible tornado.
      */
-    public static betterParsedEventName(event: types.TypeAlert, betterParsing?: boolean, useParentEvents?: boolean) {
+    public static betterParsedEventName(event: types.EventCompiled, betterParsing?: boolean, useParentEvents?: boolean) {
         let eventName = event?.properties?.event ?? `Unknown Event`;
         const defEventTable = loader.definitions.enhancedEvents;
         const properties = event?.properties;
@@ -125,25 +170,38 @@ export class EventParser {
         }
         return useParentEvents ? event?.properties?.event : eventName;
     }
-    
+   
     /**
-     * validateEvents determines the correct expiration date for an alert based on VTEC information or UGC zones.
-     * This will filter incoming alerts based on the user's settings and emit events accordingly.
-     * This will also emit specific events based on the alert type for easier handling.
-     * For exmaple, a "Tornado Warning" will emit both "onTornadoWarning" and "onRadarIndicatedTornadoWarning" events.
-     * Then the user can listen to those events individually as needed.
-     * If you want to listen to all alerts, use the "onAlerts" event.
+     * @function validateEvents
+     * @description
+     *     Processes an array of event objects and filters them based on
+     *     global and EAS filtering settings, location constraints, and
+     *     other criteria such as expired or test products. Valid events
+     *     trigger relevant event emitters.
      *
-     * @public
      * @static
-     * @param {unknown[]} events 
+     * @param {unknown[]} events
+     *     An array of events to validate and filter. Each event is
+     *     expected to conform to the internal structure of a compiled alert.
+     *
+     * @returns {void}
+     *     This function does not return a value. Valid and filtered events
+     *     are emitted via the event system (`loader.cache.events`).
+     *
+     * @remarks
+     *     - Events are augmented with default signatures and computed
+     *       distances before filtering.
+     *     - Supports multiple filter categories, including events, ignored
+     *       events, ICAO, UGC codes, and state codes.
+     *     - Emits events for each valid alert, both by parent and by
+     *       specific event name.
      */
     public static validateEvents(events: unknown[]) {
         if (events.length == 0) return;
-        const filteringSettings = loader.settings?.global?.alertFiltering;
-        const locationSettings = filteringSettings?.locationFiltering;
-        const easSettings = loader.settings?.global?.easSettings;
-        const globalSettings = loader.settings?.global;
+        const filteringSettings = loader.settings?.global_settings?.filtering;
+        const locationSettings = filteringSettings?.location;
+        const easSettings = loader.settings?.global_settings?.eas_settings;
+        const globalSettings = loader.settings?.global_settings;
         const sets = {} as Record<string, Set<string>>;
         const bools = {} as Record<string, boolean>;
         const megered = {...filteringSettings, ...easSettings, ...globalSettings, ...locationSettings };
@@ -152,45 +210,52 @@ export class EventParser {
             if (Array.isArray(setting)) { sets[key] = new Set(setting.map(item => item.toLowerCase())); }
             if (typeof setting === 'boolean') { bools[key] = setting; }
         }
-        const filtered = events.filter((alert: types.TypeAlert) => {
+        const filtered = events.filter((alert: types.EventCompiled) => {
             const originalEvent = this.buildDefaultSignature(alert);
             const props = originalEvent?.properties;
             const ugcs = props?.geocode?.UGC ?? [];
             const { performance, header, ...eventWithoutPerformance } = originalEvent;
             originalEvent.properties.parent = originalEvent.properties.event;          
-            originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools?.betterEventParsing, bools?.useParentEvents);
+            originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools?.better_event_parsing, bools?.parent_events_only);
             originalEvent.hash = loader.packages.crypto.createHash('md5').update(JSON.stringify(eventWithoutPerformance)).digest('hex');
-            originalEvent.properties.distance = this.getLocationDistances(props, bools?.filter, locationSettings?.maxDistance, locationSettings?.unit);
+            originalEvent.properties.distance = this.getLocationDistances(props, bools?.filter, locationSettings?.max_distance, locationSettings?.unit);
             if (!originalEvent.properties.distance?.in_range && bools?.filter) { return false; }
-            if (originalEvent.properties.is_test == true && bools?.ignoreTestProducts) return false;
-            if (bools?.checkExpired && originalEvent.properties.is_cancelled == true) return false;
+            if (originalEvent.properties.is_test == true && bools?.ignore_text_products) return false;
+            if (bools?.check_expired && originalEvent.properties.is_cancelled == true) return false;
             for (const key in sets) {
                 const setting = sets[key];
-                if (key === 'filteredEvents' && setting.size > 0 && !setting.has(originalEvent.properties.event.toLowerCase())) return false; // Exit early if invalid event found.
-                if (key === 'ignoredEvents' && setting.size > 0 && setting.has(originalEvent.properties.event.toLowerCase())) return false;
-                if (key === 'filteredICOAs' && setting.size > 0 && props.sender_icao != null && !setting.has(props.sender_icao.toLowerCase())) return false;
-                if (key === 'ignoredICOAs' && setting.size > 0 && props.sender_icao != null && setting.has(props.sender_icao.toLowerCase())) return false;
-                if (key === 'ugcFilter' && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc: string) => setting.has(ugc.toLowerCase()))) return false;
-                if (key === 'stateFilter' && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc: string) => setting.has(ugc.substring(0, 2).toLowerCase()))) return false;
+                if (key === 'events' && setting.size > 0 && !setting.has(originalEvent.properties.event.toLowerCase())) return false; 
+                if (key === 'ignored_events' && setting.size > 0 && setting.has(originalEvent.properties.event.toLowerCase())) return false;
+                if (key === 'filtered_icoa' && setting.size > 0 && props.sender_icao != null && !setting.has(props.sender_icao.toLowerCase())) return false;
+                if (key === 'ignored_icoa' && setting.size > 0 && props.sender_icao != null && setting.has(props.sender_icao.toLowerCase())) return false;
+                if (key === 'ugc_filter' && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc: string) => setting.has(ugc.toLowerCase()))) return false;
+                if (key === 'state_filter' && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc: string) => setting.has(ugc.substring(0, 2).toLowerCase()))) return false;
             }
-            loader.cache.events.emit(`on${originalEvent.properties.parent.replace(/\s+/g, '')}`) // onTornadoWarning
-            loader.cache.events.emit(`on${originalEvent.properties.event.replace(/\s+/g, '')}`) // onRadarIndicatedTornadoWarning
+            loader.cache.events.emit(`on${originalEvent.properties.parent.replace(/\s+/g, '')}`) 
+            loader.cache.events.emit(`on${originalEvent.properties.event.replace(/\s+/g, '')}`) 
             return true;
         })
         if (filtered.length > 0) { loader.cache.events.emit(`onAlerts`, filtered); }
     }
 
     /**
-     * getHeader constructs a standardized alert header string based on provided attributes, properties, and VTEC information.
+     * @function getHeader
+     * @description
+     *     Constructs a standardized alert header string using provided
+     *     stanza attributes, event properties, and optional VTEC data.
      *
-     * @public
      * @static
-     * @param {types.TypeAttributes} attributes 
-     * @param {?types.BaseProperties} [properties] 
-     * @param {?types.VtecEntry} [vtec] 
-     * @returns {string} 
+     * @param {types.StanzaAttributes} attributes
+     *     The stanza attributes containing AWIPS type and related metadata.
+     * @param {types.EventProperties} [properties]
+     *     Optional event properties, such as geocode, issued time, and sender ICAO.
+     * @param {types.VtecEntry} [vtec]
+     *     Optional VTEC entry providing status information for the alert.
+     *
+     * @returns {string}
+     *     A formatted alert header string following the ZCZC header convention.
      */
-    public static getHeader(attributes: types.TypeAttributes, properties?: types.BaseProperties, vtec?: types.VtecEntry) {
+    public static getHeader(attributes: types.StanzaAttributes, properties?: types.EventProperties, vtec?: types.VtecEntry) {
         const parent = `ATSX`
         const alertType = attributes?.awipsType?.type ?? attributes?.getAwip?.prefix ?? `XX`;
         const ugc = properties?.geocode?.UGC != null ? properties?.geocode?.UGC.join(`-`) : `000000`;
@@ -200,16 +265,21 @@ export class EventParser {
         const header = `ZCZC-${parent}-${alertType}-${ugc}-${status}-${issued}-${sender}-`;
         return header
     }
-    
+   
     /**
-     * eventHandler routes the validated alert message to the appropriate event parser based on its type (API, CAP, VTEC, UGC, or plain text).
+     * @function eventHandler
+     * @description
+     *     Routes a validated stanza object to the appropriate alert handler
+     *     based on its type flags: API, CAP, VTEC, UGC, or plain text.
      *
-     * @public
      * @static
-     * @param {types.TypeCompiled} validated 
-     * @returns {*} 
+     * @param {types.StanzaCompiled} validated
+     *     The validated stanza object containing flags and message details
+     *     used to determine the correct alert processing pipeline.
+     *
+     * @returns {void}
      */
-    public static eventHandler(validated: types.TypeCompiled) {
+    public static eventHandler(validated: types.StanzaCompiled) {
         if (validated.isApi) return APIAlerts.event(validated)
         if (validated.isCap) return CAPAlerts.event(validated)
         if (!validated.isCap && validated.isVtec && validated.isUGC) return VTECAlerts.event(validated);
@@ -218,28 +288,43 @@ export class EventParser {
     }
 
     /**
-     * getICAO retrieves the ICAO code and corresponding office name based on VTEC tracking information, message attributes, or WMO code.
+     * @function getICAO
+     * @description
+     *     Determines the ICAO code and corresponding name for an event.
+     *     Priority is given to the VTEC tracking code, then the attributes' `cccc` property, 
+     *     and finally the WMO code if available. Returns "N/A" if none are found.
      *
      * @private
      * @static
-     * @param {types.VtecEntry} vtec 
-     * @param {Record<string, string>} attributes 
-     * @param {(RegExpMatchArray | string | null)} WMO 
-     * @returns {{ icao: any; name: any; }} 
+     * @param {types.VtecEntry | null} vtec
+     *     The VTEC entry object, which may contain tracking information.
+     * @param {Record<string, string>} attributes
+     *     Event attributes object, potentially containing a `cccc` field.
+     * @param {RegExpMatchArray | string | null} WMO
+     *     WMO code or match array, used as a fallback if VTEC and attributes do not provide a code.
+     *
+     * @returns {{ icao: string; name: string }}
+     *     An object containing the ICAO code and its human-readable name.
      */
     private static getICAO(vtec: types.VtecEntry, attributes: Record<string, string>, WMO: RegExpMatchArray | string | null) {
         const icao = vtec != null ? vtec?.tracking.split(`-`)[0] : (attributes?.cccc ?? (WMO != null ? (Array.isArray(WMO) ? WMO[0] : WMO) : `N/A`));
         const name = loader.definitions.ICAO?.[icao] ?? `N/A`;
         return { icao, name };
     }
-    
+
     /**
-     * getCorrectIssuedDate ensures the issued date is valid and falls back to the current date if not.
+     * @function getCorrectIssuedDate
+     * @description
+     *     Determines the issued date for an event based on the provided attributes.
+     *     Falls back to the current date and time if no valid issue date is available.
      *
      * @private
      * @static
-     * @param {Record<string, string>} attributes 
-     * @returns {*} 
+     * @param {Record<string, string>} attributes
+     *     The event attributes object, expected to contain an `issue` property.
+     *
+     * @returns {string}
+     *     A locale-formatted string representing the calculated issued date and time.
      */
     private static getCorrectIssuedDate(attributes: Record<string, string>) {
         const time = attributes.issue != null ? 
@@ -249,15 +334,22 @@ export class EventParser {
         if (time == `Invalid Date`) return new Date().toLocaleString();
         return time;
     }
-    
+
     /**
-     * getCorrectExpiryDate determines the correct expiration date for an alert based on VTEC information or UGC zones.
+     * @function getCorrectExpiryDate
+     * @description
+     *     Determines the most appropriate expiry date for an event using VTEC or UGC data.
+     *     Falls back to one hour from the current time if no valid expiry is available.
      *
      * @private
      * @static
-     * @param {types.VtecEntry} vtec 
-     * @param {types.UGCEntry} ugc 
-     * @returns {*} 
+     * @param {types.VtecEntry} vtec
+     *     The VTEC entry containing a potential `expires` date.
+     * @param {types.UGCEntry} ugc
+     *     The UGC entry containing a potential `expiry` date.
+     *
+     * @returns {string}
+     *     A locale-formatted string representing the calculated expiry date and time.
      */
     private static getCorrectExpiryDate(vtec: types.VtecEntry, ugc: types.UGCEntry) {
         const time =  vtec?.expires && !isNaN(new Date(vtec.expires).getTime()) ? 
@@ -269,23 +361,34 @@ export class EventParser {
     }
 
     /**
-     * getLocationDistances calculates distances from current locations to the alert's geometry and determines if it's within a specified range.
+     * @function getLocationDistances
+     * @description
+     *     Calculates distances from an event's geometry to all current tracked locations.
+     *     Optionally filters locations by a maximum distance.
      *
      * @private
      * @static
-     * @param {?types.BaseProperties} [properties] 
-     * @param {?boolean} [isFiltered] 
-     * @param {?number} [maxDistance] 
-     * @param {?string} [unit] 
-     * @returns {*} 
+     * @param {types.EventProperties} [properties]
+     *     Event properties object which must contain a `geometry` field with coordinates.
+     *     Distances will be added to `properties.distance` keyed by location names.
+     * @param {boolean} [isFiltered=false]
+     *     If true, the returned `in_range` value reflects whether any location is within `maxDistance`.
+     * @param {number} [maxDistance]
+     *     Maximum distance to consider a location "in range" when `isFiltered` is true.
+     * @param {string} [unit='miles']
+     *     Unit of distance measurement: either 'miles' or 'kilometers'. Defaults to 'miles'.
+     *
+     * @returns {{ range?: Record<string, {unit: string, distance: number}>, in_range: boolean }}
+     *     - `range`: Optional object containing distances for each location (unit + distance).
+     *     - `in_range`: True if at least one location is within `maxDistance` or if no filtering is applied.
      */
-    private static getLocationDistances(properties?: types.BaseProperties, isFiltered?: boolean, maxDistance?: number, unit?: string) {
+    private static getLocationDistances(properties?: types.EventProperties, isFiltered?: boolean, maxDistance?: number, unit?: string) {
         let inRange = false;
         const totalTracks = Object.keys(loader.cache.currentLocations).length;
         if (properties.geometry != null) {
             for (const key in loader.cache.currentLocations) {
                 const coordinates = loader.cache.currentLocations[key];
-                const singleCoord = properties.geometry.coordinates; 
+                const singleCoord = properties.geometry.coordinates;
                 const center = singleCoord.reduce((acc, [lat, lon]) => ([acc[0] + lat, acc[1] + lon]), [0, 0]).map(sum => sum / singleCoord.length);
                 const validUnit = unit === 'miles' || unit === 'kilometers' ? unit : 'miles';
                 const distance = Utils.calculateDistance({ lat: coordinates.lat, lon: coordinates.lon }, { lat: center[0], lon: center[1] }, validUnit);
@@ -302,13 +405,25 @@ export class EventParser {
     }
 
     /**
-     * buildDefaultSignature processes and standardizes the event's properties, ensuring proper status correlation, cancellation detection, and expiry handling.
-     * C = Cancelled, U = Updated, I = Issued
-     * 
+     * @function buildDefaultSignature
+     * @description
+     *     Populates default properties for an event object, including action type flags,
+     *     tags, and status updates. Determines if the event is issued, updated, or cancelled
+     *     based on correlations, description content, VTEC codes, and expiration time.
+     *
      * @private
      * @static
-     * @param {*} event The event object to process.
-     * @returns {*} The processed event with updated properties.
+     * @param {any} event
+     *     The event object to process. Expected to have a `properties` object and optionally `vtec`.
+     *
+     * @returns {any}
+     *     The event object with updated `properties`:
+     *       - `is_cancelled`: True if the event is cancelled.
+     *       - `is_updated`: True if the event is updated.
+     *       - `is_issued`: True if the event is newly issued.
+     *       - `tags`: Array of tags derived from the event description.
+     *       - `is_test` (optional): True if the event is a test product.
+     *       - `action_type`: Updated action type after correlation processing.
      */
     private static buildDefaultSignature(event: any) {
         const props = event.properties ?? {};

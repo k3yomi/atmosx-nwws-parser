@@ -19,50 +19,75 @@ import EventParser from '../events';
 export class UGCAlerts {
 
     /**
-     * Generates a tracking identifier based on the sender's ICAO code.
+     * @function getTracking
+     * @description
+     *    Generates a unique tracking identifier for an event using the sender's ICAO
+     *    and some attributes.
      *
      * @private
      * @static
-     * @param {types.BaseProperties} baseProperties
-     * @returns {string}
+     * @param {types.EventProperties} baseProperties 
+     * @returns {string} 
      */
-    private static getTracking(baseProperties: types.BaseProperties) {
-        return `${baseProperties.sender_icao}`
+    private static getTracking(baseProperties: types.EventProperties) {
+        return `${baseProperties.sender_icao}-${baseProperties.attributes.ttaaii}-${baseProperties.attributes.id.slice(-4)}`
     }
 
     /**
-     * Determines the event type based on the message content and provided attributes.
+     * @function getEvent
+     * @description
+     *     Determines the event name from a text message and its AWIPS attributes.
+     *     If the message contains a known offshore event keyword, that offshore
+     *     event is returned. Otherwise, the event type from the AWIPS attributes
+     *     is formatted into a human-readable string with each word capitalized.
      *
      * @private
      * @static
      * @param {string} message
+     *     The raw text of the message to parse for event information.
      * @param {Record<string, any>} attributes
-     * @returns {*}
+     *     The AWIPS attributes associated with the message, typically containing
+     *     the `type` property.
+     *
+     * @returns {string}
+     *     The determined event name, either an offshore event or formatted
+     *     AWIPS type.
      */
     private static getEvent(message: string, attributes: Record<string, any>) {
         const offshoreEvent = Object.keys(loader.definitions.offshore).find(event => message.toLowerCase().includes(event.toLowerCase()));
         if (offshoreEvent) return Object.keys(loader.definitions.offshore).find(event => message.toLowerCase().includes(event.toLowerCase()));
         return attributes.type.split(`-`).map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(` `)
     }
-    
+
     /**
-     * event processes validated UGC alert messages, extracting relevant information and compiling it into structured event objects.
+     * @function event
+     * @description
+     *     Processes a compiled text-based NOAA Stanza message and extracts relevant
+     *     event information. Splits the message into multiple segments based on
+     *     markers such as "$$", "ISSUED TIME...", or separator lines, generates
+     *     base properties, headers, event names, and tracking information for
+     *     each segment, then validates and emits the processed events.
      *
      * @public
      * @static
      * @async
-     * @param {types.TypeCompiled} validated 
-     * @returns {*} 
+     * @param {types.StanzaCompiled} validated
+     *     The validated compiled stanza object containing the original message
+     *     and its attributes.
+     *
+     * @returns {Promise<void>}
+     *     Resolves after all segments of the message have been processed and
+     *     events have been validated and emitted.
      */
-    public static async event(validated: types.TypeCompiled) {
+    public static async event(validated: types.StanzaCompiled) {
         let processed = [] as unknown[];
         const messages = validated.message.split(/(?=\$\$|ISSUED TIME...|=================================================)/g)?.map(msg => msg.trim());
         if (!messages || messages.length == 0) return;
         for (let i = 0; i < messages.length; i++) {
             const tick = performance.now();
             const message = messages[i]
-            const getBaseProperties = await EventParser.getBaseProperties(message, validated) as types.BaseProperties;
-            const getHeader = EventParser.getHeader({ ...validated.attributes, ...getBaseProperties.attributes } as types.TypeAttributes, getBaseProperties);
+            const getBaseProperties = await EventParser.getBaseProperties(message, validated) as types.EventProperties;
+            const getHeader = EventParser.getHeader({ ...validated.attributes, ...getBaseProperties.attributes } as types.StanzaAttributes, getBaseProperties);
             const getEvent = this.getEvent(message, getBaseProperties.attributes.getAwip);
             processed.push({
                 performance: performance.now() - tick,

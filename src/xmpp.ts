@@ -21,19 +21,23 @@ import EventParser from './parsers/events';
 
 
 export class Xmpp { 
-    
+
     /**
-     * isSessionReconnectionEligible checks if the XMPP session is eligible for reconnection based on the last 
-     * received stanza time and current interval.
+     * @function isSessionReconnectionEligible
+     * @description
+     *     Checks if the XMPP session has been inactive longer than the given interval
+     *     and, if so, attempts a controlled reconnection.
      *
-     * @public
-     * @static
      * @async
-     * @param {number} currentInterval 
-     * @returns {Promise<void>} 
+     * @static
+     * @param {number} currentInterval
+     *     The inactivity threshold in seconds before reconnection is triggered.
+     *
+     * @returns {Promise<void>}
+     *     Resolves after reconnection logic completes or no action is needed.
      */
     public static async isSessionReconnectionEligible(currentInterval: number): Promise<void> {
-        const settings = loader.settings as types.ClientSettings;
+        const settings = loader.settings as types.ClientSettingsTypes;
         const lastStanzaElapsed = Date.now() - loader.cache.lastStanza;
         const threshold = currentInterval * 1000;
         if ((!loader.cache.isConnected && !loader.cache.sigHalt) || !loader.cache.session) { return; }
@@ -46,7 +50,7 @@ export class Xmpp {
             loader.cache.events.emit("onReconnection", {
                 reconnects: loader.cache.totalReconnects,
                 lastStanza: lastStanzaElapsed,
-                lastName: settings.NoaaWeatherWireService.clientCredentials.nickname,
+                lastName: settings.noaa_weather_wire_service_settings.credentials.nickname,
             });
             await loader.cache.session.stop().catch(() => {});
             await loader.cache.session.start().catch(() => {});
@@ -58,23 +62,25 @@ export class Xmpp {
     } 
 
     /**
-     * deploySession initializes and starts the XMPP client session, setting up event listeners for 
-     * connection management and message handling. This function is specifically tailored for
-     * NoaaWeatherWireService and connects to their XMPP server.
+     * @function deploySession
+     * @description
+     *     Initializes the NOAA Weather Wire Service (NWWS-OI) XMPP client session and
+     *     manages its lifecycle events including connection, disconnection, errors,
+     *     and message handling.
      *
-     * @public
-     * @static
      * @async
-     * @returns {Promise<void>} 
+     * @static
+     * @returns {Promise<void>}
+     *     Resolves once the XMPP session has started or fails gracefully on error.
      */
     public static async deploySession(): Promise<void> {
-        const settings = loader.settings as types.ClientSettings;
-        settings.NoaaWeatherWireService.clientCredentials.nickname ??= settings.NoaaWeatherWireService.clientCredentials.username;
+        const settings = loader.settings as types.ClientSettingsTypes;
+        settings.noaa_weather_wire_service_settings.credentials.nickname ??= settings.noaa_weather_wire_service_settings.credentials.username;
         loader.cache.session = loader.packages.xmpp.client({
             service: 'xmpp://nwws-oi.weather.gov',
             domain: 'nwws-oi.weather.gov',
-            username: settings.NoaaWeatherWireService.clientCredentials.username,
-            password: settings.NoaaWeatherWireService.clientCredentials.password,
+            username: settings.noaa_weather_wire_service_settings.credentials.username,
+            password: settings.noaa_weather_wire_service_settings.credentials.password,
         });
         loader.cache.session.on('online', async (address: string) => {
             const now = Date.now();
@@ -89,10 +95,10 @@ export class Xmpp {
             loader.cache.sigHalt = false;
             loader.cache.lastConnect = now;
             loader.cache.session.send(loader.packages.xmpp.xml('presence', {
-                to: `nwws@conference.nwws-oi.weather.gov/${settings.NoaaWeatherWireService.clientCredentials.nickname}`,
+                to: `nwws@conference.nwws-oi.weather.gov/${settings.noaa_weather_wire_service_settings.credentials.nickname}`,
                 xmlns: 'http://jabber.org/protocol/muc',
             }));
-            loader.cache.events.emit('onConnection', settings.NoaaWeatherWireService.clientCredentials.nickname);
+            loader.cache.events.emit('onConnection', settings.noaa_weather_wire_service_settings.credentials.nickname);
             if (loader.cache.attemptingReconnect) return;
             loader.cache.attemptingReconnect = true;
             await Utils.sleep(15_000);
@@ -114,8 +120,8 @@ export class Xmpp {
                 if (stanza.is('message')) {
                     const validate = StanzaParser.validate(stanza);
                     const skipMessage = validate.ignore ||
-                            (validate.isCap && !settings.NoaaWeatherWireService.alertPreferences.isCapOnly) ||
-                            (!validate.isCap && settings.NoaaWeatherWireService.alertPreferences.isCapOnly) ||
+                            (validate.isCap && !settings.noaa_weather_wire_service_settings.preferences.cap_only) ||
+                            (!validate.isCap && settings.noaa_weather_wire_service_settings.preferences.cap_only) ||
                             (validate.isCap && !validate.isCapDescription);
                     if (skipMessage) return;
                     EventParser.eventHandler(validate);

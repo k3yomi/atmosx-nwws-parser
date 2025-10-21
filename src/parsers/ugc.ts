@@ -16,15 +16,22 @@ import * as types from '../types';
 
 
 export class UGCParser {
-
+    
     /**
-     * ugcExtractor extracts and parses UGC codes from a given message string.
+     * @function ugcExtractor
+     * @description
+     *     Extracts UGC (Universal Geographic Code) information from a message.
+     *     This includes parsing the header, resolving zones, calculating the expiry
+     *     date, and retrieving associated location names from the database.
      *
-     * @public
      * @static
      * @async
-     * @param {string} message 
-     * @returns {unknown} 
+     * @param {string} message
+     *     The message string containing UGC data.
+     *
+     * @returns {Promise<types.UGCEntry | null>}
+     *     Resolves with a `UGCEntry` object containing `zones`, `locations`, and
+     *     `expiry` if parsing is successful; otherwise `null`.
      */
     public static async ugcExtractor(message: string): Promise<types.UGCEntry | null> {
         const header = this.getHeader(message);
@@ -41,12 +48,18 @@ export class UGCParser {
     }
 
     /**
-     * getHeader extracts the UGC header from a UGC message string.
+     * @function getHeader
+     * @description
+     *     Extracts the UGC header from a message by locating patterns defined in
+     *     `ugc1` and `ugc2` regular expressions. Removes all whitespace and the
+     *     trailing character from the matched header.
      *
-     * @public
      * @static
-     * @param {string} message 
-     * @returns {*} 
+     * @param {string} message
+     *     The message string containing a UGC header.
+     *
+     * @returns {string | null}
+     *     The extracted UGC header as a string, or `null` if no valid header is found.
      */
     public static getHeader(message: string): string | null {
         const start = message.search(new RegExp(loader.definitions.expressions.ugc1, "gimu"));
@@ -59,12 +72,20 @@ export class UGCParser {
     }
 
     /**
-     * getExpiry extracts the expiry date and time from a UGC message and returns it as a Date object.
+     * @function getExpiry
+     * @description
+     *     Extracts an expiration date from a message using the UGC3 format.
+     *     The function parses day, hour, and minute from the message and constructs
+     *     a Date object in the current month and year. Returns `null` if no valid
+     *     expiration is found.
      *
-     * @public
      * @static
-     * @param {string} message 
-     * @returns {*} 
+     * @param {string} message
+     *     The message string containing a UGC3-formatted expiration timestamp.
+     *
+     * @returns {Date | null}
+     *     A JavaScript Date object representing the expiration time, or `null` if
+     *     the expiration could not be parsed.
      */
     public static getExpiry(message: string): Date | null {
         const start = message.match(new RegExp(loader.definitions.expressions.ugc3, "gimu"));
@@ -80,13 +101,19 @@ export class UGCParser {
     }
 
     /**
-     * getLocations retrieves unique location names for the provided UGC zone codes from the database.
+     * @function getLocations
+     * @description
+     *     Retrieves human-readable location names for an array of zone identifiers
+     *     from the shapefiles database. If a zone is not found, the zone ID itself
+     *     is returned. Duplicate locations are removed and the result is sorted.
      *
-     * @public
      * @static
      * @async
-     * @param {String[]} zones 
-     * @returns {unknown} 
+     * @param {string[]} zones
+     *     An array of zone identifiers to look up in the shapefiles database.
+     *
+     * @returns {Promise<string[]>}
+     *     A sorted array of unique location names corresponding to the given zones.
      */
     public static async getLocations (zones: String[]): Promise<string[]> {
         const locations: string[] = [];
@@ -101,12 +128,19 @@ export class UGCParser {
     }
 
     /**
-     * getCoordinates retrieves geographical coordinates for the provided UGC zone codes from the database.
+     * @function getCoordinates
+     * @description
+     *     Retrieves geographic coordinates for an array of zone identifiers
+     *     from the shapefiles database. Returns the coordinates of the first
+     *     polygon found for any matching zone.
      *
-     * @public
      * @static
-     * @param {String[]} zones 
-     * @returns {{}} 
+     * @param {string[]} zones
+     *     An array of zone identifiers to look up in the shapefiles database.
+     *
+     * @returns {[number, number][]}
+     *     An array of latitude-longitude coordinate pairs corresponding to
+     *     the first polygon found for the given zones.
      */
     public static getCoordinates (zones: String[]): [number, number][] {
         let coordinates: [number, number][] = [];
@@ -127,12 +161,18 @@ export class UGCParser {
     }
 
     /**
-     * getZones parses a UGC header string and returns an array of individual UGC zone codes.
+     * @function getZones
+     * @description
+     *     Parses a UGC header string and returns an array of individual zone
+     *     identifiers. Handles ranges indicated with `>` and preserves the
+     *     state and format prefixes.
      *
-     * @public
      * @static
-     * @param {string} header 
-     * @returns {*} 
+     * @param {string} header
+     *     The UGC header string containing one or more zone codes or ranges.
+     *
+     * @returns {string[]}
+     *     An array of zone identifiers extracted from the header.
      */
     public static getZones(header: string): string[] {
         const ugcSplit = header.split('-');

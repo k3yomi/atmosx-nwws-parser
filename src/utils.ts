@@ -19,26 +19,34 @@ import EventParser from './parsers/events';
 import Xmpp from './xmpp';
 
 export class Utils { 
-
+    
     /**
-     * Zzzzzzz... yeah not much to explain here. Simple sleep function that returns a promise after the specified milliseconds.
+     * @function sleep
+     * @description
+     *     Pauses execution for a specified number of milliseconds.
      *
-     * @public
      * @static
      * @async
-     * @param {number} ms 
-     * @returns {Promise<void>} 
+     * @param {number} ms
+     *     The number of milliseconds to sleep.
+     * @returns {Promise<void>}
+     *     Resolves after the specified delay.
      */
     public static async sleep(ms: number) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     /**
-     * warn logs a warning message to the console with a standardized format.
+     * @function warn
+     * @description
+     *     Emits a log event and prints a warning to the console. Throttles repeated
+     *     warnings within a short interval unless `force` is `true`.
      *
-     * @public
      * @static
-     * @param {string} message 
+     * @param {string} message
+     *     The warning message to log and display.
+     * @param {boolean} [force=false]
+     *     If `true`, bypasses throttling and forces the warning to be displayed.
      */
     public static warn(message: string, force: boolean = false) {
         loader.cache.events.emit('log', message)
@@ -47,21 +55,23 @@ export class Utils {
         loader.cache.lastWarn = Date.now();
         console.warn(`\x1b[33m[ATMOSX-PARSER]\x1b[0m [${new Date().toLocaleString()}] ${message}`);
     }
-    
+
     /**
-     * loadCollectionCache reads cached alert files from the specified cache directory and processes them.
+     * @function loadCollectionCache
+     * @description
+     *     Loads cached NWWS messages from disk, validates them, and passes them
+     *     to the event parser. Honors CAP preferences and ignores empty or
+     *     incompatible files.
      *
-     * @public
      * @static
      * @async
-     * @returns {Promise<void>} 
      */
     public static async loadCollectionCache() {
         try {
-            const settings = loader.settings as types.ClientSettings;
-            if (settings.NoaaWeatherWireService.cache.read && settings.NoaaWeatherWireService.cache.directory) {
-                if (!loader.packages.fs.existsSync(settings.NoaaWeatherWireService.cache.directory)) return;
-                const cacheDir = settings.NoaaWeatherWireService.cache.directory;
+            const settings = loader.settings as types.ClientSettingsTypes;
+            if (settings.noaa_weather_wire_service_settings.cache.enabled && settings.noaa_weather_wire_service_settings.cache.directory) {
+                if (!loader.packages.fs.existsSync(settings.noaa_weather_wire_service_settings.cache.directory)) return;
+                const cacheDir = settings.noaa_weather_wire_service_settings.cache.directory;
                 const getAllFiles = loader.packages.fs.readdirSync(cacheDir).filter((file: string) => file.endsWith('.bin') && file.startsWith('cache-'));
                 this.warn(loader.definitions.messages.dump_cache.replace(`{count}`, getAllFiles.length.toString()), true);
                 await this.sleep(2000);
@@ -71,8 +81,8 @@ export class Utils {
                     const readSize = loader.packages.fs.statSync(filepath).size;
                     if (readSize == 0) { continue; }
                     const isCap = readFile.includes(`<?xml`);
-                    if (isCap && !settings.NoaaWeatherWireService.alertPreferences.isCapOnly) continue;
-                    if (!isCap && settings.NoaaWeatherWireService.alertPreferences.isCapOnly) continue;
+                    if (isCap && !settings.noaa_weather_wire_service_settings.preferences.cap_only) continue;
+                    if (!isCap && settings.noaa_weather_wire_service_settings.preferences.cap_only) continue;
                     const validate = StanzaParser.validate(readFile, { awipsid: file, isCap: isCap, raw: true, issue: undefined });
                     await EventParser.eventHandler(validate);
                 }
@@ -84,18 +94,19 @@ export class Utils {
     }
 
     /**
-     * loadGeoJsonData fetches GeoJSON data from the National Weather Service endpoint and processes each alert.
+     * @function loadGeoJsonData
+     * @description
+     *     Fetches GeoJSON data from the National Weather Service endpoint and
+     *     passes it to the event parser for processing.
      *
-     * @public
      * @static
      * @async
-     * @returns {Promise<void>} 
      */
     public static async loadGeoJsonData() {
         try {
-            const settings = loader.settings as types.ClientSettings;
-            const response = await this.createHttpRequest<types.NationalWeatherServiceResponse>(
-                settings.NationalWeatherService.endpoint
+            const settings = loader.settings as types.ClientSettingsTypes;
+            const response = await this.createHttpRequest<types.GenericHTTPResponse >(
+                settings.national_weather_service_settings.endpoint
             );
             if (response.error) return;
             EventParser.eventHandler({
@@ -115,16 +126,22 @@ export class Utils {
         }
     }
 
-    
     /**
-     * createHttpRequest performs an HTTP GET request to the specified URL with optional settings.
+     * @function createHttpRequest
+     * @description
+     *     Performs an HTTP GET request with default headers and timeout, returning
+     *     either the response data or an error message.
      *
-     * @public
      * @static
-     * @async
-     * @param {string} url 
-     * @param {?types.HTTPSettings} [options] 
-     * @returns {unknown} 
+     * @template T
+     * @param {string} url
+     *     The URL to send the GET request to.
+     * @param {types.HTTPSettings} [options]
+     *     Optional HTTP settings to override defaults such as headers and timeout.
+     *
+     * @returns {Promise<{ error: boolean; message: T | string }>}
+     *     Resolves with an object containing `error` status and either the
+     *     response data (`message`) or an error message string.
      */
     public static async createHttpRequest<T = unknown>(url: string, options?: types.HTTPSettings): Promise<{ error: boolean; message: T | string }> {
         const defaultOptions = { 
@@ -154,18 +171,22 @@ export class Utils {
         }
     }
 
-
     /**
-     * garbageCollectionCache removes files from the cache directory that exceed the specified maximum file size in megabytes.
+     * @function garbageCollectionCache
+     * @description
+     *     Deletes cache files exceeding the specified size limit to free disk space.
+     *     Recursively traverses the cache directory and removes files larger than
+     *     the given maximum.
      *
-     * @public
      * @static
-     * @param {number} maxFileMegabytes 
+     * @param {number} maxFileMegabytes
+     *     Maximum allowed file size in megabytes. Files exceeding this limit
+     *     will be deleted.
      */
     public static garbageCollectionCache(maxFileMegabytes: number) {
         try {
-            const settings = loader.settings as types.ClientSettings;
-            const cacheDir = settings.NoaaWeatherWireService.cache.directory;
+            const settings = loader.settings as types.ClientSettingsTypes;
+            const cacheDir = settings.noaa_weather_wire_service_settings.cache.directory;
             if (!cacheDir) return;
             const { fs, path } = loader.packages;
             if (!fs.existsSync(cacheDir)) return;
@@ -190,45 +211,54 @@ export class Utils {
         }
     }
 
-
     /**
-     * handleCronJob performs periodic tasks based on whether the client is connected to NWWS or fetching data from NWS.
+     * @function handleCronJob
+     * @description
+     *     Performs scheduled tasks for NWWS XMPP session maintenance or GeoJSON data
+     *     updates depending on the job type.
      *
-     * @public
      * @static
-     * @param {boolean} isNwws 
-     */ 
-    public static handleCronJob(isNwws: boolean) {
+     * @param {boolean} isWire
+     *     If `true`, executes NWWS-related maintenance tasks such as cache cleanup
+     *     and reconnection checks. If `false`, loads GeoJSON data.
+     */
+    public static handleCronJob(isWire: boolean) {
         try {
-            const settings = loader.settings as types.ClientSettings;
-            const cache = settings.NoaaWeatherWireService.cache;
-            const reconnections = settings.NoaaWeatherWireService.clientReconnections;
-            if (isNwws) {
-                if (cache.read) {
-                    void this.garbageCollectionCache(cache.maxSizeMB);
+            const settings = loader.settings as types.ClientSettingsTypes;
+            const cache = settings.noaa_weather_wire_service_settings.cache;
+            const reconnections = settings.noaa_weather_wire_service_settings.reconnection_settings;
+            if (isWire) {
+                if (cache.enabled) {
+                    void this.garbageCollectionCache(cache.max_file_size);
                 }
-                if (reconnections.canReconnect) {
-                    void Xmpp.isSessionReconnectionEligible(reconnections.currentInterval);
+                if (reconnections.enabled) {
+                    void Xmpp.isSessionReconnectionEligible(reconnections.interval);
                 }
             } else {
                 void this.loadGeoJsonData();
             }
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
-            Utils.warn(`Failed to perform scheduled tasks (${isNwws ? 'NWWS' : 'GeoJSON'}): ${msg}`);
+            Utils.warn(`Failed to perform scheduled tasks (${isWire ? 'NWWS' : 'GeoJSON'}): ${msg}`);
         }
     }
 
-
     /**
-     * mergeClientSettings merges user-provided settings into the existing client settings, allowing for nested objects to be merged correctly.
+     * @function mergeClientSettings
+     * @description
+     *     Recursively merges a ClientSettings object into a target object,
+     *     preserving nested structures and overriding existing values.
      *
-     * @public
      * @static
-     * @param {Record<string, any>} target 
-     * @param {Record<string, any>} settings 
+     * @param {Record<string, unknown>} target
+     *     The target object to merge settings into.
+     * @param {types.ClientSettingsTypes} settings
+     *     The settings object containing values to merge.
+     *
+     * @returns {Record<string, unknown>}
+     *     The updated target object with merged settings.
      */
-    public static mergeClientSettings(target: Record<string, unknown>, settings: types.ClientSettings): Record<string, unknown> {
+    public static mergeClientSettings(target: Record<string, unknown>, settings: types.ClientSettingsTypes): Record<string, unknown> {
         for (const key in settings) {
             if (!Object.prototype.hasOwnProperty.call(settings, key)) continue;
             const value = settings[key];
@@ -236,7 +266,7 @@ export class Utils {
                 if (!target[key] || typeof target[key] !== 'object' || Array.isArray(target[key])) {
                     target[key] = {};
                 }
-                this.mergeClientSettings(target[key] as Record<string, unknown>, value as types.ClientSettings);
+                this.mergeClientSettings(target[key] as Record<string, unknown>, value as types.ClientSettingsTypes);
             } else {
                 target[key] = value;
             }
@@ -244,17 +274,22 @@ export class Utils {
         return target;
     }
 
-
     /**
-     * Calculate the distance between 2 given coordinates.
+     * @function calculateDistance
+     * @description
+     *     Calculates the great-circle distance between two geographic coordinates
+     *     using the haversine formula.
      *
-     * @public
      * @static
-     * @async
-     * @param {types.Coordinates} coord1 
-     * @param {types.Coordinates} coord2 
-     * @param {('miles' | 'kilometers')} [unit='miles'] 
-     * @returns {Promise<number>} 
+     * @param {types.Coordinates} coord1
+     *     The first coordinate, containing `lat` and `lon` properties.
+     * @param {types.Coordinates} coord2
+     *     The second coordinate, containing `lat` and `lon` properties.
+     * @param {'miles' | 'kilometers'} [unit='miles']
+     *     The distance unit to return.
+     *
+     * @returns {number}
+     *     The computed distance between the two points, rounded to two decimals.
      */
     public static calculateDistance(coord1: types.Coordinates, coord2: types.Coordinates, unit: 'miles' | 'kilometers' = 'miles'): number {
         if (!coord1 || !coord2) return 0;
@@ -271,14 +306,20 @@ export class Utils {
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return Math.round(R * c * 100) / 100;
     }
-    
+
     /**
-     * validateEventReady checks if there are current locations set when location filtering is enabled, and manages warning messages accordingly.
+     * @function isReadyToProcess
+     * @description
+     *     Determines whether processing can continue based on the current
+     *     tracked locations and filter state. Emits limited warnings if no
+     *     locations are available.
      *
-     * @public
      * @static
-     * @param {boolean} isFiltering 
-     * @returns {boolean} 
+     * @param {boolean} isFiltering
+     *     Whether location-based filtering is currently active.
+     *
+     * @returns {boolean}
+     *     `true` if processing should proceed, otherwise `false`.
      */
     public static isReadyToProcess(isFiltering: boolean): boolean {
         const totalTracks = Object.keys(loader.cache.currentLocations).length;

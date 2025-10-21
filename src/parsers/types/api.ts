@@ -20,23 +20,29 @@ import TextParser from '../text';
 export class APIAlerts {
     
     /**
-     * getTracking generates a unique tracking identifier for an API alert based on extracted JSON values.
+     * @function getTracking
+     * @description
+     *   Generates a unique tracking identifier for a CAP alert based on extracted XML values.
+     *   If VTEC information is available, it constructs the tracking ID from the VTEC components.
+     *   Otherwise, it uses the WMO identifier along with TTAI and CCCC attributes.
      *
      * @private
      * @static
      * @param {Record<string, string>} extracted 
      * @returns {string} 
      */
-    private static getTracking(extracted: Record<string, string>) {
+    private static getTracking(extracted: Record<string, string>, attributes: types.StanzaAttributes) {
         return extracted.vtec ? (() => {
             const vtecValue = Array.isArray(extracted.vtec) ? extracted.vtec[0] : extracted.vtec;
             const splitVTEC = vtecValue.split('.');
             return `${splitVTEC[2]}-${splitVTEC[3]}-${splitVTEC[4]}-${splitVTEC[5]}`;
-        })() : `${extracted.wmoidentifier} (${extracted.ugc})`;
+        })() :  `${extracted.wmoidentifier}`;
     }
-    
+
     /**
-     * getICAO extracts the ICAO code and corresponding name from a VTEC string.
+     * @function getICAO
+     * @description
+     *    Extracts the sender's ICAO code and corresponding name from a VTEC string.    
      *
      * @private
      * @static
@@ -50,17 +56,19 @@ export class APIAlerts {
     }
     
     /**
-     * event processes validated API alert messages, extracting relevant information and compiling it into structured event objects.
+     * @function event
+     * @description
+     *   Processes validated API alert messages, extracting relevant information and compiling it into structured event objects.
      *
      * @public
      * @static
      * @async
-     * @param {types.TypeCompiled} validated 
+     * @param {types.StanzaCompiled} validated 
      * @returns {*} 
      */
-    public static async event(validated: types.TypeCompiled) {
+    public static async event(validated: types.StanzaCompiled) {
         let processed = [] as unknown[];
-        const messages = Object.values(JSON.parse(validated.message).features) as types.TypeAlert[];
+        const messages = Object.values(JSON.parse(validated.message).features) as types.EventCompiled[];
         for (let feature of messages) {
             const tick = performance.now();
             const getVTEC = feature?.properties?.parameters?.VTEC?.[0] ?? null;
@@ -69,13 +77,13 @@ export class APIAlerts {
             const getHeadline = feature?.properties?.parameters?.NWSheadline?.[0] ?? "";
             const getDescription = `${getHeadline} ${feature?.properties?.description ?? ``}`
             const getAWIP = feature?.properties?.parameters?.AWIPSidentifier?.[0] ?? null;
-            const getHeader = EventParser.getHeader({ ...{ getAwip: {prefix: getAWIP?.slice(0, -3) }},} as types.TypeAttributes);
+            const getHeader = EventParser.getHeader({ ...{ getAwip: {prefix: getAWIP?.slice(0, -3) }},} as types.StanzaAttributes);
             const getSource = TextParser.textProductToString(getDescription, `SOURCE...`, [`.`]) || `N/A`;
             const getOffice = this.getICAO(getVTEC || ``);
             processed.push({
                 performance: performance.now() - tick,
                 source: `api-parser`,
-                tracking: this.getTracking({ vtec: getVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
+                tracking: this.getTracking({ vtec: getVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }, validated.attributes),
                 header: getHeader,
                 vtec: getVTEC || `N/A`,
                 history: [{

@@ -20,31 +20,37 @@ import TextParser from '../text';
 export class CapAlerts {
     
     /**
-     * getTracking generates a unique tracking identifier for a CAP alert based on extracted XML values.
-     * 
+     * @function getTracking
+     * @description
+     *   Generates a unique tracking identifier for a CAP alert based on extracted XML values.
+     *   If VTEC information is available, it constructs the tracking ID from the VTEC components.
+     *   Otherwise, it uses the WMO identifier along with TTAI and CCCC attributes.
+     *
      * @private
      * @static
      * @param {Record<string, string>} extracted 
      * @returns {string} 
      */
-    private static getTracking(extracted: Record<string, string>) {
+    private static getTracking(extracted: Record<string, string>, attributes: types.StanzaAttributes) {
         return extracted.vtec ? (() => {
             const vtecValue = Array.isArray(extracted.vtec) ? extracted.vtec[0] : extracted.vtec;
             const splitVTEC = vtecValue.split('.');
             return `${splitVTEC[2]}-${splitVTEC[3]}-${splitVTEC[4]}-${splitVTEC[5]}`;
-        })() : `${extracted.wmoidentifier} (${extracted.ugc})`;
+        })() : `${extracted.wmoidentifier.substring(extracted.wmoidentifier.length - 4)}-${attributes.ttaaii}-${attributes.id.slice(-4)}`;
     }
 
     /**
-     * event processes validated CAP alert messages, extracting relevant information and compiling it into structured event objects.
+     * @function event
+     * @description
+     *    Processes validated CAP alert messages, extracting relevant information and compiling it into structured event objects.   
      *
      * @public
      * @static
      * @async
-     * @param {types.TypeCompiled} validated 
+     * @param {types.StanzaCompiled} validated 
      * @returns {*} 
      */
-    public static async event(validated: types.TypeCompiled) {
+    public static async event(validated: types.StanzaCompiled) {
         let processed = [] as unknown[];
         const messages = validated.message.match(/<\?xml[\s\S]*?<\/alert>/g)?.map(msg => msg.trim());
         if (messages == null || messages.length === 0) return;
@@ -61,12 +67,12 @@ export class CapAlerts {
                 `maxHailSize`, `maxWindGust`, `thunderstormdamagethreat`,
                 `tornadodamagethreat`, `waterspoutdetection`, `flooddetection`,
             ]);
-            const getHeader = EventParser.getHeader({ ...validated.attributes,} as types.TypeAttributes);
+            const getHeader = EventParser.getHeader({ ...validated.attributes,} as types.StanzaAttributes);
             const getSource = TextParser.textProductToString(extracted.description, `SOURCE...`, [`.`]) || `N/A`;
             processed.push({
                 performance: performance.now() - tick,
                 source: `cap-parser`,
-                tracking: this.getTracking(extracted),
+                tracking: this.getTracking(extracted, validated.attributes),
                 header: getHeader,
                 vtec: extracted.vtec || `N/A`,
                 history: [{ description: extracted.description || `N/A`, issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`, type: extracted.msgtype || `N/A` }],

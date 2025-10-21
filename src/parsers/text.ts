@@ -16,14 +16,25 @@ import * as loader from '../bootstrap';
 export class TextParser {
     
     /**
-     * textProductToString extracts a specific value from a text-based weather product message based on a given key and optional removal strings.
+     * @function textProductToString
+     * @description
+     *     Searches a text product message for a line containing a specific value,
+     *     extracts the substring immediately following that value, and optionally
+     *     removes additional specified strings. Cleans up the extracted string by
+     *     trimming whitespace and removing any remaining occurrences of the search
+     *     value or '<' characters.
      *
-     * @public
      * @static
-     * @param {string} message 
-     * @param {string} value 
-     * @param {string[]} [removal=[]] 
-     * @returns {(string | null)} 
+     * @param {string} message
+     *     The raw text product message to search.
+     * @param {string} value
+     *     The string to search for within each line of the message.
+     * @param {string[]} [removal=[]]
+     *     Optional array of substrings to remove from the extracted result.
+     *
+     * @returns {string | null}
+     *     The cleaned-up extracted string if found, or `null` if the value does
+     *     not exist in the message.
      */
     public static textProductToString(message: string,value: string,removal: string[] = []): string | null {
         const lines = message.split('\n');
@@ -37,14 +48,22 @@ export class TextParser {
         }
         return null;
     }
-    
+
     /**
-     * textProductToPolygon extracts geographical coordinates from a text-based weather product message and returns them as an array of [longitude, latitude] pairs.
+     * @function textProductToPolygon
+     * @description
+     *     Parses a text product message to extract polygon coordinates based on
+     *     LAT...LON data. Coordinates are converted to [latitude, longitude] pairs
+     *     with longitude negated (assumes Western Hemisphere). If the polygon has
+     *     more than two points, the first point is repeated at the end to close it.
      *
-     * @public
      * @static
-     * @param {string} message 
-     * @returns {[number, number][]} 
+     * @param {string} message
+     *     The raw text product message containing LAT...LON coordinate data.
+     *
+     * @returns {[number, number][]}
+     *     An array of [latitude, longitude] coordinate pairs forming the polygon.
+     *     Returns an empty array if no valid coordinates are found.
      */
     public static textProductToPolygon(message: string): [number, number][] {
         const coordinates: [number, number][] = [];
@@ -61,13 +80,20 @@ export class TextParser {
     }
 
     /**
-     * textProductToDescription extracts the main description from a text-based weather product message.
+     * @function textProductToDescription
+     * @description
+     *     Extracts a clean description portion from a text product message, optionally
+     *     removing a handle and any extra metadata such as "STANZA ATTRIBUTES...".
+     *     Also trims and normalizes whitespace.
      *
-     * @public
      * @static
-     * @param {string} message 
-     * @param {string} [handle=null] 
-     * @returns {string} 
+     * @param {string} message
+     *     The raw text product message to process.
+     * @param {string | null} [handle=null]
+     *     An optional handle string to remove from the message.
+     *
+     * @returns {string}
+     *     The extracted description text from the message.
      */
     public static textProductToDescription(message: string, handle: string = null): string {
         const original = message;
@@ -99,12 +125,19 @@ export class TextParser {
     }
 
     /**
-     * awipTextToEvent converts an AWIPS ID prefix from a text-based weather product message to its corresponding event type and prefix.
+     * @function awipTextToEvent
+     * @description
+     *     Maps the beginning of a message string to a known AWIPS event type based on
+     *     predefined prefixes. Returns a default value if no matching prefix is found.
      *
-     * @public
      * @static
-     * @param {string} message 
-     * @returns {{ type: any; prefix: any; }} 
+     * @param {string} message
+     *     The message string to analyze for an AWIPS prefix.
+     *
+     * @returns {Record<string, string>}
+     *     An object containing:
+     *       - `type`: The mapped AWIPS event type (or 'XX' if not found).
+     *       - `prefix`: The matched prefix (or 'XX' if not found).
      */
     public static awipTextToEvent(message: string): Record<string, string> {
         for (const [prefix, type] of Object.entries(loader.definitions.awips)) {
@@ -116,13 +149,22 @@ export class TextParser {
     }
     
     /**
-     * getXmlValues recursively searches a parsed XML object for specified keys and extracts their values.
+     * @function getXmlValues
+     * @description
+     *     Recursively extracts specified values from a parsed XML-like object.
+     *     Searches both object keys and array items for matching keys (case-insensitive)
+     *     and returns the corresponding values. If multiple unique values are found for
+     *     a key, an array is returned; if one value is found, it returns that value; 
+     *     if none are found, returns `null`.
      *
-     * @public
      * @static
-     * @param {*} parsed 
-     * @param {string[]} valuesToExtract 
-     * @returns {Record<string, any>} 
+     * @param {any} parsed
+     *     The parsed XML object, typically resulting from an XML-to-JS parser.
+     * @param {string[]} valuesToExtract
+     *     Array of key names to extract values for from the parsed object.
+     *
+     * @returns {Record<string, string | string[] | null>}
+     *     An object mapping each requested key to its extracted value(s) or `null`.
      */
     public static getXmlValues(parsed: any, valuesToExtract: string[]): Record<string, string> {
         const extracted: Record<string, any> = {};   

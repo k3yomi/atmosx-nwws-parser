@@ -27,33 +27,38 @@ import UGCParser from './parsers/ugc';
 export class AlertManager { 
     isNoaaWeatherWireService: boolean
     job: any
-    constructor(metadata: types.ClientSettings) { this.start(metadata) }
-
+    constructor(metadata: types.ClientSettingsTypes) { this.start(metadata) }
+    
     /**
-     * setDisplayName allows you to set or update the nickname of the client for identification purposes.
-     * This does require you to restart the XMPP client if you are using NoaaWeatherWireService for primary data.
-     * Changing this setting does not affect the username used for authentication.
-     * 
-     * @public
-     * @param {?string} [name] 
+     * @function setDisplayName
+     * @description
+     *     Sets the display nickname for the NWWS XMPP session. Trims the provided
+     *     name and validates it, emitting a warning if the name is empty or invalid.
+     *
+     * @param {string} [name]
+     *     The desired display name or nickname.
      */
     public setDisplayName(name?: string) {
-        const settings = loader.settings as types.ClientSettings;
+        const settings = loader.settings as types.ClientSettingsTypes;
         const trimmed = name?.trim();
         if (!trimmed) {
             Utils.warn(loader.definitions.messages.invalid_nickname);
             return;
         }
-        settings.NoaaWeatherWireService.clientCredentials.nickname = trimmed;
+        settings.noaa_weather_wire_service_settings.credentials.nickname = trimmed;
     }
 
     /**
-     * This will set custom coordinates based on given paramters and key name. This will be used to 
-     * get the distance between each alert at a given coord in either miles or kilometers.
+     * @function setCurrentLocation
+     * @description
+     *     Sets the current location with a name and geographic coordinates.
+     *     Validates the coordinates before updating the cache, emitting warnings
+     *     if values are missing or invalid.
      *
-     * @public
-     * @param {string} locationName 
-     * @param {?types.Coordinates} [coordinates] 
+     * @param {string} locationName
+     *     The name of the location to set.
+     * @param {types.Coordinates} [coordinates]
+     *     The latitude and longitude of the location.
      */
     public setCurrentLocation(locationName: string, coordinates?: types.Coordinates): void {
         if (!coordinates) {
@@ -68,25 +73,33 @@ export class AlertManager {
         loader.cache.currentLocations[locationName] = coordinates;
     }
 
-
     /**
-     * createEasAudio generates EAS audio files based on the provided description and header information.
+     * @function createEasAudio
+     * @description
+     *     Generates an EAS (Emergency Alert System) audio file using the provided
+     *     description and header.
      *
-     * @public
      * @async
-     * @param {string} description 
-     * @param {string} header 
-     * @returns {unknown} 
+     * @param {string} description
+     *     The main content of the alert to include in the audio.
+     * @param {string} header
+     *     The header of the alert.
+     *
+     * @returns {Promise<Buffer>}
+     *     Resolves with a Buffer containing the generated audio data.
      */
     public async createEasAudio(description: string, header: string) {
         return await EAS.generateEASAudio(description, header);
     }
 
     /**
-     * getAllAlertTypes provides a comprehensive list of all possible alert event and action combinations
+     * @function getAllAlertTypes
+     * @description
+     *     Generates a list of all possible alert types by combining defined
+     *     event names with action names.
      *
-     * @public
-     * @returns {{}} 
+     * @returns {string[]}
+     *     An array of strings representing all possible event-action alert types.
      */
     public getAllAlertTypes(): string[] {
         const events = new Set(Object.values(loader.definitions.events));
@@ -97,13 +110,20 @@ export class AlertManager {
     }
 
     /**
-     * searchAlertDatbase allows you to search the internal alert database for previously received alerts up to 50,000 records.
+     * @function searchStanzaDatabase
+     * @description
+     *     Searches the stanza database for entries containing the specified query.
+     *     Escapes SQL wildcard characters and returns results in descending order
+     *     by ID, up to the specified limit.
      *
-     * @public
      * @async
-     * @param {string} query 
+     * @param {string} query
+     *     The search string to look for in the stanza content.
      * @param {number} [limit=250]
-     * @returns {unknown} 
+     *     Maximum number of results to return.
+     *
+     * @returns {Promise<any[]>}
+     *     Resolves with an array of matching database rows.
      */
     public async searchStanzaDatabase(query: string, limit: number = 250) {
         const escapeLike = (s: string) => s.replace(/[%_]/g, '\\$&');
@@ -114,59 +134,63 @@ export class AlertManager {
     }
 
     /**
-     * setSettings allow you to dynamically update the settings of the AlertManager instance. This doesn't
-     * require a refresh of the instance. However, if you are switching to NWWS->NWS or vice versa,
-     * you will need to call stop() and then start() for changes to take effect.
+     * @function setSettings
+     * @description
+     *     Merges the provided client settings into the current configuration,
+     *     preserving nested structures.
      *
-     * @public
      * @async
-     * @param {types.ClientSettings} settings 
-     * @returns {Promise<void>} 
+     * @param {types.ClientSettingsTypes} settings
+     *     The settings to merge into the current client configuration.
+     * @returns {Promise<void>}
+     *     Resolves once the settings have been merged.
      */
-    public async setSettings(settings: types.ClientSettings) {
+    public async setSettings(settings: types.ClientSettingsTypes) {
         Utils.mergeClientSettings(loader.settings, settings);
     }
 
     /**
-     * "on" allows the client to listen for specific events emitted by the parser.
-     * Events include:
-     * - onAlerts: Emitted when a batch of new alerts have been fully parsed
-     * - onMessage: Emitted when a raw CAP/XML has been parsed by the StanzaParser
-     * - onConnection: Emitted when the XMPP client connects successfully
-     * - onReconnect: Emitted when the XMPP client is attempting to reconnect
-     * - onOccupant: Emitted when an occupant joins or leaves the XMPP MUC room (NWWS only)
-     * - onAnyEventType (Ex. onTornadoWarning) Emitted when a specific alert event type is received
-     * - log: Emitted for general log messages from the parser
-     * 
-     * @public
-     * @param {string} event 
-     * @param {(...args: any[]) => void} callback 
+     * @function on
+     * @description
+     *     Registers a callback for a specific event and returns a function
+     *     to unregister the listener.
+     *
+     * @param {string} event
+     *     The name of the event to listen for.
+     * @param {(...args: any[]) => void} callback
+     *     The function to call when the event is emitted.
+     *
      * @returns {() => void}
+     *     A function that removes the registered event listener when called.
      */
     public on(event: string, callback: (...args: any[]) => void) {
         loader.cache.events.on(event, callback);
         return () => loader.cache.events.off(event, callback);
     }
-    
+
     /**
-     * start initializes the AlertManager instance, setting up necessary configurations and connections.
-     * This method must be called before the instance can begin processing alerts.
+     * @function start
+     * @description
+     *     Initializes the client with the provided settings, starts the NWWS XMPP
+     *     session if applicable, loads cached messages, and sets up scheduled
+     *     tasks (cron jobs) for ongoing processing.
      *
-     * @public
      * @async
-     * @param {Record<string, string>} [metadata={}] 
-     * @returns {Promise<void>} 
+     * @param {types.ClientSettingsTypes} metadata
+     *     Client settings used to configure session, caching, and filtering behavior.
+     * @returns {Promise<void>}
+     *     Resolves once initialization and scheduling are complete.
      */
-    public async start(metadata: types.ClientSettings): Promise<void> {
+    public async start(metadata: types.ClientSettingsTypes): Promise<void> {
         if (!loader.cache.isReady) { 
             Utils.warn(loader.definitions.messages.not_ready);
             return;
         }
         this.setSettings(metadata);
-        const settings = loader.settings as types.ClientSettings;
-        this.isNoaaWeatherWireService = settings.isNWWS;
+        const settings = loader.settings as types.ClientSettingsTypes;
+        this.isNoaaWeatherWireService = settings.is_wire;
         loader.cache.isReady = false;
-        while (!Utils.isReadyToProcess(settings.global.alertFiltering.locationFiltering?.filter ?? false)) {
+        while (!Utils.isReadyToProcess(settings.global_settings.filtering.location?.filter ?? false)) {
             await Utils.sleep(2000);
         }
         if (this.isNoaaWeatherWireService) {
@@ -184,19 +208,22 @@ export class AlertManager {
             try { this.job.stop(); } catch { Utils.warn(`Failed to stop existing cron job.`); }
             this.job = null;
         }
-        const interval = !this.isNoaaWeatherWireService ? settings.NationalWeatherService.checkInterval : 5;
+        const interval = !this.isNoaaWeatherWireService ? settings.national_weather_service_settings.interval : 5;
         this.job = new loader.packages.jobs.Cron(`*/${interval} * * * * *`, () => { 
             Utils.handleCronJob(this.isNoaaWeatherWireService);
         });
     }
 
-
     /**
-     * stop terminates the AlertManager instance, closing any active connections and cleaning up resources.
+     * @function stop
+     * @description
+     *     Stops active scheduled tasks (cron job) and, if connected, the NWWS
+     *     XMPP session. Updates relevant cache flags to indicate the session
+     *     is no longer active.
      *
-     * @public
      * @async
      * @returns {Promise<void>}
+     *     Resolves once all tasks and the session have been stopped.
      */
     public async stop(): Promise<void> {
         loader.cache.isReady = true;
