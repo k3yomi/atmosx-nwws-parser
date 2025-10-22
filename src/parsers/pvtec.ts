@@ -14,10 +14,10 @@
 import * as loader from '../bootstrap';
 import * as types from '../types';
 
-export class VtecParser {
+export class PVtecParser {
     
     /**
-     * @function vtecExtractor
+     * @function pVtecExtractor
      * @description
      *     Extracts VTEC entries from a raw NWWS message string and returns
      *     structured objects containing type, tracking, event, status,
@@ -27,16 +27,16 @@ export class VtecParser {
      * @param {string} message
      * @returns {Promise<types.VtecEntry[] | null>}
      */
-    public static async vtecExtractor(message: string): Promise<types.VtecEntry[] | null> {
-        const matches = message.match(new RegExp(loader.definitions.expressions.vtec, 'g'));
+    public static async pVtecExtractor(message: string): Promise<types.PVtecEntry[] | null> {
+        const matches = message.match(new RegExp(loader.definitions.expressions.pvtec, 'g'));
         if (!matches) return null;
-        const vtecs: types.VtecEntry[] = [];
-        for (const vtec of matches) {
-            const parts = vtec.split('.');
+        const pVtecs: types.PVtecEntry[] = [];
+        for (const pvtec of matches) {
+            const parts = pvtec.split('.');
             if (parts.length < 7) continue; 
             const dates = parts[6].split('-');
-            vtecs.push({
-                raw: vtec,
+            pVtecs.push({
+                raw: pvtec,
                 type: loader.definitions.productTypes[parts[0]],
                 tracking: `${parts[2]}-${parts[3]}-${parts[4]}-${parts[5]}`,
                 event: `${loader.definitions.events[parts[3]]} ${loader.definitions.actions[parts[4]]}`,
@@ -45,7 +45,7 @@ export class VtecParser {
                 expires: this.parseExpiryDate(dates),
             });
         }
-        return vtecs.length ? vtecs : null;
+        return pVtecs.length ? pVtecs : null;
     }
 
     /**
@@ -69,4 +69,4 @@ export class VtecParser {
     }
 }
 
-export default VtecParser;
+export default PVtecParser;

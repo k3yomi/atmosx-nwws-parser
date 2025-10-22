@@ -12,7 +12,8 @@
 */
 
 import * as types from '../../types';
-import VtecParser from '../vtec';
+import pVtecParser from '../pvtec';
+import hVtecParser from '../hvtec';
 import UgcParser from '../ugc';
 import EventParser from '../events';
 
@@ -43,21 +44,23 @@ export class VTECAlerts {
                 const tick = performance.now();
                 const message = messages[i]
                 const attributes = cachedAttribute != null ? JSON.parse(cachedAttribute[1]) : validated;
-                const getVTEC = await VtecParser.vtecExtractor(message) as types.VtecEntry[]
+                const getPVTEC = await pVtecParser.pVtecExtractor(message) as types.PVtecEntry[]
+                const getHVTEC = await hVtecParser.HVtecExtractor(message) as types.HVtecEntry
                 const getUGC = await UgcParser.ugcExtractor(message) as types.UGCEntry
-                if (getVTEC != null && getUGC != null) {
-                    for (let j = 0; j < getVTEC.length; j++) {
-                        const vtec = getVTEC[j];
-                        const getBaseProperties = await EventParser.getBaseProperties(message, attributes, getUGC, vtec) as types.EventProperties;
-                        const getHeader = EventParser.getHeader({ ...validated.attributes, ...getBaseProperties.metadata } as types.StanzaAttributes, getBaseProperties, vtec);
+                if (getPVTEC != null && getUGC != null) {
+                    for (let j = 0; j < getPVTEC.length; j++) {
+                        const pVtec = getPVTEC[j];
+                        const getBaseProperties = await EventParser.getBaseProperties(message, attributes, getUGC, pVtec, getHVTEC) as types.EventProperties;
+                        const getHeader = EventParser.getHeader({ ...validated.attributes, ...getBaseProperties.metadata } as types.StanzaAttributes, getBaseProperties, pVtec);
                         processed.push({
                             performance: performance.now() - tick,
-                            source: `vtec-parser`,
-                            tracking: vtec.tracking,
+                            source: `pvtec-parser`,
+                            tracking: pVtec.tracking,
                             header: getHeader,
-                            vtec: vtec.raw,
-                            history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: vtec.status }],
-                            properties: { event: vtec.event, parent: vtec.event, action_type: vtec.status, ...getBaseProperties, }
+                            pvtec: pVtec.raw,
+                            hvtec: getHVTEC != null ? getHVTEC.raw : `N/A`,
+                            history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: pVtec.status }],
+                            properties: { event: pVtec.event, parent: pVtec.event, action_type: pVtec.status, ...getBaseProperties, }
                         })
                     }
                 }

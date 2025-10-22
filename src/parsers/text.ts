@@ -11,6 +11,7 @@
     Written by: KiyoWx (k3yomi)                
 */
 
+import * as loader from '../bootstrap';
 
 export class TextParser {
     
@@ -82,8 +83,7 @@ export class TextParser {
      */
     public static textProductToDescription(message: string, handle: string = null): string {
         const original = message;
-        const dateRegex = /\d{3,4}\s*(AM|PM)?\s*[A-Z]{2,4}\s+[A-Z]{3,}\s+[A-Z]{3,}\s+\d{1,2}\s+\d{4}/gim;
-        const discoveredDates = Array.from(message.matchAll(dateRegex));
+        const discoveredDates = Array.from(message.matchAll(new RegExp(loader.definitions.expressions.dateline, 'gim')));
         if (discoveredDates.length) {
             const lastMatch = discoveredDates[discoveredDates.length - 1][0];
             const startIdx = message.lastIndexOf(lastMatch);

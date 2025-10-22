@@ -4,11 +4,11 @@ import * as loader from '../bootstrap';
 import * as types from '../types';
 import TextParser from './text';
 import UGCParser from './ugc';
-import VTECAlerts from './types/vtec';
-import UGCAlerts from './types/ugc';
-import TextAlerts from './types/text';
-import CAPAlerts from './types/cap';
-import APIAlerts from './types/api';
+import VTECAlerts from './events/vtec';
+import UGCAlerts from './events/ugc';
+import TextAlerts from './events/text';
+import CAPAlerts from './events/cap';
+import APIAlerts from './events/api';
 import Utils from '../utils';
 
 
@@ -27,10 +27,11 @@ export class EventParser {
      * @param {string} message
      * @param {types.StanzaCompiled} validated
      * @param {types.UGCEntry} [ugc=null]
-     * @param {types.VtecEntry} [vtec=null]
+     * @param {types.PVtecEntry} [pVtec=null]
+     * @param {types.HVtecEntry} [hVtec=null]
      * @returns {Promise<Record<string, any>>}
      */
-    public static async getBaseProperties(message: string, metadata: types.DefaultAttributesType, ugc: types.UGCEntry = null, vtec: types.VtecEntry = null) {
+    public static async getBaseProperties(message: string, metadata: types.DefaultAttributesType, ugc: types.UGCEntry = null, pVtec: types.PVtecEntry = null, hVtec: types.HVtecEntry = null) {
         const settings = loader.settings as types.ClientSettingsTypes;
         const definitions = {
             tornado: TextParser.textProductToString(message, `TORNADO...`) || TextParser.textProductToString(message, `WATERSPOUT...`) || `N/A`,
@@ -40,15 +41,15 @@ export class EventParser {
             damage: TextParser.textProductToString(message, `DAMAGE THREAT...`) || `N/A`,
             source: TextParser.textProductToString(message, `SOURCE...`, [`.`]) || `N/A`,
             polygon: TextParser.textProductToPolygon(message),
-            description: TextParser.textProductToDescription(message, vtec?.raw ?? null),
+            description: TextParser.textProductToDescription(message, pVtec?.raw ?? null),
             wmo: message.match(new RegExp(loader.definitions.expressions.wmo, 'imu')),
             mdTorIntensity: TextParser.textProductToString(message, `MOST PROBABLE PEAK TORNADO INTENSITY...`) || `N/A`,
             mdWindGusts: TextParser.textProductToString(message, `MOST PROBABLE PEAK WIND GUST...`) || `N/A`,
             mdHailSize: TextParser.textProductToString(message, `MOST PROBABLE PEAK HAIL SIZE...`) || `N/A`,
         };
-        const getOffice = this.getICAO(vtec, metadata, definitions.wmo);
+        const getOffice = this.getICAO(pVtec, metadata, definitions.wmo);
         const getCorrectIssued = this.getCorrectIssuedDate(metadata);
-        const getCorrectExpiry = this.getCorrectExpiryDate(vtec, ugc);
+        const getCorrectExpiry = this.getCorrectExpiryDate(pVtec, ugc);
         const base = { 
             locations: ugc?.locations.join(`; `) || `No Location Specified (UGC Missing)`,
             issued: getCorrectIssued,
@@ -57,9 +58,8 @@ export class EventParser {
             description: definitions.description,
             sender_name: getOffice.name,
             sender_icao: getOffice.icao,
-            metadata: {
-                ...Object.fromEntries(Object.entries(metadata).filter(([key]) => key !== 'message'))
-            },
+            metadata: {...Object.fromEntries(Object.entries(metadata).filter(([key]) => key !== 'message'))},
+            technical: { ugc: ugc, vtec: pVtec, hvtec: hVtec },
             parameters: {
                 wmo: Array.isArray(definitions.wmo) ? definitions.wmo[0] : (definitions.wmo ?? `N/A`),
                 source: definitions.source,
@@ -181,14 +181,14 @@ export class EventParser {
      * @static
      * @param {types.StanzaAttributes} attributes
      * @param {types.EventProperties} [properties]
-     * @param {types.VtecEntry} [vtec]
+     * @param {types.PVtecEntry} [pVtec]
      * @returns {string}
      */
-    public static getHeader(attributes: types.StanzaAttributes, properties?: types.EventProperties, vtec?: types.VtecEntry) {
+    public static getHeader(attributes: types.StanzaAttributes, properties?: types.EventProperties, pVtec?: types.PVtecEntry) {
         const parent = `ATSX`
         const alertType = attributes?.awipsType?.type ?? attributes?.getAwip?.prefix ?? `XX`;
         const ugc = properties?.geocode?.UGC != null ? properties?.geocode?.UGC.join(`-`) : `000000`;
-        const status = vtec?.status || 'Issued';
+        const status = pVtec?.status || 'Issued';
         const issued = properties?.issued != null ? new Date(properties?.issued)?.toISOString().replace(/[-:]/g, '').split('.')[0] : new Date().toISOString().replace(/[-:]/g, '').split('.')[0];
         const sender = properties?.sender_icao || `XXXX`;
         const header = `ZCZC-${parent}-${alertType}-${ugc}-${status}-${issued}-${sender}-`;
@@ -199,7 +199,7 @@ export class EventParser {
      * @function eventHandler
      * @description
      *     Routes a validated stanza object to the appropriate alert handler
-     *     based on its type flags: API, CAP, VTEC, UGC, or plain text.
+     *     based on its type flags: API, CAP, pVTEC (Primary VTEC), UGC, or plain text.
      *
      * @static
      * @param {types.StanzaCompiled} validated
@@ -208,9 +208,9 @@ export class EventParser {
     public static eventHandler(metadata: types.StanzaCompiled) {
         if (metadata.isApi) return APIAlerts.event(metadata)
         if (metadata.isCap) return CAPAlerts.event(metadata)
-        if (!metadata.isCap && metadata.isVtec && metadata.isUGC) return VTECAlerts.event(metadata);
-        if (!metadata.isCap && !metadata.isVtec && metadata.isUGC) return UGCAlerts.event(metadata); 
-        if (!metadata.isCap && !metadata.isVtec && !metadata.isUGC) return TextAlerts.event(metadata);
+        if (!metadata.isCap && metadata.isPVtec && metadata.isUGC) return VTECAlerts.event(metadata);
+        if (!metadata.isCap && !metadata.isPVtec && metadata.isUGC) return UGCAlerts.event(metadata); 
+        if (!metadata.isCap && !metadata.isPVtec && !metadata.isUGC) return TextAlerts.event(metadata);
     }
 
     /**
@@ -222,13 +222,13 @@ export class EventParser {
      *
      * @private
      * @static
-     * @param {types.VtecEntry | null} vtec
+     * @param {types.PVtecEntry | null} pVtec
      * @param {Record<string, string>} attributes
      * @param {RegExpMatchArray | string | null} WMO
      * @returns {{ icao: string; name: string }}
      */
-    private static getICAO(vtec: types.VtecEntry, metadata: types.DefaultAttributesType, WMO: RegExpMatchArray | string | null) {
-        const icao = vtec != null ? vtec?.tracking.split(`-`)[0] : (metadata.attributes?.cccc ?? (WMO != null ? (Array.isArray(WMO) ? WMO[0] : WMO) : `N/A`));
+    private static getICAO(pVtec: types.PVtecEntry, metadata: types.DefaultAttributesType, WMO: RegExpMatchArray | string | null) {
+        const icao = pVtec != null ? pVtec?.tracking.split(`-`)[0] : (metadata.attributes?.cccc ?? (WMO != null ? (Array.isArray(WMO) ? WMO[0] : WMO) : `N/A`));
         const name = loader.definitions.ICAO?.[icao] ?? `N/A`;
         return { icao, name };
     }
@@ -261,16 +261,16 @@ export class EventParser {
      *
      * @private
      * @static
-     * @param {types.VtecEntry} vtec
+     * @param {types.PVtecEntry} pVtec
      * @param {types.UGCEntry} ugc
      * @returns {string}
      */
-    private static getCorrectExpiryDate(vtec: types.VtecEntry, ugc: types.UGCEntry) {
-        const time =  vtec?.expires && !isNaN(new Date(vtec.expires).getTime()) ? 
-            new Date(vtec.expires).toLocaleString() : 
+    private static getCorrectExpiryDate(pVtec: types.PVtecEntry, ugc: types.UGCEntry) {
+        const time =  pVtec?.expires && !isNaN(new Date(pVtec.expires).getTime()) ? 
+            new Date(pVtec.expires).toLocaleString() : 
             (ugc?.expiry != null ? new Date(ugc.expiry).toLocaleString() : 
             new Date(new Date().getTime() + 1 * 60 * 60 * 1000).toLocaleString())
-        if (time == `Invalid Date`) return new Date(new Date().getTime() + 1 * 60 * 60 * 1000).toLocaleString();
+        if (time == `Invalid Date`) return `Until Further Notice`;
         return time;
     }
 
@@ -342,8 +342,8 @@ export class EventParser {
             const detectedPhrase = loader.definitions.cancelSignatures.find(sig => props.description.toLowerCase().includes(sig.toLowerCase()));
             if (detectedPhrase) { setAction(`C`); }
         }
-        if (event.vtec) { 
-            const getType = event.vtec.split(`.`)[0];
+        if (event.pvtec) { 
+            const getType = event.pvtec.split(`.`)[0];
             const isTestProduct = loader.definitions.productTypes[getType] == `Test Product`
             if (isTestProduct) { setAction(`C`); props.is_test = true; }
         }

@@ -32,7 +32,7 @@ export class StanzaParser {
      *     message: string;
      *     attributes: types.StanzaAttributes;
      *     isCap: boolean,
-     *     isVtec: boolean;
+     *     isPVtec: boolean;
      *     isCapDescription: boolean;
      *     awipsType: Record<string, string>;
      *     isApi: boolean;
@@ -40,17 +40,17 @@ export class StanzaParser {
      *     isUGC?: boolean;
      * }}
      */
-    public static validate(stanza: any, isDebug: boolean | types.StanzaAttributes = false): { message: string; attributes: types.StanzaAttributes; isCap: any; isVtec: boolean; isCapDescription: any; awipsType: any; isApi: boolean; ignore: boolean; isUGC?: boolean; } {
+    public static validate(stanza: any, isDebug: boolean | types.StanzaAttributes = false): { message: string; attributes: types.StanzaAttributes; isCap: any; isPVtec: boolean; isCapDescription: any; awipsType: any; isApi: boolean; ignore: boolean; isUGC?: boolean; } {
         if (isDebug !== false) { 
             const vTypes = isDebug as types.StanzaAttributes;
             const message = stanza;
             const attributes = vTypes;
             const isCap = vTypes.isCap ?? message.includes(`<?xml`);
             const isCapDescription = message.includes(`<areaDesc>`);
-            const isVtec = message.match(loader.definitions.expressions.vtec) != null;
+            const isPVtec = message.match(loader.definitions.expressions.pvtec) != null;
             const isUGC = message.match(loader.definitions.expressions.ugc1) != null;
             const awipsType = this.getType(attributes);
-            return { message, attributes, isCap, isVtec, isUGC, isCapDescription, awipsType: awipsType, isApi: false, ignore: false };
+            return { message, attributes, isCap, isPVtec, isUGC, isCapDescription, awipsType: awipsType, isApi: false, ignore: false };
         }
         if (stanza.is(`message`)) {
             let cb = stanza.getChild(`x`)
@@ -60,15 +60,15 @@ export class StanzaParser {
                 if (attributes.awipsid && attributes.awipsid.length > 1) {
                     const isCap = message.includes(`<?xml`);
                     const isCapDescription = message.includes(`<areaDesc>`);
-                    const isVtec = message.match(loader.definitions.expressions.vtec) != null;
+                    const isPVtec = message.match(loader.definitions.expressions.pvtec) != null;
                     const isUGC = message.match(loader.definitions.expressions.ugc1) != null;
                     const awipsType = this.getType(attributes);
-                    this.cache(message, {attributes, isCap, isVtec, awipsType });
-                    return { message, attributes, isCap, isVtec, isUGC, isCapDescription, awipsType: awipsType, isApi: false, ignore: false  };
+                    this.cache(message, {attributes, isCap, isPVtec, awipsType });
+                    return { message, attributes, isCap, isPVtec, isUGC, isCapDescription, awipsType: awipsType, isApi: false, ignore: false  };
                 }
             }
         }
-        return { message: null, attributes: null, isApi: null, isCap: null, isVtec: null, isUGC: null, isCapDescription: null, awipsType: null, ignore: true };
+        return { message: null, attributes: null, isApi: null, isCap: null, isPVtec: null, isUGC: null, isCapDescription: null, awipsType: null, ignore: true };
     }
 
     /**
@@ -117,7 +117,7 @@ export class StanzaParser {
         const cacheDir = settings.noaa_weather_wire_service_settings.cache.directory;
         if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
         const prefix = `category-${data.awipsType.prefix}-${data.awipsType.type}s`;
-        const suffix = `${data.isCap ? 'cap' : 'raw'}${data.isVtec ? '-vtec' : ''}`;
+        const suffix = `${data.isCap ? 'cap' : 'raw'}${data.isPVtec ? '-vtec' : ''}`;
         const categoryFile = path.join(cacheDir, `${prefix}-${suffix}.bin`);
         const cacheFile = path.join(cacheDir, `cache-${suffix}.bin`);
         const entry = `[SoF]\nSTANZA ATTRIBUTES...${JSON.stringify(compiled)}\n[EoF]\n${message}`;

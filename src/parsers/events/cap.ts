@@ -34,8 +34,8 @@ export class CapAlerts {
     private static getTracking(extracted: Record<string, string>, metadata: types.StanzaAttributes) {
         return extracted.vtec ? (() => {
             const vtecValue = Array.isArray(extracted.vtec) ? extracted.vtec[0] : extracted.vtec;
-            const splitVTEC = vtecValue.split('.');
-            return `${splitVTEC[2]}-${splitVTEC[3]}-${splitVTEC[4]}-${splitVTEC[5]}`;
+            const splitPVTEC = vtecValue.split('.');
+            return `${splitPVTEC[2]}-${splitPVTEC[3]}-${splitPVTEC[4]}-${splitPVTEC[5]}`;
         })() : `${extracted.wmoidentifier.substring(extracted.wmoidentifier.length - 4)}-${metadata.attributes.ttaaii}-${metadata.attributes.id.slice(-4)}`;
     }
 
@@ -79,7 +79,8 @@ export class CapAlerts {
                     source: `cap-parser`,
                     tracking: this.getTracking(extracted, attributes),
                     header: getHeader,
-                    vtec: extracted.vtec || `N/A`,
+                    pvtec: extracted.vtec || `N/A`,
+                    hvtec: `N/A`,
                     history: [{ description: extracted.description || `N/A`, issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`, type: extracted.msgtype || `N/A` }],
                     properties: {
                         locations: extracted.areadesc || `N/A`,
@@ -91,9 +92,15 @@ export class CapAlerts {
                         description: extracted.description || `N/A`,
                         sender_name: extracted.sendername || `N/A`,
                         sender_icao: extracted.wmoidentifier ? extracted.wmoidentifier.substring(extracted.wmoidentifier.length - 4) : `N/A`,
-                        attributes: validated.attributes,
+                        attributes: attributes,
                         geocode: {
                             UGC: [extracted.ugc],
+                        },
+                        metadata: {attributes},
+                        technical: {
+                            vtec: extracted.vtec || `N/A`,
+                            ugc: extracted.ugc || `N/A`,
+                            hvtec: `N/A`,
                         },
                         parameters: {
                             wmo: extracted.wmoidentifier || `N/A`,

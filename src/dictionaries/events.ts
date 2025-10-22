@@ -72,6 +72,7 @@ export const ACTIONS: Record<string, string> = {
     "S": "Statement"
 }
 
+
 export const STATUS: Record<string, string> = {
     "NEW": "Issued", 
     "CON": "Updated", 
@@ -106,4 +107,36 @@ export const STATUS_CORRELATIONS: {type: string, forward: string, cancel: boolea
     {type: "Routine", forward: "Routine", cancel: false, update: true, new: false},
 ]
 
+export const CAUSES : Record<string, string> = {
+    "SM": "Snow Melt",
+    "RS": "Rain/Snow Melt",
+    "ER": "Excessive Rain",
+    "DM": "Dam/Levee Failure",
+    "IJ": "Ice Jam",
+    "GO": "Glacier Lake Outburst",
+    "IC": "Ice",
+    "FS": "Flash Flood / Storm Surge",
+    "FT": "Tidal Effects",
+    "ET": "Elevated Upstream Flow",
+    "MC": "Other Multiple Causes",
+    "WT": "Wind and/or Tidal Effects",
+    "DR": "Reservoir Release",
+    "UU": "Unknown",
+    "OT": "Other Effects"
+}
 
+export const RECORDS: Record<string, string> = {
+    "NO": "No Record Expected",
+    "NR": "Near Record or possible record",
+    "UU": "Unknown history of records",
+    "OO": "Other",
+}
+
+export const SEVERITY: Record<string, string> = {
+    N: "Not Expected",
+    0: "Areal Flood or FF Product",
+    1: "Minor",
+    2: "Moderate",
+    3: "Major",
+    U: "Unknown",
+}

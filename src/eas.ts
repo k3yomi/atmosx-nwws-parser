@@ -32,14 +32,14 @@ export class EAS {
      * @static
      * @async
      * @param {string} message
-     * @param {string} vtec
+     * @param {string} header
      * @returns {Promise<string | null>}
      */
-    public static generateEASAudio(message: string, vtec: string) {
+    public static generateEASAudio(message: string, header: string) {
         return new Promise(async (resolve) => {
             const settings = loader.settings as types.ClientSettingsTypes;
             const assetsDir = settings.global_settings.eas_settings.directory;
-            const rngFile = `${vtec.replace(/[^a-zA-Z0-9]/g, `_`)}`.substring(0, 32).replace(/^_+|_+$/g, '');
+            const rngFile = `${header.replace(/[^a-zA-Z0-9]/g, `_`)}`.substring(0, 32).replace(/^_+|_+$/g, '');
             const os = loader.packages.os.platform();
             for (const { regex, replacement } of loader.definitions.messageSignatures) { message = message.replace(regex, replacement); }
             if (!assetsDir) { Utils.warn(loader.definitions.messages.eas_no_directory); return resolve(null); }
@@ -77,10 +77,10 @@ export class EAS {
                 toneRadio = this.applyNWREffect(toneSamples, 8000);
             }
             let build = toneRadio != null  ? [toneRadio, this.generateSilence(0.5, 8000)] : [];
-            build.push( this.generateSAMEHeader(vtec, 3, 8000, { preMarkSec: 1.1, gapSec: 0.5 }), this.generateSilence(0.5, 8000), this.generateAttentionTone(8, 8000), this.generateSilence(0.5, 8000), ttsRadio);
+            build.push( this.generateSAMEHeader(header, 3, 8000, { preMarkSec: 1.1, gapSec: 0.5 }), this.generateSilence(0.5, 8000), this.generateAttentionTone(8, 8000), this.generateSilence(0.5, 8000), ttsRadio);
 
             for (let i = 0; i < 3; i++) {
-                build.push(this.generateSAMEHeader(vtec, 1, 8000, { preMarkSec: 0.5, gapSec: 0.1 }));
+                build.push(this.generateSAMEHeader(header, 1, 8000, { preMarkSec: 0.5, gapSec: 0.1 }));
                 build.push(this.generateSilence(0.5, 8000));
             }
             const allSamples = this.concatPCM16(build);

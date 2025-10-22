@@ -83,11 +83,12 @@ __export(index_exports, {
   Database: () => database_default,
   EAS: () => eas_default,
   EventParser: () => events_default,
+  HVtecParser: () => hvtec_default,
+  PVtecParser: () => pvtec_default,
   StanzaParser: () => stanza_default,
   TextParser: () => text_default,
   UGCParser: () => ugc_default,
   Utils: () => utils_default,
-  VtecParser: () => vtec_default,
   default: () => index_default
 });
 module.exports = __toCommonJS(index_exports);
@@ -211,6 +212,37 @@ var STATUS_CORRELATIONS = [
   { type: "Cancelled", forward: "Cancelled", cancel: true, update: false, new: false },
   { type: "Routine", forward: "Routine", cancel: false, update: true, new: false }
 ];
+var CAUSES = {
+  "SM": "Snow Melt",
+  "RS": "Rain/Snow Melt",
+  "ER": "Excessive Rain",
+  "DM": "Dam/Levee Failure",
+  "IJ": "Ice Jam",
+  "GO": "Glacier Lake Outburst",
+  "IC": "Ice",
+  "FS": "Flash Flood / Storm Surge",
+  "FT": "Tidal Effects",
+  "ET": "Elevated Upstream Flow",
+  "MC": "Other Multiple Causes",
+  "WT": "Wind and/or Tidal Effects",
+  "DR": "Reservoir Release",
+  "UU": "Unknown",
+  "OT": "Other Effects"
+};
+var RECORDS = {
+  "NO": "No Record Expected",
+  "NR": "Near Record or possible record",
+  "UU": "Unknown history of records",
+  "OO": "Other"
+};
+var SEVERITY = {
+  N: "Not Expected",
+  0: "Areal Flood or FF Product",
+  1: "Minor",
+  2: "Moderate",
+  3: "Major",
+  U: "Unknown"
+};
 
 // src/dictionaries/offshore.ts
 var OFFSHORE = {
@@ -1004,6 +1036,9 @@ var definitions = {
   correlations: STATUS_CORRELATIONS,
   offshore: OFFSHORE,
   awips: AWIPS,
+  causes: CAUSES,
+  records: RECORDS,
+  severity: SEVERITY,
   cancelSignatures: CANCEL_SIGNATURES,
   messageSignatures: MESSAGE_SIGNATURES,
   tags: TAGS,
@@ -1029,7 +1064,8 @@ var definitions = {
     } }
   ],
   expressions: {
-    vtec: `[OTEX].(NEW|CON|EXT|EXA|EXB|UPG|CAN|EXP|COR|ROU).[A-Z]{4}.[A-Z]{2}.[WAYSFON].[0-9]{4}.[0-9]{6}T[0-9]{4}Z-[0-9]{6}T[0-9]{4}Z`,
+    pvtec: `[OTEX].(NEW|CON|EXT|EXA|EXB|UPG|CAN|EXP|COR|ROU).[A-Z]{4}.[A-Z]{2}.[WAYSFON].[0-9]{4}.[0-9]{6}T[0-9]{4}Z-[0-9]{6}T[0-9]{4}Z`,
+    hvtec: `[a-zA-Z0-9]{4}.[A-Z0-9].[A-Z]{2}.[0-9]{6}T[0-9]{4}Z.[0-9]{6}T[0-9]{4}Z.[0-9]{6}T[0-9]{4}Z.[A-Z]{2}`,
     wmo: `[A-Z0-9]{6}\\s[A-Z]{4}\\s\\d{6}`,
     ugc1: `(\\w{2}[CZ](\\d{3}((-|>)\\s?(
 
@@ -1038,8 +1074,7 @@ var definitions = {
 
 )?)`,
     ugc3: `(\\d{6})(?=-|$)`,
-    dateline: `/d{3,4}s*(AM|PM)?s*[A-Z]{2,4}s+[A-Z]{3,}s+[A-Z]{3,}s+d{1,2}s+d{4}`,
-    wmoID: `[A-Z0-9]{2}([A-Z]{3})`
+    dateline: `/d{3,4}s*(AM|PM)?s*[A-Z]{2,4}s+[A-Z]{3,}s+[A-Z]{3,}s+d{1,2}s+d{4}`
   },
   shapefiles: [
     { id: `C`, file: `USCounties` },
@@ -1084,7 +1119,7 @@ var StanzaParser = class {
    *     message: string;
    *     attributes: types.StanzaAttributes;
    *     isCap: boolean,
-   *     isVtec: boolean;
+   *     isPVtec: boolean;
    *     isCapDescription: boolean;
    *     awipsType: Record<string, string>;
    *     isApi: boolean;
@@ -1100,10 +1135,10 @@ var StanzaParser = class {
       const attributes = vTypes;
       const isCap = (_a = vTypes.isCap) != null ? _a : message.includes(`<?xml`);
       const isCapDescription = message.includes(`<areaDesc>`);
-      const isVtec = message.match(definitions.expressions.vtec) != null;
+      const isPVtec = message.match(definitions.expressions.pvtec) != null;
       const isUGC = message.match(definitions.expressions.ugc1) != null;
       const awipsType = this.getType(attributes);
-      return { message, attributes, isCap, isVtec, isUGC, isCapDescription, awipsType, isApi: false, ignore: false };
+      return { message, attributes, isCap, isPVtec, isUGC, isCapDescription, awipsType, isApi: false, ignore: false };
     }
     if (stanza.is(`message`)) {
       let cb = stanza.getChild(`x`);
@@ -1113,15 +1148,15 @@ var StanzaParser = class {
         if (attributes.awipsid && attributes.awipsid.length > 1) {
           const isCap = message.includes(`<?xml`);
           const isCapDescription = message.includes(`<areaDesc>`);
-          const isVtec = message.match(definitions.expressions.vtec) != null;
+          const isPVtec = message.match(definitions.expressions.pvtec) != null;
           const isUGC = message.match(definitions.expressions.ugc1) != null;
           const awipsType = this.getType(attributes);
-          this.cache(message, { attributes, isCap, isVtec, awipsType });
-          return { message, attributes, isCap, isVtec, isUGC, isCapDescription, awipsType, isApi: false, ignore: false };
+          this.cache(message, { attributes, isCap, isPVtec, awipsType });
+          return { message, attributes, isCap, isPVtec, isUGC, isCapDescription, awipsType, isApi: false, ignore: false };
         }
       }
     }
-    return { message: null, attributes: null, isApi: null, isCap: null, isVtec: null, isUGC: null, isCapDescription: null, awipsType: null, ignore: true };
+    return { message: null, attributes: null, isApi: null, isCap: null, isPVtec: null, isUGC: null, isCapDescription: null, awipsType: null, ignore: true };
   }
   /**
    * @function getType
@@ -1169,7 +1204,7 @@ var StanzaParser = class {
       const cacheDir = settings2.noaa_weather_wire_service_settings.cache.directory;
       if (!fs2.existsSync(cacheDir)) fs2.mkdirSync(cacheDir, { recursive: true });
       const prefix = `category-${data.awipsType.prefix}-${data.awipsType.type}s`;
-      const suffix = `${data.isCap ? "cap" : "raw"}${data.isVtec ? "-vtec" : ""}`;
+      const suffix = `${data.isCap ? "cap" : "raw"}${data.isPVtec ? "-vtec" : ""}`;
       const categoryFile = path2.join(cacheDir, `${prefix}-${suffix}.bin`);
       const cacheFile = path2.join(cacheDir, `cache-${suffix}.bin`);
       const entry = `[SoF]
@@ -1259,8 +1294,7 @@ var TextParser = class {
    */
   static textProductToDescription(message, handle = null) {
     const original = message;
-    const dateRegex = /\d{3,4}\s*(AM|PM)?\s*[A-Z]{2,4}\s+[A-Z]{3,}\s+[A-Z]{3,}\s+\d{1,2}\s+\d{4}/gim;
-    const discoveredDates = Array.from(message.matchAll(dateRegex));
+    const discoveredDates = Array.from(message.matchAll(new RegExp(definitions.expressions.dateline, "gim")));
     if (discoveredDates.length) {
       const lastMatch = discoveredDates[discoveredDates.length - 1][0];
       const startIdx = message.lastIndexOf(lastMatch);
@@ -1513,10 +1547,10 @@ var UGCParser = class {
 };
 var ugc_default = UGCParser;
 
-// src/parsers/vtec.ts
-var VtecParser = class {
+// src/parsers/pvtec.ts
+var PVtecParser = class {
   /**
-   * @function vtecExtractor
+   * @function pVtecExtractor
    * @description
    *     Extracts VTEC entries from a raw NWWS message string and returns
    *     structured objects containing type, tracking, event, status,
@@ -1526,18 +1560,18 @@ var VtecParser = class {
    * @param {string} message
    * @returns {Promise<types.VtecEntry[] | null>}
    */
-  static vtecExtractor(message) {
+  static pVtecExtractor(message) {
     return __async(this, null, function* () {
       var _a;
-      const matches = message.match(new RegExp(definitions.expressions.vtec, "g"));
+      const matches = message.match(new RegExp(definitions.expressions.pvtec, "g"));
       if (!matches) return null;
-      const vtecs = [];
-      for (const vtec of matches) {
-        const parts = vtec.split(".");
+      const pVtecs = [];
+      for (const pvtec of matches) {
+        const parts = pvtec.split(".");
         if (parts.length < 7) continue;
         const dates = parts[6].split("-");
-        vtecs.push({
-          raw: vtec,
+        pVtecs.push({
+          raw: pvtec,
           type: definitions.productTypes[parts[0]],
           tracking: `${parts[2]}-${parts[3]}-${parts[4]}-${parts[5]}`,
           event: `${definitions.events[parts[3]]} ${definitions.actions[parts[4]]}`,
@@ -1546,7 +1580,7 @@ var VtecParser = class {
           expires: this.parseExpiryDate(dates)
         });
       }
-      return vtecs.length ? vtecs : null;
+      return pVtecs.length ? pVtecs : null;
     });
   }
   /**
@@ -1569,9 +1603,41 @@ var VtecParser = class {
     return `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}T${pad(local.getHours())}:${pad(local.getMinutes())}:00.000-04:00`;
   }
 };
-var vtec_default = VtecParser;
+var pvtec_default = PVtecParser;
 
-// src/parsers/types/vtec.ts
+// src/parsers/hvtec.ts
+var HVtecParser = class {
+  /**
+   * @function HVtecExtractor
+   * @description
+   *     Extracts VTEC entries from a raw NWWS message string and returns
+   *     structured objects containing type, tracking, event, status,
+   *     WMO identifiers, and expiry date.
+   *
+   * @static
+   * @param {string} message
+   * @returns {Promise<types.HtecEntry[] | null>}
+   */
+  static HVtecExtractor(message) {
+    return __async(this, null, function* () {
+      const matches = message.match(new RegExp(definitions.expressions.hvtec, "g"));
+      if (!matches || matches.length !== 1) return null;
+      const hvtec = matches[0];
+      const parts = hvtec.split(".");
+      if (parts.length < 7) return null;
+      const hvtecs = [{
+        severity: definitions.severity[parts[1]],
+        cause: definitions.causes[parts[2]],
+        record: definitions.records[parts[6]],
+        raw: hvtec
+      }];
+      return hvtecs;
+    });
+  }
+};
+var hvtec_default = HVtecParser;
+
+// src/parsers/events/vtec.ts
 var VTECAlerts = class {
   /**
    * @function event
@@ -1599,21 +1665,23 @@ var VTECAlerts = class {
           const tick = performance.now();
           const message = messages[i];
           const attributes = cachedAttribute != null ? JSON.parse(cachedAttribute[1]) : validated;
-          const getVTEC = yield vtec_default.vtecExtractor(message);
+          const getPVTEC = yield pvtec_default.pVtecExtractor(message);
+          const getHVTEC = yield hvtec_default.HVtecExtractor(message);
           const getUGC = yield ugc_default.ugcExtractor(message);
-          if (getVTEC != null && getUGC != null) {
-            for (let j = 0; j < getVTEC.length; j++) {
-              const vtec = getVTEC[j];
-              const getBaseProperties = yield events_default.getBaseProperties(message, attributes, getUGC, vtec);
-              const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, validated.attributes), getBaseProperties.metadata), getBaseProperties, vtec);
+          if (getPVTEC != null && getUGC != null) {
+            for (let j = 0; j < getPVTEC.length; j++) {
+              const pVtec = getPVTEC[j];
+              const getBaseProperties = yield events_default.getBaseProperties(message, attributes, getUGC, pVtec, getHVTEC);
+              const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, validated.attributes), getBaseProperties.metadata), getBaseProperties, pVtec);
               processed.push({
                 performance: performance.now() - tick,
-                source: `vtec-parser`,
-                tracking: vtec.tracking,
+                source: `pvtec-parser`,
+                tracking: pVtec.tracking,
                 header: getHeader,
-                vtec: vtec.raw,
-                history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: vtec.status }],
-                properties: __spreadValues({ event: vtec.event, parent: vtec.event, action_type: vtec.status }, getBaseProperties)
+                pvtec: pVtec.raw,
+                hvtec: getHVTEC != null ? getHVTEC.raw : `N/A`,
+                history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: pVtec.status }],
+                properties: __spreadValues({ event: pVtec.event, parent: pVtec.event, action_type: pVtec.status }, getBaseProperties)
               });
             }
           }
@@ -1623,9 +1691,9 @@ var VTECAlerts = class {
     });
   }
 };
-var vtec_default2 = VTECAlerts;
+var vtec_default = VTECAlerts;
 
-// src/parsers/types/ugc.ts
+// src/parsers/events/ugc.ts
 var UGCAlerts = class {
   /**
    * @function getTracking
@@ -1697,7 +1765,8 @@ var UGCAlerts = class {
               source: `ugc-parser`,
               tracking: this.getTracking(getBaseProperties),
               header: getHeader,
-              vtec: `N/A`,
+              pvtec: `N/A`,
+              hvtec: `N/A`,
               history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: `Issued` }],
               properties: __spreadValues({ event: getEvent, parent: getEvent, action_type: `Issued` }, getBaseProperties)
             });
@@ -1710,7 +1779,7 @@ var UGCAlerts = class {
 };
 var ugc_default2 = UGCAlerts;
 
-// src/parsers/types/text.ts
+// src/parsers/events/text.ts
 var TextAlerts = class {
   /**
    * @function getTracking
@@ -1781,7 +1850,8 @@ var TextAlerts = class {
             source: `text-parser`,
             tracking: this.getTracking(getBaseProperties),
             header: getHeader,
-            vtec: `N/A`,
+            pvtec: `N/A`,
+            hvtec: `N/A`,
             history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: `Issued` }],
             properties: __spreadValues({ event: getEvent, parent: getEvent, action_type: `Issued` }, getBaseProperties)
           });
@@ -1793,7 +1863,7 @@ var TextAlerts = class {
 };
 var text_default2 = TextAlerts;
 
-// src/parsers/types/cap.ts
+// src/parsers/events/cap.ts
 var CapAlerts = class {
   /**
    * @function getTracking
@@ -1810,8 +1880,8 @@ var CapAlerts = class {
   static getTracking(extracted, metadata) {
     return extracted.vtec ? (() => {
       const vtecValue = Array.isArray(extracted.vtec) ? extracted.vtec[0] : extracted.vtec;
-      const splitVTEC = vtecValue.split(".");
-      return `${splitVTEC[2]}-${splitVTEC[3]}-${splitVTEC[4]}-${splitVTEC[5]}`;
+      const splitPVTEC = vtecValue.split(".");
+      return `${splitPVTEC[2]}-${splitPVTEC[3]}-${splitPVTEC[4]}-${splitPVTEC[5]}`;
     })() : `${extracted.wmoidentifier.substring(extracted.wmoidentifier.length - 4)}-${metadata.attributes.ttaaii}-${metadata.attributes.id.slice(-4)}`;
   }
   /**
@@ -1869,7 +1939,8 @@ var CapAlerts = class {
             source: `cap-parser`,
             tracking: this.getTracking(extracted, attributes),
             header: getHeader,
-            vtec: extracted.vtec || `N/A`,
+            pvtec: extracted.vtec || `N/A`,
+            hvtec: `N/A`,
             history: [{ description: extracted.description || `N/A`, issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`, type: extracted.msgtype || `N/A` }],
             properties: {
               locations: extracted.areadesc || `N/A`,
@@ -1881,9 +1952,15 @@ var CapAlerts = class {
               description: extracted.description || `N/A`,
               sender_name: extracted.sendername || `N/A`,
               sender_icao: extracted.wmoidentifier ? extracted.wmoidentifier.substring(extracted.wmoidentifier.length - 4) : `N/A`,
-              attributes: validated.attributes,
+              attributes,
               geocode: {
                 UGC: [extracted.ugc]
+              },
+              metadata: { attributes },
+              technical: {
+                vtec: extracted.vtec || `N/A`,
+                ugc: extracted.ugc || `N/A`,
+                hvtec: `N/A`
               },
               parameters: {
                 wmo: extracted.wmoidentifier || `N/A`,
@@ -1914,7 +1991,7 @@ var CapAlerts = class {
 };
 var cap_default = CapAlerts;
 
-// src/parsers/types/api.ts
+// src/parsers/events/api.ts
 var APIAlerts = class {
   /**
    * @function getTracking
@@ -1929,10 +2006,10 @@ var APIAlerts = class {
    * @returns {string} 
    */
   static getTracking(extracted) {
-    return extracted.vtec ? (() => {
-      const vtecValue = Array.isArray(extracted.vtec) ? extracted.vtec[0] : extracted.vtec;
-      const splitVTEC = vtecValue.split(".");
-      return `${splitVTEC[2]}-${splitVTEC[3]}-${splitVTEC[4]}-${splitVTEC[5]}`;
+    return extracted.pVtec ? (() => {
+      const vtecValue = Array.isArray(extracted.pVtec) ? extracted.pVtec[0] : extracted.pVtec;
+      const splitPVTEC = vtecValue.split(".");
+      return `${splitPVTEC[2]}-${splitPVTEC[3]}-${splitPVTEC[4]}-${splitPVTEC[5]}`;
     })() : `${extracted.wmoidentifier}`;
   }
   /**
@@ -1942,12 +2019,12 @@ var APIAlerts = class {
    *
    * @private
    * @static
-   * @param {string} vtec 
+   * @param {string} pVtec 
    * @returns {{ icao: any; name: any; }} 
    */
-  static getICAO(vtec) {
+  static getICAO(pVtec) {
     var _a, _b;
-    const icao = vtec ? vtec.split(`.`)[2] : `N/A`;
+    const icao = pVtec ? pVtec.split(`.`)[2] : `N/A`;
     const name = (_b = (_a = definitions.ICAO) == null ? void 0 : _a[icao]) != null ? _b : `N/A`;
     return { icao, name };
   }
@@ -1969,7 +2046,7 @@ var APIAlerts = class {
       const messages = Object.values(JSON.parse(validated.message).features);
       for (let feature of messages) {
         const tick = performance.now();
-        const getVTEC = (_d = (_c = (_b = (_a = feature == null ? void 0 : feature.properties) == null ? void 0 : _a.parameters) == null ? void 0 : _b.VTEC) == null ? void 0 : _c[0]) != null ? _d : null;
+        const getPVTEC = (_d = (_c = (_b = (_a = feature == null ? void 0 : feature.properties) == null ? void 0 : _a.parameters) == null ? void 0 : _b.VTEC) == null ? void 0 : _c[0]) != null ? _d : null;
         const getWmo = (_g = (_f = (_e = feature == null ? void 0 : feature.properties) == null ? void 0 : _e.parameters) == null ? void 0 : _f.WMOidentifier[0]) != null ? _g : null;
         const getUgc = (_j = (_i = (_h = feature == null ? void 0 : feature.properties) == null ? void 0 : _h.geocode) == null ? void 0 : _i.UGC) != null ? _j : null;
         const getHeadline = (_n = (_m = (_l = (_k = feature == null ? void 0 : feature.properties) == null ? void 0 : _k.parameters) == null ? void 0 : _l.NWSheadline) == null ? void 0 : _m[0]) != null ? _n : "";
@@ -1977,13 +2054,13 @@ var APIAlerts = class {
         const getAWIP = (_t = (_s = (_r = (_q = feature == null ? void 0 : feature.properties) == null ? void 0 : _q.parameters) == null ? void 0 : _r.AWIPSidentifier) == null ? void 0 : _s[0]) != null ? _t : null;
         const getHeader = events_default.getHeader(__spreadValues({}, { getAwip: { prefix: getAWIP == null ? void 0 : getAWIP.slice(0, -3) } }));
         const getSource = text_default.textProductToString(getDescription, `SOURCE...`, [`.`]) || `N/A`;
-        const getOffice = this.getICAO(getVTEC || ``);
+        const getOffice = this.getICAO(getPVTEC || ``);
         processed.push({
           performance: performance.now() - tick,
           source: `api-parser`,
-          tracking: this.getTracking({ vtec: getVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
+          tracking: this.getTracking({ pVtec: getPVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
           header: getHeader,
-          vtec: getVTEC || `N/A`,
+          pvtec: getPVTEC || `N/A`,
           history: [{
             description: (_v = (_u = feature == null ? void 0 : feature.properties) == null ? void 0 : _u.description) != null ? _v : `N/A`,
             action: (_x = (_w = feature == null ? void 0 : feature.properties) == null ? void 0 : _w.messageType) != null ? _x : `N/A`,
@@ -2002,6 +2079,12 @@ var APIAlerts = class {
             attributes: validated.attributes,
             geocode: {
               UGC: (_Q = (_P = (_O = feature == null ? void 0 : feature.properties) == null ? void 0 : _O.geocode) == null ? void 0 : _P.UGC) != null ? _Q : [`XX000`]
+            },
+            metadata: {},
+            technical: {
+              vtec: getPVTEC || `N/A`,
+              ugc: getUgc ? getUgc.join(`,`) : `N/A`,
+              hvtec: `N/A`
             },
             parameters: {
               wmo: ((_T = (_S = (_R = feature == null ? void 0 : feature.properties) == null ? void 0 : _R.parameters) == null ? void 0 : _S.WMOidentifier) == null ? void 0 : _T[0]) || getWmo || `N/A`,
@@ -2046,10 +2129,11 @@ var EventParser = class {
    * @param {string} message
    * @param {types.StanzaCompiled} validated
    * @param {types.UGCEntry} [ugc=null]
-   * @param {types.VtecEntry} [vtec=null]
+   * @param {types.PVtecEntry} [pVtec=null]
+   * @param {types.HVtecEntry} [hVtec=null]
    * @returns {Promise<Record<string, any>>}
    */
-  static getBaseProperties(message, metadata, ugc = null, vtec = null) {
+  static getBaseProperties(message, metadata, ugc = null, pVtec = null, hVtec = null) {
     return __async(this, null, function* () {
       var _a, _b;
       const settings2 = settings;
@@ -2061,15 +2145,15 @@ var EventParser = class {
         damage: text_default.textProductToString(message, `DAMAGE THREAT...`) || `N/A`,
         source: text_default.textProductToString(message, `SOURCE...`, [`.`]) || `N/A`,
         polygon: text_default.textProductToPolygon(message),
-        description: text_default.textProductToDescription(message, (_a = vtec == null ? void 0 : vtec.raw) != null ? _a : null),
+        description: text_default.textProductToDescription(message, (_a = pVtec == null ? void 0 : pVtec.raw) != null ? _a : null),
         wmo: message.match(new RegExp(definitions.expressions.wmo, "imu")),
         mdTorIntensity: text_default.textProductToString(message, `MOST PROBABLE PEAK TORNADO INTENSITY...`) || `N/A`,
         mdWindGusts: text_default.textProductToString(message, `MOST PROBABLE PEAK WIND GUST...`) || `N/A`,
         mdHailSize: text_default.textProductToString(message, `MOST PROBABLE PEAK HAIL SIZE...`) || `N/A`
       };
-      const getOffice = this.getICAO(vtec, metadata, definitions2.wmo);
+      const getOffice = this.getICAO(pVtec, metadata, definitions2.wmo);
       const getCorrectIssued = this.getCorrectIssuedDate(metadata);
-      const getCorrectExpiry = this.getCorrectExpiryDate(vtec, ugc);
+      const getCorrectExpiry = this.getCorrectExpiryDate(pVtec, ugc);
       const base = {
         locations: (ugc == null ? void 0 : ugc.locations.join(`; `)) || `No Location Specified (UGC Missing)`,
         issued: getCorrectIssued,
@@ -2079,6 +2163,7 @@ var EventParser = class {
         sender_name: getOffice.name,
         sender_icao: getOffice.icao,
         metadata: __spreadValues({}, Object.fromEntries(Object.entries(metadata).filter(([key]) => key !== "message"))),
+        technical: { ugc, vtec: pVtec, hvtec: hVtec },
         parameters: {
           wmo: Array.isArray(definitions2.wmo) ? definitions2.wmo[0] : (_b = definitions2.wmo) != null ? _b : `N/A`,
           source: definitions2.source,
@@ -2213,15 +2298,15 @@ var EventParser = class {
    * @static
    * @param {types.StanzaAttributes} attributes
    * @param {types.EventProperties} [properties]
-   * @param {types.VtecEntry} [vtec]
+   * @param {types.PVtecEntry} [pVtec]
    * @returns {string}
    */
-  static getHeader(attributes, properties, vtec) {
+  static getHeader(attributes, properties, pVtec) {
     var _a, _b, _c, _d, _e, _f, _g;
     const parent = `ATSX`;
     const alertType = (_d = (_c = (_a = attributes == null ? void 0 : attributes.awipsType) == null ? void 0 : _a.type) != null ? _c : (_b = attributes == null ? void 0 : attributes.getAwip) == null ? void 0 : _b.prefix) != null ? _d : `XX`;
     const ugc = ((_e = properties == null ? void 0 : properties.geocode) == null ? void 0 : _e.UGC) != null ? (_f = properties == null ? void 0 : properties.geocode) == null ? void 0 : _f.UGC.join(`-`) : `000000`;
-    const status = (vtec == null ? void 0 : vtec.status) || "Issued";
+    const status = (pVtec == null ? void 0 : pVtec.status) || "Issued";
     const issued = (properties == null ? void 0 : properties.issued) != null ? (_g = new Date(properties == null ? void 0 : properties.issued)) == null ? void 0 : _g.toISOString().replace(/[-:]/g, "").split(".")[0] : (/* @__PURE__ */ new Date()).toISOString().replace(/[-:]/g, "").split(".")[0];
     const sender = (properties == null ? void 0 : properties.sender_icao) || `XXXX`;
     const header = `ZCZC-${parent}-${alertType}-${ugc}-${status}-${issued}-${sender}-`;
@@ -2231,7 +2316,7 @@ var EventParser = class {
    * @function eventHandler
    * @description
    *     Routes a validated stanza object to the appropriate alert handler
-   *     based on its type flags: API, CAP, VTEC, UGC, or plain text.
+   *     based on its type flags: API, CAP, pVTEC (Primary VTEC), UGC, or plain text.
    *
    * @static
    * @param {types.StanzaCompiled} validated
@@ -2240,9 +2325,9 @@ var EventParser = class {
   static eventHandler(metadata) {
     if (metadata.isApi) return api_default.event(metadata);
     if (metadata.isCap) return cap_default.event(metadata);
-    if (!metadata.isCap && metadata.isVtec && metadata.isUGC) return vtec_default2.event(metadata);
-    if (!metadata.isCap && !metadata.isVtec && metadata.isUGC) return ugc_default2.event(metadata);
-    if (!metadata.isCap && !metadata.isVtec && !metadata.isUGC) return text_default2.event(metadata);
+    if (!metadata.isCap && metadata.isPVtec && metadata.isUGC) return vtec_default.event(metadata);
+    if (!metadata.isCap && !metadata.isPVtec && metadata.isUGC) return ugc_default2.event(metadata);
+    if (!metadata.isCap && !metadata.isPVtec && !metadata.isUGC) return text_default2.event(metadata);
   }
   /**
    * @function getICAO
@@ -2253,14 +2338,14 @@ var EventParser = class {
    *
    * @private
    * @static
-   * @param {types.VtecEntry | null} vtec
+   * @param {types.PVtecEntry | null} pVtec
    * @param {Record<string, string>} attributes
    * @param {RegExpMatchArray | string | null} WMO
    * @returns {{ icao: string; name: string }}
    */
-  static getICAO(vtec, metadata, WMO) {
+  static getICAO(pVtec, metadata, WMO) {
     var _a, _b, _c, _d;
-    const icao = vtec != null ? vtec == null ? void 0 : vtec.tracking.split(`-`)[0] : (_b = (_a = metadata.attributes) == null ? void 0 : _a.cccc) != null ? _b : WMO != null ? Array.isArray(WMO) ? WMO[0] : WMO : `N/A`;
+    const icao = pVtec != null ? pVtec == null ? void 0 : pVtec.tracking.split(`-`)[0] : (_b = (_a = metadata.attributes) == null ? void 0 : _a.cccc) != null ? _b : WMO != null ? Array.isArray(WMO) ? WMO[0] : WMO : `N/A`;
     const name = (_d = (_c = definitions.ICAO) == null ? void 0 : _c[icao]) != null ? _d : `N/A`;
     return { icao, name };
   }
@@ -2289,13 +2374,13 @@ var EventParser = class {
    *
    * @private
    * @static
-   * @param {types.VtecEntry} vtec
+   * @param {types.PVtecEntry} pVtec
    * @param {types.UGCEntry} ugc
    * @returns {string}
    */
-  static getCorrectExpiryDate(vtec, ugc) {
-    const time = (vtec == null ? void 0 : vtec.expires) && !isNaN(new Date(vtec.expires).getTime()) ? new Date(vtec.expires).toLocaleString() : (ugc == null ? void 0 : ugc.expiry) != null ? new Date(ugc.expiry).toLocaleString() : new Date((/* @__PURE__ */ new Date()).getTime() + 1 * 60 * 60 * 1e3).toLocaleString();
-    if (time == `Invalid Date`) return new Date((/* @__PURE__ */ new Date()).getTime() + 1 * 60 * 60 * 1e3).toLocaleString();
+  static getCorrectExpiryDate(pVtec, ugc) {
+    const time = (pVtec == null ? void 0 : pVtec.expires) && !isNaN(new Date(pVtec.expires).getTime()) ? new Date(pVtec.expires).toLocaleString() : (ugc == null ? void 0 : ugc.expiry) != null ? new Date(ugc.expiry).toLocaleString() : new Date((/* @__PURE__ */ new Date()).getTime() + 1 * 60 * 60 * 1e3).toLocaleString();
+    if (time == `Invalid Date`) return `Until Further Notice`;
     return time;
   }
   /**
@@ -2377,8 +2462,8 @@ var EventParser = class {
         setAction(`C`);
       }
     }
-    if (event.vtec) {
-      const getType = event.vtec.split(`.`)[0];
+    if (event.pvtec) {
+      const getType = event.pvtec.split(`.`)[0];
       const isTestProduct = definitions.productTypes[getType] == `Test Product`;
       if (isTestProduct) {
         setAction(`C`);
@@ -2755,7 +2840,7 @@ var Utils = class _Utils {
           attributes: {},
           isCap: true,
           isApi: true,
-          isVtec: false,
+          isPVtec: false,
           isUGC: false,
           isCapDescription: false,
           awipsType: { type: "api", prefix: "AP" },
@@ -2967,14 +3052,14 @@ var EAS = class {
    * @static
    * @async
    * @param {string} message
-   * @param {string} vtec
+   * @param {string} header
    * @returns {Promise<string | null>}
    */
-  static generateEASAudio(message, vtec) {
+  static generateEASAudio(message, header) {
     return new Promise((resolve) => __async(this, null, function* () {
       const settings2 = settings;
       const assetsDir = settings2.global_settings.eas_settings.directory;
-      const rngFile = `${vtec.replace(/[^a-zA-Z0-9]/g, `_`)}`.substring(0, 32).replace(/^_+|_+$/g, "");
+      const rngFile = `${header.replace(/[^a-zA-Z0-9]/g, `_`)}`.substring(0, 32).replace(/^_+|_+$/g, "");
       const os2 = packages.os.platform();
       for (const { regex, replacement } of definitions.messageSignatures) {
         message = message.replace(regex, replacement);
@@ -3023,9 +3108,9 @@ var EAS = class {
         toneRadio = this.applyNWREffect(toneSamples, 8e3);
       }
       let build = toneRadio != null ? [toneRadio, this.generateSilence(0.5, 8e3)] : [];
-      build.push(this.generateSAMEHeader(vtec, 3, 8e3, { preMarkSec: 1.1, gapSec: 0.5 }), this.generateSilence(0.5, 8e3), this.generateAttentionTone(8, 8e3), this.generateSilence(0.5, 8e3), ttsRadio);
+      build.push(this.generateSAMEHeader(header, 3, 8e3, { preMarkSec: 1.1, gapSec: 0.5 }), this.generateSilence(0.5, 8e3), this.generateAttentionTone(8, 8e3), this.generateSilence(0.5, 8e3), ttsRadio);
       for (let i = 0; i < 3; i++) {
-        build.push(this.generateSAMEHeader(vtec, 1, 8e3, { preMarkSec: 0.5, gapSec: 0.1 }));
+        build.push(this.generateSAMEHeader(header, 1, 8e3, { preMarkSec: 0.5, gapSec: 0.1 }));
         build.push(this.generateSilence(0.5, 8e3));
       }
       const allSamples = this.concatPCM16(build);
@@ -3652,9 +3737,10 @@ var index_default = AlertManager;
   Database,
   EAS,
   EventParser,
+  HVtecParser,
+  PVtecParser,
   StanzaParser,
   TextParser,
   UGCParser,
-  Utils,
-  VtecParser
+  Utils
 });

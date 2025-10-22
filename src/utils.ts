@@ -110,7 +110,7 @@ export class Utils {
                 attributes: {},
                 isCap: true,
                 isApi: true,
-                isVtec: false,
+                isPVtec: false,
                 isUGC: false,
                 isCapDescription: false,
                 awipsType: { type: 'api', prefix: 'AP' },

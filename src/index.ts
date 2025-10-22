@@ -21,7 +21,8 @@ import Database from './database';
 import EAS from './eas';
 import EventParser from './parsers/events';
 import TextParser from './parsers/text';
-import VtecParser from './parsers/vtec';
+import PVtecParser from './parsers/pvtec';
+import HVtecParser from './parsers/hvtec';
 import UGCParser from './parsers/ugc';
 
 export class AlertManager { 
@@ -223,4 +224,4 @@ export class AlertManager {
 }
 
 export default AlertManager;
-export { StanzaParser, EventParser, TextParser, VtecParser, UGCParser, EAS, Database, Utils };
+export { StanzaParser, EventParser, TextParser, PVtecParser, HVtecParser, UGCParser, EAS, Database, Utils };

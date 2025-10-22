@@ -134,6 +134,11 @@ interface LocalEventProperties {
     issued?: string;
     expires?: string;
     geocode?: { UGC: string[] };
+    technical: { 
+        ugc?: UGCEntry | null;
+        pVtec?: PVtecEntry | null,
+        hVtec?: HVtecEntry | null;
+    }
     description?: string;
     sender_name?: string;
     sender_icao?: string;
@@ -177,7 +182,7 @@ export interface StanzaCompiled {
     isCap?: boolean;
     isApi?: boolean;
     isCapDescription?: boolean;
-    isVtec?: boolean;
+    isPVtec?: boolean;
     isUGC?: boolean;
     getAwip?: Record<string, string>;
     awipsType?: Record<string, string>;
@@ -186,7 +191,7 @@ export interface StanzaCompiled {
     awipsid?: string;
 }
 
-export interface VtecEntry { 
+export interface PVtecEntry { 
     raw?: string;
     type?: string;
     tracking?: string;
@@ -203,11 +208,20 @@ export interface UGCEntry {
     polygon?: [number, number][];
 }
 
+export interface HVtecEntry { 
+    severity?: string,
+    cause?: string,
+    record?: string,
+    raw?: string,
+}
+
+
 export interface EventCompiled {
     performance?: number;
     tracking?: string;
     header?: string;
-    vtec?: string;
+    pvtec?: string;
+    hvtec?: string;
     history?: LocalEventHistory[];
     properties?: LocalEventProperties;
     geometry?: { type?: string; coordinates?: [number, number][] } | null;

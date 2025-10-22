@@ -13,11 +13,10 @@
 
 import * as types from '../../types';
 import * as loader from '../../bootstrap';
-import UgcParser from '../ugc';
 import EventParser from '../events';
 
 
-export class UGCAlerts {
+export class TextAlerts {
 
     /**
      * @function getTracking
@@ -37,16 +36,15 @@ export class UGCAlerts {
     /**
      * @function getEvent
      * @description
-     *     Determines the human-readable event name from a message and AWIPS attributes.
-     *     - Checks if the message contains any predefined offshore event keywords
-     *       and returns the matching offshore event if found.
-     *     - Otherwise, returns a formatted event type string from the provided attributes,
-     *       capitalizing the first letter of each word.
+     *     Determines the event name from a text message and its AWIPS attributes.
+     *     If the message contains a known offshore event keyword, that offshore
+     *     event is returned. Otherwise, the event type from the AWIPS attributes
+     *     is formatted into a human-readable string with each word capitalized.
      *
      * @private
      * @static
      * @param {string} message
-     * @param {Record<string, any>} attributes
+     * @param {types.StanzaAttributes} metadata
      * @returns {string}
      */
     private static getEvent(message: string, metadata: types.StanzaAttributes) {
@@ -58,11 +56,13 @@ export class UGCAlerts {
     /**
      * @function event
      * @description
-     *     Processes a validated stanza message, extracting UGC entries and
-     *     computing base properties for non-VTEC events. Each extracted event
-     *     is enriched with metadata, performance timing, and history information,
-     *     then filtered and emitted via `EventParser.validateEvents`.
+     *     Processes a compiled text-based NOAA Stanza message and extracts relevant
+     *     event information. Splits the message into multiple segments based on
+     *     markers such as "$$", "ISSUED TIME...", or separator lines, generates
+     *     base properties, headers, event names, and tracking information for
+     *     each segment, then validates and emits the processed events.
      *
+     * @public
      * @static
      * @async
      * @param {types.StanzaCompiled} validated
@@ -78,26 +78,24 @@ export class UGCAlerts {
             for (let i = 0; i < messages.length; i++) {
                 const tick = performance.now();
                 const message = messages[i]
-                const getUGC = await UgcParser.ugcExtractor(message) as types.UGCEntry
-                if (getUGC != null) {
-                    const attributes = cachedAttribute != null ? JSON.parse(cachedAttribute[1]) : validated;
-                    const getBaseProperties = await EventParser.getBaseProperties(message, attributes, getUGC) as types.EventProperties;
-                    const getHeader = EventParser.getHeader({ ...attributes, ...getBaseProperties.metadata } as types.StanzaAttributes, getBaseProperties);
-                    const getEvent = this.getEvent(message, attributes);
-                    processed.push({
-                        performance: performance.now() - tick,
-                        source: `ugc-parser`,
-                        tracking: this.getTracking(getBaseProperties),
-                        header: getHeader,
-                        vtec: `N/A`,
-                        history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: `Issued` }],
-                        properties: { event: getEvent, parent: getEvent, action_type: `Issued`, ...getBaseProperties, }
-                    })
-                }
+                const attributes = cachedAttribute != null ? JSON.parse(cachedAttribute[1]) : validated;
+                const getBaseProperties = await EventParser.getBaseProperties(message, attributes) as types.EventProperties;
+                const getHeader = EventParser.getHeader({ ...validated.attributes, ...getBaseProperties.metadata } as types.StanzaAttributes, getBaseProperties);
+                const getEvent = this.getEvent(message, attributes);
+                processed.push({
+                    performance: performance.now() - tick,
+                    source: `text-parser`,
+                    tracking: this.getTracking(getBaseProperties),
+                    header: getHeader,
+                    pvtec: `N/A`,
+                    hvtec: `N/A`,
+                    history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: `Issued` }],
+                    properties: { event: getEvent, parent: getEvent, action_type: `Issued`, ...getBaseProperties, }
+                })
             }
         }
         EventParser.validateEvents(processed);
     }
 }
 
-export default UGCAlerts;
+export default TextAlerts;

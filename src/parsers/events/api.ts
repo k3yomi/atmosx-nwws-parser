@@ -32,10 +32,10 @@ export class APIAlerts {
      * @returns {string} 
      */
     private static getTracking(extracted: Record<string, string>) {
-        return extracted.vtec ? (() => {
-            const vtecValue = Array.isArray(extracted.vtec) ? extracted.vtec[0] : extracted.vtec;
-            const splitVTEC = vtecValue.split('.');
-            return `${splitVTEC[2]}-${splitVTEC[3]}-${splitVTEC[4]}-${splitVTEC[5]}`;
+        return extracted.pVtec ? (() => {
+            const vtecValue = Array.isArray(extracted.pVtec) ? extracted.pVtec[0] : extracted.pVtec;
+            const splitPVTEC = vtecValue.split('.');
+            return `${splitPVTEC[2]}-${splitPVTEC[3]}-${splitPVTEC[4]}-${splitPVTEC[5]}`;
         })() :  `${extracted.wmoidentifier}`;
     }
 
@@ -46,11 +46,11 @@ export class APIAlerts {
      *
      * @private
      * @static
-     * @param {string} vtec 
+     * @param {string} pVtec 
      * @returns {{ icao: any; name: any; }} 
      */
-    private static getICAO(vtec: string) {
-        const icao = vtec ? vtec.split(`.`)[2] : `N/A`;
+    private static getICAO(pVtec: string) {
+        const icao = pVtec ? pVtec.split(`.`)[2] : `N/A`;
         const name = loader.definitions.ICAO?.[icao] ?? `N/A`;
         return { icao, name };
     }
@@ -71,7 +71,7 @@ export class APIAlerts {
         const messages = Object.values(JSON.parse(validated.message).features) as types.EventCompiled[];
         for (let feature of messages) {
             const tick = performance.now();
-            const getVTEC = feature?.properties?.parameters?.VTEC?.[0] ?? null;
+            const getPVTEC = feature?.properties?.parameters?.VTEC?.[0] ?? null;
             const getWmo = feature?.properties?.parameters?.WMOidentifier[0] ?? null;
             const getUgc = feature?.properties?.geocode?.UGC ?? null;
             const getHeadline = feature?.properties?.parameters?.NWSheadline?.[0] ?? "";
@@ -79,13 +79,13 @@ export class APIAlerts {
             const getAWIP = feature?.properties?.parameters?.AWIPSidentifier?.[0] ?? null;
             const getHeader = EventParser.getHeader({ ...{ getAwip: {prefix: getAWIP?.slice(0, -3) }},} as types.StanzaAttributes);
             const getSource = TextParser.textProductToString(getDescription, `SOURCE...`, [`.`]) || `N/A`;
-            const getOffice = this.getICAO(getVTEC || ``);
+            const getOffice = this.getICAO(getPVTEC || ``);
             processed.push({
                 performance: performance.now() - tick,
                 source: `api-parser`,
-                tracking: this.getTracking({ vtec: getVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
+                tracking: this.getTracking({ pVtec: getPVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
                 header: getHeader,
-                vtec: getVTEC || `N/A`,
+                pvtec: getPVTEC || `N/A`,
                 history: [{
                     description: feature?.properties?.description ?? `N/A`,
                     action: feature?.properties?.messageType ?? `N/A`,
@@ -104,6 +104,12 @@ export class APIAlerts {
                     attributes: validated.attributes,
                     geocode: {
                         UGC: feature?.properties?.geocode?.UGC ?? [`XX000`]
+                    },
+                    metadata: {},
+                    technical: {
+                        vtec: getPVTEC || `N/A`,
+                        ugc: getUgc ? getUgc.join(`,`) : `N/A`,
+                        hvtec: `N/A`,
                     },
                     parameters: {
                         wmo: feature?.properties?.parameters?.WMOidentifier?.[0] || getWmo || `N/A`,
