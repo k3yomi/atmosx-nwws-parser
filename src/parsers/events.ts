@@ -110,8 +110,9 @@ export class EventParser {
                     const conditionMet = (condition.description && description.includes(condition.description.toLowerCase())) || (condition.condition && condition.condition(damageThreatTag || tornadoThreatTag));
                     if (conditionMet) { eventName = specificEvent; break; }
                 }   
-                if (baseEvent === 'Severe Thunderstorm Warning' && damageThreatTag === 'POSSIBLE' && !eventName.includes('(TPROB)')) eventName += ' (TPROB)';
+                if (baseEvent === 'Severe Thunderstorm Warning' && tornadoThreatTag === 'POSSIBLE' && !eventName.includes('(TPROB)')) eventName += ' (TPROB)';
                 break;
+
             }
         }
         return useParentEvents ? event?.properties?.event : eventName;

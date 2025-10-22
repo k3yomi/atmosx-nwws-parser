@@ -2135,7 +2135,7 @@ var EventParser = class {
             break;
           }
         }
-        if (baseEvent === "Severe Thunderstorm Warning" && damageThreatTag === "POSSIBLE" && !eventName.includes("(TPROB)")) eventName += " (TPROB)";
+        if (baseEvent === "Severe Thunderstorm Warning" && tornadoThreatTag === "POSSIBLE" && !eventName.includes("(TPROB)")) eventName += " (TPROB)";
         break;
       }
     }
