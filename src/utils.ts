@@ -70,7 +70,6 @@ export class Utils {
                 const cacheDir = settings.noaa_weather_wire_service_settings.cache.directory;
                 const getAllFiles = loader.packages.fs.readdirSync(cacheDir).filter((file: string) => file.endsWith('.bin') && file.startsWith('cache-'));
                 this.warn(loader.definitions.messages.dump_cache.replace(`{count}`, getAllFiles.length.toString()), true);
-                await this.sleep(2000);
                 for (const file of getAllFiles) {
                     const filepath = loader.packages.path.join(cacheDir, file);
                     const readFile = loader.packages.fs.readFileSync(filepath, { encoding: 'utf-8' });

@@ -2797,7 +2797,6 @@ var Utils = class _Utils {
           const cacheDir = settings2.noaa_weather_wire_service_settings.cache.directory;
           const getAllFiles = packages.fs.readdirSync(cacheDir).filter((file) => file.endsWith(".bin") && file.startsWith("cache-"));
           this.warn(definitions.messages.dump_cache.replace(`{count}`, getAllFiles.length.toString()), true);
-          yield this.sleep(2e3);
           for (const file of getAllFiles) {
             const filepath = packages.path.join(cacheDir, file);
             const readFile = packages.fs.readFileSync(filepath, { encoding: "utf-8" });
@@ -3670,14 +3669,16 @@ var AlertManager = class {
         yield utils_default.sleep(2e3);
       }
       if (this.isNoaaWeatherWireService) {
-        try {
-          yield database_default.loadDatabase();
-          yield xmpp_default.deploySession();
-          yield utils_default.loadCollectionCache();
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          utils_default.warn(`Failed to initialize NWWS services: ${msg}`);
-        }
+        (() => __async(this, null, function* () {
+          try {
+            yield database_default.loadDatabase();
+            yield xmpp_default.deploySession();
+            yield utils_default.loadCollectionCache();
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            utils_default.warn(`Failed to initialize NWWS services: ${msg}`);
+          }
+        }))();
       }
       utils_default.handleCronJob(this.isNoaaWeatherWireService);
       if (this.job) {
