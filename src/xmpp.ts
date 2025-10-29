@@ -120,8 +120,8 @@ export class Xmpp {
                             (!validate.isCap && settings.noaa_weather_wire_service_settings.preferences.cap_only) ||
                             (validate.isCap && !validate.isCapDescription);
                     if (skipMessage) return;
-                    EventParser.eventHandler(validate);
-                    Database.stanzaCacheImport(JSON.stringify(validate));
+                    await EventParser.eventHandler(validate);
+                    await Database.stanzaCacheImport(JSON.stringify(validate));
                     loader.cache.events.emit('onMessage', validate);
                 }
                 if (stanza.is('presence') && stanza.attrs.from?.startsWith('nwws@conference.nwws-oi.weather.gov/')) {

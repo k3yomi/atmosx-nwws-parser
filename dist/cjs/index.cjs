@@ -2719,8 +2719,8 @@ var Xmpp = class {
             const validate = stanza_default.validate(stanza);
             const skipMessage = validate.ignore || validate.isCap && !settings2.noaa_weather_wire_service_settings.preferences.cap_only || !validate.isCap && settings2.noaa_weather_wire_service_settings.preferences.cap_only || validate.isCap && !validate.isCapDescription;
             if (skipMessage) return;
-            events_default.eventHandler(validate);
-            database_default.stanzaCacheImport(JSON.stringify(validate));
+            yield events_default.eventHandler(validate);
+            yield database_default.stanzaCacheImport(JSON.stringify(validate));
             cache.events.emit("onMessage", validate);
           }
           if (stanza.is("presence") && ((_a2 = stanza.attrs.from) == null ? void 0 : _a2.startsWith("nwws@conference.nwws-oi.weather.gov/"))) {
@@ -2808,7 +2808,7 @@ var Utils = class _Utils {
             if (isCap && !settings2.noaa_weather_wire_service_settings.preferences.cap_only) continue;
             if (!isCap && settings2.noaa_weather_wire_service_settings.preferences.cap_only) continue;
             const validate = stanza_default.validate(readFile, { isCap, raw: true });
-            events_default.eventHandler(validate);
+            yield events_default.eventHandler(validate);
           }
           this.warn(definitions.messages.dump_cache_complete, true);
         }

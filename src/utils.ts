@@ -79,7 +79,7 @@ export class Utils {
                     if (isCap && !settings.noaa_weather_wire_service_settings.preferences.cap_only) continue;
                     if (!isCap && settings.noaa_weather_wire_service_settings.preferences.cap_only) continue;
                     const validate = StanzaParser.validate(readFile, { isCap: isCap, raw: true });
-                    EventParser.eventHandler(validate);
+                    await EventParser.eventHandler(validate);
                 }
                 this.warn(loader.definitions.messages.dump_cache_complete, true);
             }
