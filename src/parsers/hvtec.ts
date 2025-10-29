@@ -28,7 +28,7 @@ export class HVtecParser {
      * @returns {Promise<types.HtecEntry[] | null>}
      */
     public static async HVtecExtractor(message: string): Promise<types.HVtecEntry[] | null> {
-        const matches = message.match(new RegExp(loader.definitions.expressions.hvtec, 'g'));
+        const matches = message.match(loader.definitions.regular_expressions.hvtec);
         if (!matches || matches.length !== 1) return null;
         const hvtec = matches[0];
         const parts = hvtec.split('.');

@@ -61,6 +61,9 @@ interface LocalCacheSettings {
 }
 
 interface LocalAlertPreferenceSettings {
+    disable_ugc?: boolean;
+    disable_vtec?: boolean;
+    disable_text?: boolean;
     cap_only?: boolean;
     shapefile_coordinates?: boolean;
 }
@@ -197,7 +200,7 @@ export interface PVtecEntry {
     tracking?: string;
     event?: string;
     status?: string;
-    wmo?: string[];
+    wmo?: string;
     expires?: Date | string;
 }
 

@@ -28,8 +28,7 @@ export class PVtecParser {
      * @returns {Promise<types.VtecEntry[] | null>}
      */
     public static async pVtecExtractor(message: string): Promise<types.PVtecEntry[] | null> {
-        const matches = message.match(new RegExp(loader.definitions.expressions.pvtec, 'g'));
-        if (!matches) return null;
+        const matches = message.match(loader.definitions.regular_expressions.pvtec) ?? [];
         const pVtecs: types.PVtecEntry[] = [];
         for (const pvtec of matches) {
             const parts = pvtec.split('.');
@@ -41,11 +40,11 @@ export class PVtecParser {
                 tracking: `${parts[2]}-${parts[3]}-${parts[4]}-${parts[5]}`,
                 event: `${loader.definitions.events[parts[3]]} ${loader.definitions.actions[parts[4]]}`,
                 status: loader.definitions.status[parts[1]],
-                wmo: message.match(new RegExp(loader.definitions.expressions.wmo, 'gimu')) ?? [],
+                wmo: message.match(loader.definitions.regular_expressions.wmo)?.[0] || `N/A`,
                 expires: this.parseExpiryDate(dates),
             });
         }
-        return pVtecs.length ? pVtecs : null;
+        return pVtecs.length > 0 ? pVtecs : null;
     }
 
     /**

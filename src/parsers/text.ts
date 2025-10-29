@@ -83,7 +83,7 @@ export class TextParser {
      */
     public static textProductToDescription(message: string, handle: string = null): string {
         const original = message;
-        const discoveredDates = Array.from(message.matchAll(new RegExp(loader.definitions.expressions.dateline, 'gim')));
+        const discoveredDates = Array.from(message.matchAll(loader.definitions.regular_expressions.dateline));
         if (discoveredDates.length) {
             const lastMatch = discoveredDates[discoveredDates.length - 1][0];
             const startIdx = message.lastIndexOf(lastMatch);

@@ -65,6 +65,7 @@ import crypto from "crypto";
 import os from "os";
 import say from "say";
 import child from "child_process";
+import worker from "worker_threads";
 
 // src/dictionaries/events.ts
 var EVENTS = {
@@ -913,7 +914,8 @@ var packages = {
   crypto,
   os,
   say,
-  child
+  child,
+  worker
 };
 var cache = {
   isReady: true,
@@ -953,6 +955,9 @@ var settings = {
       directory: null
     },
     preferences: {
+      disable_ugc: false,
+      disable_vtec: false,
+      disable_text: false,
       cap_only: false,
       shapefile_coordinates: false
     }
@@ -1021,18 +1026,14 @@ var definitions = {
       "Considerable Severe Thunderstorm Warning": { condition: (damageThreatTag) => damageThreatTag === "CONSIDERABLE" }
     } }
   ],
-  expressions: {
-    pvtec: `[OTEX].(NEW|CON|EXT|EXA|EXB|UPG|CAN|EXP|COR|ROU).[A-Z]{4}.[A-Z]{2}.[WAYSFON].[0-9]{4}.[0-9]{6}T[0-9]{4}Z-[0-9]{6}T[0-9]{4}Z`,
-    hvtec: `[a-zA-Z0-9]{4}.[A-Z0-9].[A-Z]{2}.[0-9]{6}T[0-9]{4}Z.[0-9]{6}T[0-9]{4}Z.[0-9]{6}T[0-9]{4}Z.[A-Z]{2}`,
-    wmo: `[A-Z0-9]{6}\\s[A-Z]{4}\\s\\d{6}`,
-    ugc1: `(\\w{2}[CZ](\\d{3}((-|>)\\s?(
-
-)?))+)`,
-    ugc2: `(\\d{6}(-|>)\\s?(
-
-)?)`,
-    ugc3: `(\\d{6})(?=-|$)`,
-    dateline: `/d{3,4}s*(AM|PM)?s*[A-Z]{2,4}s+[A-Z]{3,}s+[A-Z]{3,}s+d{1,2}s+d{4}`
+  regular_expressions: {
+    pvtec: new RegExp(`[OTEX].(NEW|CON|EXT|EXA|EXB|UPG|CAN|EXP|COR|ROU).[A-Z]{4}.[A-Z]{2}.[WAYSFON].[0-9]{4}.[0-9]{6}T[0-9]{4}Z-[0-9]{6}T[0-9]{4}Z`, "g"),
+    hvtec: new RegExp(`[a-zA-Z0-9]{4}.[A-Z0-9].[A-Z]{2}.[0-9]{6}T[0-9]{4}Z.[0-9]{6}T[0-9]{4}Z.[0-9]{6}T[0-9]{4}Z.[A-Z]{2}`, "imu"),
+    wmo: new RegExp(`[A-Z0-9]{6}\\s[A-Z]{4}\\s\\d{6}`, "imu"),
+    ugc1: new RegExp(`(\\w{2}[CZ](\\d{3}((-|>)\\s?(\\n\\n)?))+)`, "imu"),
+    ugc2: new RegExp(`(\\d{6}(-|>)\\s?(\\n\\n)?)`, "imu"),
+    ugc3: new RegExp(`(\\d{6})(?=-|$)`, "imu"),
+    dateline: new RegExp(`\\d{3,4}\\s*(AM|PM)?\\s*[A-Z]{2,4}\\s+[A-Z]{3,}\\s+[A-Z]{3,}\\s+\\d{1,2}\\s+\\d{4}`, "gim")
   },
   shapefiles: [
     { id: `C`, file: `USCounties` },
@@ -1093,8 +1094,8 @@ var StanzaParser = class {
       const attributes = vTypes;
       const isCap = (_a = vTypes.isCap) != null ? _a : message.includes(`<?xml`);
       const isCapDescription = message.includes(`<areaDesc>`);
-      const isPVtec = message.match(definitions.expressions.pvtec) != null;
-      const isUGC = message.match(definitions.expressions.ugc1) != null;
+      const isPVtec = message.match(definitions.regular_expressions.pvtec) != null;
+      const isUGC = message.match(definitions.regular_expressions.ugc1) != null;
       const awipsType = this.getType(attributes);
       return { message, attributes, isCap, isPVtec, isUGC, isCapDescription, awipsType, isApi: false, ignore: false };
     }
@@ -1106,8 +1107,8 @@ var StanzaParser = class {
         if (attributes.awipsid && attributes.awipsid.length > 1) {
           const isCap = message.includes(`<?xml`);
           const isCapDescription = message.includes(`<areaDesc>`);
-          const isPVtec = message.match(definitions.expressions.pvtec) != null;
-          const isUGC = message.match(definitions.expressions.ugc1) != null;
+          const isPVtec = message.match(definitions.regular_expressions.pvtec) != null;
+          const isUGC = message.match(definitions.regular_expressions.ugc1) != null;
           const awipsType = this.getType(attributes);
           this.cache(message, { attributes, isCap, isPVtec, awipsType });
           return { message, attributes, isCap, isPVtec, isUGC, isCapDescription, awipsType, isApi: false, ignore: false };
@@ -1252,7 +1253,7 @@ var TextParser = class {
    */
   static textProductToDescription(message, handle = null) {
     const original = message;
-    const discoveredDates = Array.from(message.matchAll(new RegExp(definitions.expressions.dateline, "gim")));
+    const discoveredDates = Array.from(message.matchAll(definitions.regular_expressions.dateline));
     if (discoveredDates.length) {
       const lastMatch = discoveredDates[discoveredDates.length - 1][0];
       const startIdx = message.lastIndexOf(lastMatch);
@@ -1372,11 +1373,9 @@ var UGCParser = class {
    * @returns {string | null}
    */
   static getHeader(message) {
-    const start = message.search(new RegExp(definitions.expressions.ugc1, "gimu"));
-    if (start === -1) return null;
+    const start = message.search(definitions.regular_expressions.ugc1);
     const subMessage = message.substring(start);
-    const end = subMessage.search(new RegExp(definitions.expressions.ugc2, "gimu"));
-    if (end === -1) return null;
+    const end = subMessage.search(definitions.regular_expressions.ugc2);
     const full = subMessage.substring(0, end).replace(/\s+/g, "").slice(0, -1);
     return full || null;
   }
@@ -1393,16 +1392,13 @@ var UGCParser = class {
    * @returns {Date | null}
    */
   static getExpiry(message) {
-    const start = message.match(new RegExp(definitions.expressions.ugc3, "gimu"));
-    if (start != null) {
-      const day = parseInt(start[0].substring(0, 2), 10);
-      const hour = parseInt(start[0].substring(2, 4), 10);
-      const minute = parseInt(start[0].substring(4, 6), 10);
-      const now = /* @__PURE__ */ new Date();
-      const expires = new Date(now.getUTCFullYear(), now.getUTCMonth(), day, hour, minute, 0);
-      return expires;
-    }
-    return null;
+    const start = message.match(definitions.regular_expressions.ugc3);
+    const day = parseInt(start[0].substring(0, 2), 10);
+    const hour = parseInt(start[0].substring(2, 4), 10);
+    const minute = parseInt(start[0].substring(4, 6), 10);
+    const now = /* @__PURE__ */ new Date();
+    const expires = new Date(now.getUTCFullYear(), now.getUTCMonth(), day, hour, minute, 0);
+    return expires;
   }
   /**
    * @function getLocations
@@ -1418,16 +1414,20 @@ var UGCParser = class {
    */
   static getLocations(zones) {
     return __async(this, null, function* () {
-      const locations = [];
-      for (let i = 0; i < zones.length; i++) {
-        const id = zones[i].trim();
-        const located = yield cache.db.prepare(
-          `
-                SELECT location FROM shapefiles WHERE id = ?`
-        ).get(id);
-        located != void 0 ? locations.push(located.location) : locations.push(id);
+      const uniqueZones = Array.from(new Set(zones.map((z) => z.trim())));
+      const placeholders = uniqueZones.map(() => "?").join(",");
+      const rows = yield cache.db.prepare(
+        `SELECT id, location FROM shapefiles WHERE id IN (${placeholders})`
+      ).all(...uniqueZones);
+      const locationMap = /* @__PURE__ */ new Map();
+      for (const row of rows) {
+        locationMap.set(row.id, row.location);
       }
-      return Array.from(new Set(locations)).sort();
+      const locations = uniqueZones.map((id) => {
+        var _a;
+        return (_a = locationMap.get(id)) != null ? _a : id;
+      });
+      return locations.sort();
     });
   }
   /**
@@ -1520,9 +1520,8 @@ var PVtecParser = class {
    */
   static pVtecExtractor(message) {
     return __async(this, null, function* () {
-      var _a;
-      const matches = message.match(new RegExp(definitions.expressions.pvtec, "g"));
-      if (!matches) return null;
+      var _a, _b;
+      const matches = (_a = message.match(definitions.regular_expressions.pvtec)) != null ? _a : [];
       const pVtecs = [];
       for (const pvtec of matches) {
         const parts = pvtec.split(".");
@@ -1534,11 +1533,11 @@ var PVtecParser = class {
           tracking: `${parts[2]}-${parts[3]}-${parts[4]}-${parts[5]}`,
           event: `${definitions.events[parts[3]]} ${definitions.actions[parts[4]]}`,
           status: definitions.status[parts[1]],
-          wmo: (_a = message.match(new RegExp(definitions.expressions.wmo, "gimu"))) != null ? _a : [],
+          wmo: ((_b = message.match(definitions.regular_expressions.wmo)) == null ? void 0 : _b[0]) || `N/A`,
           expires: this.parseExpiryDate(dates)
         });
       }
-      return pVtecs.length ? pVtecs : null;
+      return pVtecs.length > 0 ? pVtecs : null;
     });
   }
   /**
@@ -1578,7 +1577,7 @@ var HVtecParser = class {
    */
   static HVtecExtractor(message) {
     return __async(this, null, function* () {
-      const matches = message.match(new RegExp(definitions.expressions.hvtec, "g"));
+      const matches = message.match(definitions.regular_expressions.hvtec);
       if (!matches || matches.length !== 1) return null;
       const hvtec = matches[0];
       const parts = hvtec.split(".");
@@ -2093,37 +2092,37 @@ var EventParser = class {
    */
   static getBaseProperties(message, metadata, ugc = null, pVtec = null, hVtec = null) {
     return __async(this, null, function* () {
-      var _a, _b;
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
       const settings2 = settings;
       const definitions2 = {
-        tornado: text_default.textProductToString(message, `TORNADO...`) || text_default.textProductToString(message, `WATERSPOUT...`) || `N/A`,
-        hail: text_default.textProductToString(message, `MAX HAIL SIZE...`, [`IN`]) || text_default.textProductToString(message, `HAIL...`, [`IN`]) || `N/A`,
-        gusts: text_default.textProductToString(message, `MAX WIND GUST...`) || text_default.textProductToString(message, `WIND...`) || `N/A`,
-        flood: text_default.textProductToString(message, `FLASH FLOOD...`) || `N/A`,
-        damage: text_default.textProductToString(message, `DAMAGE THREAT...`) || `N/A`,
-        source: text_default.textProductToString(message, `SOURCE...`, [`.`]) || `N/A`,
+        tornado: (_b = (_a = text_default.textProductToString(message, `TORNADO...`)) != null ? _a : text_default.textProductToString(message, `WATERSPOUT...`)) != null ? _b : `N/A`,
+        hail: (_d = (_c = text_default.textProductToString(message, `MAX HAIL SIZE...`, [`IN`])) != null ? _c : text_default.textProductToString(message, `HAIL...`, [`IN`])) != null ? _d : `N/A`,
+        gusts: (_f = (_e = text_default.textProductToString(message, `MAX WIND GUST...`)) != null ? _e : text_default.textProductToString(message, `WIND...`)) != null ? _f : `N/A`,
+        flood: (_g = text_default.textProductToString(message, `FLASH FLOOD...`)) != null ? _g : `N/A`,
+        damage: (_h = text_default.textProductToString(message, `DAMAGE THREAT...`)) != null ? _h : `N/A`,
+        source: (_i = text_default.textProductToString(message, `SOURCE...`, [`.`])) != null ? _i : `N/A`,
         polygon: text_default.textProductToPolygon(message),
-        description: text_default.textProductToDescription(message, (_a = pVtec == null ? void 0 : pVtec.raw) != null ? _a : null),
-        wmo: message.match(new RegExp(definitions.expressions.wmo, "imu")),
-        mdTorIntensity: text_default.textProductToString(message, `MOST PROBABLE PEAK TORNADO INTENSITY...`) || `N/A`,
-        mdWindGusts: text_default.textProductToString(message, `MOST PROBABLE PEAK WIND GUST...`) || `N/A`,
-        mdHailSize: text_default.textProductToString(message, `MOST PROBABLE PEAK HAIL SIZE...`) || `N/A`
+        description: text_default.textProductToDescription(message, (_j = pVtec == null ? void 0 : pVtec.raw) != null ? _j : null),
+        wmo: (_l = (_k = message.match(definitions.regular_expressions.wmo)) == null ? void 0 : _k[0]) != null ? _l : `N/A`,
+        mdTorIntensity: (_m = text_default.textProductToString(message, `MOST PROBABLE PEAK TORNADO INTENSITY...`)) != null ? _m : `N/A`,
+        mdWindGusts: (_n = text_default.textProductToString(message, `MOST PROBABLE PEAK WIND GUST...`)) != null ? _n : `N/A`,
+        mdHailSize: (_o = text_default.textProductToString(message, `MOST PROBABLE PEAK HAIL SIZE...`)) != null ? _o : `N/A`
       };
       const getOffice = this.getICAO(pVtec, metadata, definitions2.wmo);
       const getCorrectIssued = this.getCorrectIssuedDate(metadata);
       const getCorrectExpiry = this.getCorrectExpiryDate(pVtec, ugc);
       const base = {
-        locations: (ugc == null ? void 0 : ugc.locations.join(`; `)) || `No Location Specified (UGC Missing)`,
+        locations: (_p = ugc == null ? void 0 : ugc.locations.join(`; `)) != null ? _p : `No Location Specified (UGC Missing)`,
         issued: getCorrectIssued,
         expires: getCorrectExpiry,
-        geocode: { UGC: (ugc == null ? void 0 : ugc.zones) || [`XX000`] },
+        geocode: { UGC: (_q = ugc == null ? void 0 : ugc.zones) != null ? _q : [`XX000`] },
         description: definitions2.description,
         sender_name: getOffice.name,
         sender_icao: getOffice.icao,
         metadata: __spreadValues({}, Object.fromEntries(Object.entries(metadata).filter(([key]) => key !== "message"))),
         technical: { ugc, vtec: pVtec, hvtec: hVtec },
         parameters: {
-          wmo: Array.isArray(definitions2.wmo) ? definitions2.wmo[0] : (_b = definitions2.wmo) != null ? _b : `N/A`,
+          wmo: Array.isArray(definitions2.wmo) ? definitions2.wmo[0] : (_r = definitions2.wmo) != null ? _r : `N/A`,
           source: definitions2.source,
           max_hail_size: definitions2.hail,
           max_wind_gust: definitions2.gusts,
@@ -2260,13 +2259,13 @@ var EventParser = class {
    * @returns {string}
    */
   static getHeader(attributes, properties, pVtec) {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     const parent = `ATSX`;
     const alertType = (_d = (_c = (_a = attributes == null ? void 0 : attributes.awipsType) == null ? void 0 : _a.type) != null ? _c : (_b = attributes == null ? void 0 : attributes.getAwip) == null ? void 0 : _b.prefix) != null ? _d : `XX`;
     const ugc = ((_e = properties == null ? void 0 : properties.geocode) == null ? void 0 : _e.UGC) != null ? (_f = properties == null ? void 0 : properties.geocode) == null ? void 0 : _f.UGC.join(`-`) : `000000`;
-    const status = (pVtec == null ? void 0 : pVtec.status) || "Issued";
-    const issued = (properties == null ? void 0 : properties.issued) != null ? (_g = new Date(properties == null ? void 0 : properties.issued)) == null ? void 0 : _g.toISOString().replace(/[-:]/g, "").split(".")[0] : (/* @__PURE__ */ new Date()).toISOString().replace(/[-:]/g, "").split(".")[0];
-    const sender = (properties == null ? void 0 : properties.sender_icao) || `XXXX`;
+    const status = (_g = pVtec == null ? void 0 : pVtec.status) != null ? _g : "Issued";
+    const issued = (properties == null ? void 0 : properties.issued) != null ? (_h = new Date(properties == null ? void 0 : properties.issued)) == null ? void 0 : _h.toISOString().replace(/[-:]/g, "").split(".")[0] : (/* @__PURE__ */ new Date()).toISOString().replace(/[-:]/g, "").split(".")[0];
+    const sender = (_i = properties == null ? void 0 : properties.sender_icao) != null ? _i : `XXXX`;
     const header = `ZCZC-${parent}-${alertType}-${ugc}-${status}-${issued}-${sender}-`;
     return header;
   }
@@ -2281,11 +2280,14 @@ var EventParser = class {
    * @returns {void}
    */
   static eventHandler(metadata) {
+    const settings2 = settings;
+    const preferences = settings2.noaa_weather_wire_service_settings.preferences;
     if (metadata.isApi) return api_default.event(metadata);
     if (metadata.isCap) return cap_default.event(metadata);
-    if (!metadata.isCap && metadata.isPVtec && metadata.isUGC) return vtec_default.event(metadata);
-    if (!metadata.isCap && !metadata.isPVtec && metadata.isUGC) return ugc_default2.event(metadata);
-    if (!metadata.isCap && !metadata.isPVtec && !metadata.isUGC) return text_default2.event(metadata);
+    if (!preferences.disable_vtec && !metadata.isCap && metadata.isPVtec && metadata.isUGC) return vtec_default.event(metadata);
+    if (!preferences.disable_ugc && !metadata.isCap && !metadata.isPVtec && metadata.isUGC) return ugc_default2.event(metadata);
+    if (!preferences.disable_text && !metadata.isCap && !metadata.isPVtec && !metadata.isUGC) return text_default2.event(metadata);
+    return;
   }
   /**
    * @function getICAO
@@ -2302,9 +2304,9 @@ var EventParser = class {
    * @returns {{ icao: string; name: string }}
    */
   static getICAO(pVtec, metadata, WMO) {
-    var _a, _b, _c, _d;
-    const icao = pVtec != null ? pVtec == null ? void 0 : pVtec.tracking.split(`-`)[0] : (_b = (_a = metadata.attributes) == null ? void 0 : _a.cccc) != null ? _b : WMO != null ? Array.isArray(WMO) ? WMO[0] : WMO : `N/A`;
-    const name = (_d = (_c = definitions.ICAO) == null ? void 0 : _c[icao]) != null ? _d : `N/A`;
+    var _a, _b, _c;
+    const icao = pVtec != null ? pVtec == null ? void 0 : pVtec.tracking.split(`-`)[0] : ((_a = metadata.attributes) == null ? void 0 : _a.cccc) || (WMO != null ? Array.isArray(WMO) ? WMO[0] : WMO : `N/A`);
+    const name = (_c = (_b = definitions.ICAO) == null ? void 0 : _b[icao]) != null ? _c : `N/A`;
     return { icao, name };
   }
   /**
@@ -2766,7 +2768,7 @@ var Utils = class _Utils {
             if (isCap && !settings2.noaa_weather_wire_service_settings.preferences.cap_only) continue;
             if (!isCap && settings2.noaa_weather_wire_service_settings.preferences.cap_only) continue;
             const validate = stanza_default.validate(readFile, { isCap, raw: true });
-            yield events_default.eventHandler(validate);
+            events_default.eventHandler(validate);
           }
           this.warn(definitions.messages.dump_cache_complete, true);
         }

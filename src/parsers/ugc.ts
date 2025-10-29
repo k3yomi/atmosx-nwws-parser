@@ -55,11 +55,9 @@ export class UGCParser {
      * @returns {string | null}
      */
     public static getHeader(message: string): string | null {
-        const start = message.search(new RegExp(loader.definitions.expressions.ugc1, "gimu"));
-        if (start === -1) return null;
+        const start = message.search(loader.definitions.regular_expressions.ugc1);
         const subMessage = message.substring(start);
-        const end = subMessage.search(new RegExp(loader.definitions.expressions.ugc2, "gimu"));
-        if (end === -1) return null;
+        const end = subMessage.search(loader.definitions.regular_expressions.ugc2);
         const full = subMessage.substring(0, end).replace(/\s+/g, '').slice(0, -1);
         return full || null;
     }
@@ -77,16 +75,13 @@ export class UGCParser {
      * @returns {Date | null}
      */
     public static getExpiry(message: string): Date | null {
-        const start = message.match(new RegExp(loader.definitions.expressions.ugc3, "gimu"));
-        if (start != null) { 
-            const day = parseInt(start[0].substring(0, 2), 10);
-            const hour = parseInt(start[0].substring(2, 4), 10);
-            const minute = parseInt(start[0].substring(4, 6), 10);
-            const now = new Date();
-            const expires = new Date(now.getUTCFullYear(), now.getUTCMonth(), day, hour, minute, 0);
-            return expires;
-        }
-        return null;
+        const start = message.match(loader.definitions.regular_expressions.ugc3);
+        const day = parseInt(start[0].substring(0, 2), 10);
+        const hour = parseInt(start[0].substring(2, 4), 10);
+        const minute = parseInt(start[0].substring(4, 6), 10);
+        const now = new Date();
+        const expires = new Date(now.getUTCFullYear(), now.getUTCMonth(), day, hour, minute, 0);
+        return expires;
     }
 
     /**
@@ -101,16 +96,16 @@ export class UGCParser {
      * @param {string[]} zones
      * @returns {Promise<string[]>}
      */
-    public static async getLocations (zones: String[]): Promise<string[]> {
-        const locations: string[] = [];
-        for (let i = 0; i < zones.length; i++) {
-            const id = zones[i].trim();
-            const located = await loader.cache.db.prepare(`
-                SELECT location FROM shapefiles WHERE id = ?`
-            ).get(id);
-            located != undefined ? locations.push(located.location) : locations.push(id);
-        }
-        return Array.from(new Set(locations)).sort();
+    public static async getLocations(zones: string[]): Promise<string[]> {
+        const uniqueZones = Array.from(new Set(zones.map(z => z.trim())));
+        const placeholders = uniqueZones.map(() => '?').join(',');
+        const rows = await loader.cache.db.prepare(
+            `SELECT id, location FROM shapefiles WHERE id IN (${placeholders})`
+        ).all(...uniqueZones);
+        const locationMap = new Map<string, string>();
+        for (const row of rows) { locationMap.set(row.id, row.location) }
+        const locations = uniqueZones.map(id => locationMap.get(id) ?? id);
+        return locations.sort();
     }
 
     /**

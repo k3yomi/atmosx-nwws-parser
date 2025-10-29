@@ -34,27 +34,27 @@ export class EventParser {
     public static async getBaseProperties(message: string, metadata: types.DefaultAttributesType, ugc: types.UGCEntry = null, pVtec: types.PVtecEntry = null, hVtec: types.HVtecEntry = null) {
         const settings = loader.settings as types.ClientSettingsTypes;
         const definitions = {
-            tornado: TextParser.textProductToString(message, `TORNADO...`) || TextParser.textProductToString(message, `WATERSPOUT...`) || `N/A`,
-            hail: TextParser.textProductToString(message, `MAX HAIL SIZE...`, [`IN`]) || TextParser.textProductToString(message, `HAIL...`, [`IN`]) || `N/A`,
-            gusts: TextParser.textProductToString(message, `MAX WIND GUST...`) || TextParser.textProductToString(message, `WIND...`) || `N/A`,
-            flood: TextParser.textProductToString(message, `FLASH FLOOD...`) || `N/A`,
-            damage: TextParser.textProductToString(message, `DAMAGE THREAT...`) || `N/A`,
-            source: TextParser.textProductToString(message, `SOURCE...`, [`.`]) || `N/A`,
+            tornado: TextParser.textProductToString(message, `TORNADO...`) ?? TextParser.textProductToString(message, `WATERSPOUT...`) ?? `N/A`,
+            hail: TextParser.textProductToString(message, `MAX HAIL SIZE...`, [`IN`]) ?? TextParser.textProductToString(message, `HAIL...`, [`IN`]) ?? `N/A`,
+            gusts: TextParser.textProductToString(message, `MAX WIND GUST...`) ?? TextParser.textProductToString(message, `WIND...`) ?? `N/A`,
+            flood: TextParser.textProductToString(message, `FLASH FLOOD...`) ?? `N/A`,
+            damage: TextParser.textProductToString(message, `DAMAGE THREAT...`) ?? `N/A`,
+            source: TextParser.textProductToString(message, `SOURCE...`, [`.`]) ?? `N/A`,
             polygon: TextParser.textProductToPolygon(message),
             description: TextParser.textProductToDescription(message, pVtec?.raw ?? null),
-            wmo: message.match(new RegExp(loader.definitions.expressions.wmo, 'imu')),
-            mdTorIntensity: TextParser.textProductToString(message, `MOST PROBABLE PEAK TORNADO INTENSITY...`) || `N/A`,
-            mdWindGusts: TextParser.textProductToString(message, `MOST PROBABLE PEAK WIND GUST...`) || `N/A`,
-            mdHailSize: TextParser.textProductToString(message, `MOST PROBABLE PEAK HAIL SIZE...`) || `N/A`,
+            wmo: message.match(loader.definitions.regular_expressions.wmo)?.[0] ?? `N/A`,
+            mdTorIntensity: TextParser.textProductToString(message, `MOST PROBABLE PEAK TORNADO INTENSITY...`) ?? `N/A`,
+            mdWindGusts: TextParser.textProductToString(message, `MOST PROBABLE PEAK WIND GUST...`) ?? `N/A`,
+            mdHailSize: TextParser.textProductToString(message, `MOST PROBABLE PEAK HAIL SIZE...`) ?? `N/A`,
         };
         const getOffice = this.getICAO(pVtec, metadata, definitions.wmo);
         const getCorrectIssued = this.getCorrectIssuedDate(metadata);
         const getCorrectExpiry = this.getCorrectExpiryDate(pVtec, ugc);
         const base = { 
-            locations: ugc?.locations.join(`; `) || `No Location Specified (UGC Missing)`,
+            locations: ugc?.locations.join(`; `) ?? `No Location Specified (UGC Missing)`,
             issued: getCorrectIssued,
             expires: getCorrectExpiry,
-            geocode: { UGC: ugc?.zones || [`XX000`] },
+            geocode: { UGC: ugc?.zones ?? [`XX000`] },
             description: definitions.description,
             sender_name: getOffice.name,
             sender_icao: getOffice.icao,
@@ -188,9 +188,9 @@ export class EventParser {
         const parent = `ATSX`
         const alertType = attributes?.awipsType?.type ?? attributes?.getAwip?.prefix ?? `XX`;
         const ugc = properties?.geocode?.UGC != null ? properties?.geocode?.UGC.join(`-`) : `000000`;
-        const status = pVtec?.status || 'Issued';
+        const status = pVtec?.status ?? 'Issued';
         const issued = properties?.issued != null ? new Date(properties?.issued)?.toISOString().replace(/[-:]/g, '').split('.')[0] : new Date().toISOString().replace(/[-:]/g, '').split('.')[0];
-        const sender = properties?.sender_icao || `XXXX`;
+        const sender = properties?.sender_icao ?? `XXXX`;
         const header = `ZCZC-${parent}-${alertType}-${ugc}-${status}-${issued}-${sender}-`;
         return header
     }
@@ -206,11 +206,14 @@ export class EventParser {
      * @returns {void}
      */
     public static eventHandler(metadata: types.StanzaCompiled) {
+        const settings = loader.settings as types.ClientSettingsTypes;
+        const preferences = settings.noaa_weather_wire_service_settings.preferences;
         if (metadata.isApi) return APIAlerts.event(metadata)
         if (metadata.isCap) return CAPAlerts.event(metadata)
-        if (!metadata.isCap && metadata.isPVtec && metadata.isUGC) return VTECAlerts.event(metadata);
-        if (!metadata.isCap && !metadata.isPVtec && metadata.isUGC) return UGCAlerts.event(metadata); 
-        if (!metadata.isCap && !metadata.isPVtec && !metadata.isUGC) return TextAlerts.event(metadata);
+        if (!preferences.disable_vtec && !metadata.isCap && metadata.isPVtec && metadata.isUGC) return VTECAlerts.event(metadata);
+        if (!preferences.disable_ugc && !metadata.isCap && !metadata.isPVtec && metadata.isUGC) return UGCAlerts.event(metadata); 
+        if (!preferences.disable_text && !metadata.isCap && !metadata.isPVtec && !metadata.isUGC) return TextAlerts.event(metadata);
+        return;
     }
 
     /**
@@ -228,7 +231,7 @@ export class EventParser {
      * @returns {{ icao: string; name: string }}
      */
     private static getICAO(pVtec: types.PVtecEntry, metadata: types.DefaultAttributesType, WMO: RegExpMatchArray | string | null) {
-        const icao = pVtec != null ? pVtec?.tracking.split(`-`)[0] : (metadata.attributes?.cccc ?? (WMO != null ? (Array.isArray(WMO) ? WMO[0] : WMO) : `N/A`));
+        const icao = pVtec != null ? pVtec?.tracking.split(`-`)[0] : (metadata.attributes?.cccc || (WMO != null ? (Array.isArray(WMO) ? WMO[0] : WMO) : `N/A`));
         const name = loader.definitions.ICAO?.[icao] ?? `N/A`;
         return { icao, name };
     }

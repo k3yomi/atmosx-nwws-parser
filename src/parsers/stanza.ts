@@ -42,13 +42,13 @@ export class StanzaParser {
      */
     public static validate(stanza: any, isDebug: boolean | types.StanzaAttributes = false): { message: string; attributes: types.StanzaAttributes; isCap: any; isPVtec: boolean; isCapDescription: any; awipsType: any; isApi: boolean; ignore: boolean; isUGC?: boolean; } {
         if (isDebug !== false) { 
-            const vTypes = isDebug as types.StanzaAttributes;
+            const vTypes = isDebug as types.StanzaAttributes;  
             const message = stanza;
             const attributes = vTypes;
             const isCap = vTypes.isCap ?? message.includes(`<?xml`);
             const isCapDescription = message.includes(`<areaDesc>`);
-            const isPVtec = message.match(loader.definitions.expressions.pvtec) != null;
-            const isUGC = message.match(loader.definitions.expressions.ugc1) != null;
+            const isPVtec = message.match(loader.definitions.regular_expressions.pvtec) != null;
+            const isUGC = message.match(loader.definitions.regular_expressions.ugc1) != null;
             const awipsType = this.getType(attributes);
             return { message, attributes, isCap, isPVtec, isUGC, isCapDescription, awipsType: awipsType, isApi: false, ignore: false };
         }
@@ -60,8 +60,8 @@ export class StanzaParser {
                 if (attributes.awipsid && attributes.awipsid.length > 1) {
                     const isCap = message.includes(`<?xml`);
                     const isCapDescription = message.includes(`<areaDesc>`);
-                    const isPVtec = message.match(loader.definitions.expressions.pvtec) != null;
-                    const isUGC = message.match(loader.definitions.expressions.ugc1) != null;
+                    const isPVtec = message.match(loader.definitions.regular_expressions.pvtec) != null;
+                    const isUGC = message.match(loader.definitions.regular_expressions.ugc1) != null;
                     const awipsType = this.getType(attributes);
                     this.cache(message, {attributes, isCap, isPVtec, awipsType });
                     return { message, attributes, isCap, isPVtec, isUGC, isCapDescription, awipsType: awipsType, isApi: false, ignore: false  };
