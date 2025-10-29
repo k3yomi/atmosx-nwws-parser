@@ -107,7 +107,6 @@ var import_crypto = __toESM(require("crypto"));
 var import_os = __toESM(require("os"));
 var import_say = __toESM(require("say"));
 var import_child_process = __toESM(require("child_process"));
-var import_worker_threads = __toESM(require("worker_threads"));
 
 // src/dictionaries/events.ts
 var EVENTS = {
@@ -956,8 +955,7 @@ var packages = {
   crypto: import_crypto.default,
   os: import_os.default,
   say: import_say.default,
-  child: import_child_process.default,
-  worker: import_worker_threads.default
+  child: import_child_process.default
 };
 var cache = {
   isReady: true,

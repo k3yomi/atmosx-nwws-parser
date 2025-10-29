@@ -65,7 +65,6 @@ import crypto from "crypto";
 import os from "os";
 import say from "say";
 import child from "child_process";
-import worker from "worker_threads";
 
 // src/dictionaries/events.ts
 var EVENTS = {
@@ -914,8 +913,7 @@ var packages = {
   crypto,
   os,
   say,
-  child,
-  worker
+  child
 };
 var cache = {
   isReady: true,
