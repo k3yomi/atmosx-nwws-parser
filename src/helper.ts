@@ -49,7 +49,7 @@ export class AtmosXWireParser {
             const shapefiles = [{ id: `C`, file: `USCounties` }, { id: `Z`, file: `ForecastZones` }, { id: `Z`, file: `FireZones` }, { id: `Z`, file: `OffShoreZones` }, { id: `Z`, file: `FireCounties` }, { id: `Z`, file: `Marine` }]
             for (let shape of shapefiles) {
                 const { id, file } = shape;
-                const filepath = path.resolve(__dirname, '../../shapefiles', `${file}.shp`);
+                const filepath = path.resolve(__dirname, '../../shapefiles', `${file}`);
                 const { features } = await shapefile.read(filepath, filepath);
                 console.log(`Importing ${features.length} features from ${file}...`);
                 for (let feature of features) {
