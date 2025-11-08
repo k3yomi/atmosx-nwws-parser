@@ -1,30 +1,3 @@
-var __create = Object.create;
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {
     var fulfilled = (value) => {
@@ -46,23 +19,15 @@ var __async = (__this, __arguments, generator) => {
   });
 };
 
-// src/helper.ts
-var helper_exports = {};
-__export(helper_exports, {
-  AtmosXWireParser: () => AtmosXWireParser,
-  default: () => helper_default
-});
-module.exports = __toCommonJS(helper_exports);
-
 // bootstrap.ts
-var fs = __toESM(require("fs"));
-var path = __toESM(require("path"));
-var events = __toESM(require("events"));
-var xmpp = __toESM(require("@xmpp/client"));
-var shapefile = __toESM(require("shapefile"));
-var xml2js = __toESM(require("xml2js"));
-var import_better_sqlite3 = __toESM(require("better-sqlite3"));
-var packages = { fs, path, events, xmpp, shapefile, xml2js, sqlite3: import_better_sqlite3.default };
+import * as fs from "fs";
+import * as path from "path";
+import * as events from "events";
+import * as xmpp from "@xmpp/client";
+import * as shapefile from "shapefile";
+import * as xml2js from "xml2js";
+import sqlite3 from "better-sqlite3";
+var packages = { fs, path, events, xmpp, shapefile, xml2js, sqlite3 };
 var statics = {
   events: new events.EventEmitter(),
   session: null,
@@ -1083,7 +1048,7 @@ var AtmosXWireParser = class {
         const shapefiles = [{ id: `C`, file: `USCounties` }, { id: `Z`, file: `ForecastZones` }, { id: `Z`, file: `FireZones` }, { id: `Z`, file: `OffShoreZones` }, { id: `Z`, file: `FireCounties` }, { id: `Z`, file: `Marine` }];
         for (let shape of shapefiles) {
           const { id, file } = shape;
-          const filepath = path2.join(__dirname, `../../shapefiles`, file);
+          const filepath = path2.resolve(__dirname, "../../shapefiles", `${file}.shp`);
           const { features } = yield shapefile2.read(filepath, filepath);
           console.log(`Importing ${features.length} features from ${file}...`);
           for (let feature of features) {
@@ -1354,7 +1319,7 @@ var AtmosXWireParser = class {
   }
 };
 var helper_default = AtmosXWireParser;
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  AtmosXWireParser
-});
+export {
+  AtmosXWireParser,
+  helper_default as default
+};

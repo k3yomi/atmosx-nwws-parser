@@ -1,3 +1,30 @@
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {
     var fulfilled = (value) => {
@@ -19,15 +46,23 @@ var __async = (__this, __arguments, generator) => {
   });
 };
 
+// src/helper.ts
+var helper_exports = {};
+__export(helper_exports, {
+  AtmosXWireParser: () => AtmosXWireParser,
+  default: () => helper_default
+});
+module.exports = __toCommonJS(helper_exports);
+
 // bootstrap.ts
-import * as fs from "fs";
-import * as path from "path";
-import * as events from "events";
-import * as xmpp from "@xmpp/client";
-import * as shapefile from "shapefile";
-import * as xml2js from "xml2js";
-import sqlite3 from "better-sqlite3";
-var packages = { fs, path, events, xmpp, shapefile, xml2js, sqlite3 };
+var fs = __toESM(require("fs"));
+var path = __toESM(require("path"));
+var events = __toESM(require("events"));
+var xmpp = __toESM(require("@xmpp/client"));
+var shapefile = __toESM(require("shapefile"));
+var xml2js = __toESM(require("xml2js"));
+var import_better_sqlite3 = __toESM(require("better-sqlite3"));
+var packages = { fs, path, events, xmpp, shapefile, xml2js, sqlite3: import_better_sqlite3.default };
 var statics = {
   events: new events.EventEmitter(),
   session: null,
@@ -1026,7 +1061,300 @@ ${stanzaData.message}`, "utf8");
   }
 };
 var stanza_default = mStanza;
-export {
-  stanza_default as default,
-  mStanza
+
+// src/helper.ts
+var AtmosXWireParser = class {
+  constructor(metadata) {
+    /**
+      * @function initalizeDatabase
+      * @description Initalizes the database and creates the shapefiles table if it does not exist. 
+      * Also imports shapefiles into the database if the table is created.
+      * 
+      * @param {string} database - The path to the database file.
+      */
+    this.initalizeDatabase = (database) => __async(this, null, function* () {
+      const { fs: fs2, sqlite3: sqlite32, path: path2, shapefile: shapefile2 } = this.packages;
+      if (!fs2.existsSync(database)) {
+        fs2.writeFileSync(database, "", "utf8");
+      }
+      const db = new sqlite32(database);
+      statics.db = db;
+      let parseShapefiles = () => __async(this, null, function* () {
+        const shapefiles = [{ id: `C`, file: `USCounties` }, { id: `Z`, file: `ForecastZones` }, { id: `Z`, file: `FireZones` }, { id: `Z`, file: `OffShoreZones` }, { id: `Z`, file: `FireCounties` }, { id: `Z`, file: `Marine` }];
+        for (let shape of shapefiles) {
+          const { id, file } = shape;
+          const filepath = path2.resolve(__dirname, "../../shapefiles", `${file}.shp`);
+          const { features } = yield shapefile2.read(filepath, filepath);
+          console.log(`Importing ${features.length} features from ${file}...`);
+          for (let feature of features) {
+            let { properties, geometry } = feature;
+            let equals, location;
+            if (properties.FIPS) {
+              equals = `${properties.STATE}${id}${properties.FIPS.substring(2)}`;
+              location = `${properties.COUNTYNAME}, ${properties.STATE}`;
+            } else if (properties.FULLSTAID) {
+              equals = `${properties.ST}${id}${properties.WFO}`;
+              location = `${properties.CITY}, ${properties.STATE}`;
+            } else if (properties.STATE) {
+              equals = `${properties.STATE}${id}${properties.ZONE}`;
+              location = `${properties.NAME}, ${properties.STATE}`;
+            } else {
+              equals = properties.ID;
+              location = properties.NAME;
+            }
+            const importStatement = `INSERT OR REPLACE INTO shapefiles (id, location, geometry) VALUES (?, ?, ?)`;
+            yield db.prepare(importStatement).run(equals, location, JSON.stringify(geometry));
+          }
+          console.log(`Finished importing ${file}.`);
+        }
+      });
+      let isExisting = () => __async(this, null, function* () {
+        const checkStatement = `SELECT name FROM sqlite_master WHERE type='table' AND name='shapefiles'`;
+        if (!db.prepare(checkStatement).get()) {
+          db.prepare(`CREATE TABLE shapefiles (id TEXT PRIMARY KEY, location TEXT, geometry TEXT)`).run();
+          console.log(definitions.messages.shapefile_creation);
+          yield parseShapefiles();
+          console.log(definitions.messages.shapefile_creation_finished);
+        }
+      });
+      yield isExisting();
+      this.initalizeSession(this.metadata);
+    });
+    /**
+      * @function initalizeClient
+      * @description Initalizes the XMPP client and sets up event listeners.
+      * 
+      * @param {object} metadata - The metadata object containing authentication information.
+      */
+    this.initalizeClient = (metadata) => {
+      if (settings.database == null) {
+        throw new Error(`error-database-not-configured`);
+      }
+      statics.session = packages.xmpp.client({
+        service: `xmpp://nwws-oi.weather.gov`,
+        domain: `nwws-oi.weather.gov`,
+        username: metadata.authentication.username || null,
+        password: metadata.authentication.password || null
+      });
+    };
+    /**
+      * @function initalizeSession
+      * @description Initalizes the XMPP session and sets up event listeners for connection, disconnection, errors, and incoming stanzas.
+      * 
+      * @param {object} metadata - The metadata object containing authentication information.
+      * 
+      * @emits onConnection - Emitted when the client successfully connects to the XMPP server.
+      * @emits onStanza - Emitted when a valid stanza is received from the XMPP server.
+      * @emits onError - Emitted when an error occurs.
+      * @emits onReconnect - Emitted when the client attempts to reconnect to the XMPP server.
+      * @throws Will throw an error if the database is not configured, if the client is reconnecting too fast, or if the connection to the XMPP server is lost.
+      */
+    this.initalizeSession = (metadata) => __async(this, null, function* () {
+      if (this.metadata.authentication.display == void 0) this.metadata.authentication.display = this.metadata.authentication.username || `No Username Provided`;
+      this.initalizeClient(this.metadata);
+      statics.session.on(`online`, (address) => __async(this, null, function* () {
+        if (cache.lastConnect && (/* @__PURE__ */ new Date()).getTime() - cache.lastConnect < 10 * 1e3) {
+          setTimeout(() => __async(this, null, function* () {
+            yield statics.session.stop().catch(() => {
+            });
+            yield statics.session.start().catch(() => {
+            });
+          }), 2 * 1e3);
+          cache.sigHault = true;
+          throw new Error(`error-reconnecting-too-fast`);
+        }
+        statics.session.send(packages.xmpp.xml("presence", { to: `nwws@conference.nwws-oi.weather.gov/${this.metadata.authentication.display}`, xmlns: "http://jabber.org/protocol/muc" }));
+        statics.session.send(packages.xmpp.xml("presence", { to: `nwws@conference.nwws-oi.weather.gov`, type: "available" }));
+        statics.events.emit(`onConnection`, this.metadata.authentication.display);
+        cache.lastConnect = (/* @__PURE__ */ new Date()).getTime();
+        cache.sigHault = false;
+        cache.isConnected = true;
+        if (cache.attemptingReconnect) {
+          setTimeout(() => {
+            cache.attemptingReconnect = false;
+          }, 15 * 1e3);
+        }
+      }));
+      statics.session.on(`offline`, () => {
+        cache.isConnected = false;
+        cache.sigHault = true;
+        cache.attemptingReconnect = false;
+        throw new Error(`error-connection-lost`);
+      });
+      statics.session.on(`error`, (err) => {
+        cache.isConnected = false;
+        cache.sigHault = true;
+        cache.attemptingReconnect = false;
+        throw new Error(err.message || `error-connection-lost`);
+      });
+      statics.session.on(`stanza`, (stanza) => {
+        cache.lastStanza = (/* @__PURE__ */ new Date()).getTime();
+        try {
+          if (stanza.is(`message`)) {
+            const sValid = stanza_default.validate(stanza);
+            if (sValid.ignore || sValid.isCap && !settings.alertSettings.onlyCap || !sValid.isCap && settings.alertSettings.onlyCap || sValid.isCap && !sValid.hasCapDescription) return;
+            statics.events.emit(`onMessage`, sValid);
+            stanza_default.create(sValid);
+          }
+          if (stanza.is("presence") && stanza.attrs.from && stanza.attrs.from.startsWith("nwws@conference.nwws-oi.weather.gov/")) {
+            let occupant = stanza.attrs.from.split("/").slice(1).join("/");
+            statics.events.emit("onOccupant", { occupant, type: stanza.attrs.type === "unavailable" ? "unavailable" : "available" });
+          }
+        } catch (error) {
+          statics.events.emit(`onError`, { error: error.message || `An unknown error occurred`, code: `stanza-parse-error` });
+          return;
+        }
+      });
+      yield statics.session.start();
+    });
+    /**
+      * @function initalizeCache
+      * @description Initalizes the cache by reading cached stanzas from files in the cache directory.
+      * The function checks the alert settings to determine which files to read and processes each file by validating and creating stanzas.
+      * If the cache directory is not set or reading from cache is disabled, the function returns without performing any actions.
+      */
+    this.initalizeCache = () => {
+      if (settings.cacheSettings.readCache && settings.cacheSettings.cacheDir) {
+        let dir = settings.cacheSettings.cacheDir;
+        let dict = [
+          { file: `${dir}/category-defaults-raw-vtec.bin`, attributes: { awipsid: "alert", isCap: false, raw: true, issue: void 0 } },
+          { file: `${dir}/category-defaults-cap-vtec.bin`, attributes: { awipsid: "alert", isCap: true, raw: false, issue: void 0 } },
+          { file: `${dir}/category-defaults-raw.bin`, attributes: { awipsid: "alert", isCap: false, raw: true, issue: void 0 } },
+          { file: `${dir}/category-special-weather-statements-raw.bin`, attributes: { awipsid: "SPS001", isCap: false, raw: true, issue: void 0 } },
+          { file: `${dir}/category-mesoscale-discussions-raw.bin`, attributes: { awipsid: "SWOMCD001", isCap: false, raw: true, issue: void 0 } },
+          { file: `${dir}/category-local-storm-reports.bin`, attributes: { awipsid: "LSR001", isCap: false, raw: true, issue: void 0 } }
+        ];
+        for (let file of dict) {
+          if (file.attributes.isCap && !settings.alertSettings.onlyCap) continue;
+          if (!file.attributes.isCap && settings.alertSettings.onlyCap) continue;
+          if (!this.packages.fs.existsSync(file.file)) continue;
+          let read = this.packages.fs.readFileSync(file.file, "utf8");
+          const sValid = stanza_default.validate(read, file.attributes);
+          stanza_default.create(sValid);
+        }
+      }
+    };
+    /**
+      * @function errorHandler
+      * @description Sets up a global error handler to catch uncaught exceptions and emit an 'onError' event with the error details.
+      * The function checks if the error message matches any predefined halting conditions and includes the corresponding message and code in the emitted event.
+      * This helps in logging and handling errors gracefully within the application.
+      */
+    this.errorHandler = () => {
+      process.on("uncaughtException", (error) => {
+        const hault = definitions.haultingConditions.find((e) => error.message.includes(e.error));
+        if (hault) {
+          statics.events.emit(`onError`, { error: `${hault ? hault.message : error.message}`, code: hault.code });
+        }
+        statics.events.emit(`onError`, { error: error.stack || error.message || `An unknown error occurred`, code: `uncaught-exception` });
+      });
+    };
+    /** 
+      * @function garabeCollector
+      * @description Cleans up cache files in the specified cache directory that exceed the maximum allowed size.
+      * The function traverses the cache directory and its subdirectories, checking the size of each file.
+      * If a file exceeds the specified maximum size in megabytes, it is deleted.
+      * 
+      * @param {number} maxMegabytes - The maximum allowed size for cache files in megabytes.
+      */
+    this.garabeCollector = (maxMegabytes) => {
+      if (!settings.cacheSettings.cacheDir) return;
+      let maxBytes = maxMegabytes * 1024 * 1024;
+      let directory = settings.cacheSettings.cacheDir;
+      let stackFiles = [directory], files = [];
+      while (stackFiles.length) {
+        const currentDirectory = stackFiles.pop();
+        if (!currentDirectory || typeof currentDirectory !== "string") continue;
+        packages.fs.readdirSync(currentDirectory).forEach((file) => {
+          const filePath = packages.path.join(currentDirectory, file);
+          if (packages.fs.statSync(filePath).isDirectory()) {
+            stackFiles.push(filePath);
+          } else {
+            files.push({ file: filePath, size: packages.fs.statSync(filePath).size });
+          }
+        });
+      }
+      if (!files.length) return;
+      files.forEach(({ file, size }) => {
+        if (size > maxBytes) {
+          packages.fs.unlinkSync(file);
+        }
+      });
+      return;
+    };
+    /** 
+      * @function isReconnectEligible
+      * @description Checks if the client is eligible to reconnect based on the specified interval. 
+      * If the client is not connected and the last stanza received was longer than the specified interval ago,
+      * the function attempts to reconnect the client.
+      * 
+      * @param {number} interval - The minimum interval in seconds between reconnection attempts.
+      * @returns {object} An object containing the connection status and session information.
+      */
+    this.isReconnectEligible = (interval) => __async(this, null, function* () {
+      const minSeconds = interval;
+      if ((cache.isConnected || cache.sigHault === true) && statics.session) {
+        let lastStanza = (/* @__PURE__ */ new Date()).getTime() - cache.lastStanza;
+        if (lastStanza > minSeconds * 1e3) {
+          if (!cache.attemptingReconnect) {
+            cache.attemptingReconnect = true;
+            cache.isConnected = false;
+            cache.totalReconnects += 1;
+            statics.events.emit(`onReconnect`, { reconnects: cache.totalReconnects, lastStanza: lastStanza / 1e3, lastName: this.metadata.authentication.display });
+            yield statics.session.stop().catch(() => {
+            });
+            yield statics.session.start().catch(() => {
+            });
+          }
+        }
+      }
+      return {
+        message: `Session is not connected or session is not available`,
+        isConnected: cache.isConnected,
+        session: statics.session
+      };
+    });
+    /** 
+      * @function setDisplayName
+      * @description Sets the display name for the XMPP session.
+      * 
+      * @param {string} name - The display name to set for the session.
+      */
+    this.setDisplayName = (name) => __async(this, null, function* () {
+      this.metadata.authentication.display = name;
+    });
+    /** 
+      * @function onEvent
+      * @description Registers an event listener for the specified event and returns a function to remove the listener.
+      * 
+      * @param {string} event - The name of the event to listen for.
+      * @param {function} callback - The callback function to execute when the event is emitted.
+      * @returns {function} A function that removes the event listener when called.
+      */
+    this.onEvent = (event, callback) => {
+      statics.events.on(event, callback);
+      return () => {
+        statics.events.off(event, callback);
+      };
+    };
+    this.packages = packages;
+    this.metadata = metadata;
+    Object.assign(settings, metadata);
+    this.errorHandler();
+    this.initalizeDatabase(this.metadata.database);
+    this.initalizeCache();
+    setInterval(() => {
+      if (settings.cacheSettings.cacheDir) {
+        this.garabeCollector(settings.cacheSettings.maxMegabytes);
+      }
+      if (settings.xmpp.reconnect) {
+        this.isReconnectEligible(settings.xmpp.reconnectInterval);
+      }
+    }, 1 * 1e3);
+  }
 };
+var helper_default = AtmosXWireParser;
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  AtmosXWireParser
+});
