@@ -7,13 +7,13 @@
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/K3YOMI/atmosx-nwws-parser.git",
-		"branch": "beta-ready"
+		"branch": "beta"
 	},
 	"scripts": {
 		"start": "cd ./test && node ./index.js",
 		"build:tsup": "tsup && cd ./test && node ./index.js",
 		"publish": "tsup && npm publish --access public",
-		"publish-beta": "tsup && npm publish --tag beta-ready --access public"
+		"publish-beta": "tsup && npm publish --tag beta --access public"
 	},
 	"keywords": [
 		"NWWS",
