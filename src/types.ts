@@ -15,12 +15,9 @@
 interface LocalEasSettings {
     directory?: string;
     intro_wav?: string;
-    festival_tts_voice?: string;
 }
 
 interface LocalLocationFilteringSettings { 
-    filter?: boolean;
-    max_distance?: number;
     unit?: 'miles' | 'kilometers';
 }
 

@@ -113,15 +113,12 @@ export const settings = {
             check_expired: true,
             ignore_text_products: true,
             location: {
-                max_distance: 100,
-                unit: `miles`,
-                filter: false
+                unit: `miles`
             },
         },
         eas_settings: {
             directory: null,
             intro_wav: null,
-            festival_tts_voice: `kal_diphone`,
         }
     }
 };

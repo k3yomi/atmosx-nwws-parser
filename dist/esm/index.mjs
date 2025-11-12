@@ -977,15 +977,12 @@ var settings = {
       check_expired: true,
       ignore_text_products: true,
       location: {
-        max_distance: 100,
-        unit: `miles`,
-        filter: false
+        unit: `miles`
       }
     },
     eas_settings: {
       directory: null,
-      intro_wav: null,
-      festival_tts_voice: `kal_diphone`
+      intro_wav: null
     }
   }
 };
@@ -2213,7 +2210,7 @@ var EventParser = class {
       }
     }
     const filtered = events2.filter((alert) => {
-      var _a2, _b2, _d2;
+      var _a2, _b2;
       const originalEvent = this.buildDefaultSignature(alert);
       const props = originalEvent == null ? void 0 : originalEvent.properties;
       const ugcs = (_b2 = (_a2 = props == null ? void 0 : props.geocode) == null ? void 0 : _a2.UGC) != null ? _b2 : [];
@@ -2221,10 +2218,7 @@ var EventParser = class {
       originalEvent.properties.parent = originalEvent.properties.event;
       originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools == null ? void 0 : bools.better_event_parsing, bools == null ? void 0 : bools.parent_events_only);
       originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(eventWithoutPerformance)).digest("hex");
-      originalEvent.properties.distance = this.getLocationDistances(props, bools == null ? void 0 : bools.filter, locationSettings == null ? void 0 : locationSettings.max_distance, locationSettings == null ? void 0 : locationSettings.unit);
-      if (!((_d2 = originalEvent.properties.distance) == null ? void 0 : _d2.in_range) && (bools == null ? void 0 : bools.filter)) {
-        return false;
-      }
+      originalEvent.properties.distance = this.getLocationDistances(props, locationSettings == null ? void 0 : locationSettings.unit);
       if (originalEvent.properties.is_test == true && (bools == null ? void 0 : bools.ignore_text_products)) return false;
       if ((bools == null ? void 0 : bools.check_expired) && originalEvent.properties.is_cancelled == true) return false;
       for (const key in sets) {
@@ -2355,9 +2349,7 @@ var EventParser = class {
    * @param {string} [unit='miles']
    * @returns {{ range?: Record<string, {unit: string, distance: number}>, in_range: boolean }}
    */
-  static getLocationDistances(properties, isFiltered, maxDistance, unit) {
-    let inRange = false;
-    const totalTracks = Object.keys(cache.currentLocations).length;
+  static getLocationDistances(properties, unit) {
     if (properties.geometry != null) {
       for (const key in cache.currentLocations) {
         const coordinates = cache.currentLocations[key];
@@ -2370,17 +2362,9 @@ var EventParser = class {
         }
         properties.distance[key] = { unit, distance };
       }
-      if (!isFiltered) {
-        return { range: properties.distance, in_range: true };
-      }
-      for (const key in properties.distance) {
-        if (properties.distance[key].distance <= maxDistance) {
-          inRange = true;
-        }
-      }
-      return { range: properties.distance, in_range: totalTracks == 0 ? true : inRange };
+      return properties.distance;
     }
-    return { in_range: false };
+    return {};
   }
   /**
    * @function buildDefaultSignature

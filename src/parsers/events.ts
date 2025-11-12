@@ -152,8 +152,7 @@ export class EventParser {
             originalEvent.properties.parent = originalEvent.properties.event;          
             originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools?.better_event_parsing, bools?.parent_events_only);
             originalEvent.hash = loader.packages.crypto.createHash('md5').update(JSON.stringify(eventWithoutPerformance)).digest('hex');
-            originalEvent.properties.distance = this.getLocationDistances(props, bools?.filter, locationSettings?.max_distance, locationSettings?.unit);
-            if (!originalEvent.properties.distance?.in_range && bools?.filter) { return false; }
+            originalEvent.properties.distance = this.getLocationDistances(props, locationSettings?.unit);
             if (originalEvent.properties.is_test == true && bools?.ignore_text_products) return false;
             if (bools?.check_expired && originalEvent.properties.is_cancelled == true) return false;
             for (const key in sets) {
@@ -286,14 +285,10 @@ export class EventParser {
      * @private
      * @static
      * @param {types.EventProperties} [properties]
-     * @param {boolean} [isFiltered=false]
-     * @param {number} [maxDistance]
      * @param {string} [unit='miles']
-     * @returns {{ range?: Record<string, {unit: string, distance: number}>, in_range: boolean }}
+     * @returns {Record<string, { distance: number, unit: string}>}
      */
-    private static getLocationDistances(properties?: types.EventProperties, isFiltered?: boolean, maxDistance?: number, unit?: string) {
-        let inRange = false;
-        const totalTracks = Object.keys(loader.cache.currentLocations).length;
+    private static getLocationDistances(properties?: types.EventProperties, unit?: string) {
         if (properties.geometry != null) {
             for (const key in loader.cache.currentLocations) {
                 const coordinates = loader.cache.currentLocations[key];
@@ -304,13 +299,9 @@ export class EventParser {
                 if (!properties.distance) { properties.distance = {}; }
                 properties.distance[key] = { unit, distance };
             }
-            if (!isFiltered) { return {range: properties.distance, in_range: true}; }
-            for (const key in properties.distance) {
-                if (properties.distance[key].distance <= maxDistance) { inRange = true; }
-            }
-            return {range: properties.distance, in_range: totalTracks == 0 ? true : inRange}
+            return properties.distance
         }
-        return {in_range: false};
+        return {}
     }
 
     /**
