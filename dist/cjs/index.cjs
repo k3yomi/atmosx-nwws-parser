@@ -2386,10 +2386,8 @@ var EventParser = class {
    * @private
    * @static
    * @param {types.EventProperties} [properties]
-   * @param {boolean} [isFiltered=false]
-   * @param {number} [maxDistance]
    * @param {string} [unit='miles']
-   * @returns {{ range?: Record<string, {unit: string, distance: number}>, in_range: boolean }}
+   * @returns {Record<string, { distance: number, unit: string}>}
    */
   static getLocationDistances(properties, unit) {
     if (properties.geometry != null) {
@@ -3000,16 +2998,18 @@ var Utils = class _Utils {
    *     locations are available.
    *
    * @static
-   * @param {boolean} isFiltering
    * @returns {boolean}
    */
-  static isReadyToProcess(isFiltering) {
+  static isReadyToProcess() {
     const totalTracks = Object.keys(cache.currentLocations).length;
     if (totalTracks > 0) {
       cache.totalLocationWarns = 0;
       return true;
     }
-    if (!isFiltering) return true;
+    if (totalTracks == 0) {
+      return true;
+    }
+    ;
     if (cache.totalLocationWarns < 3) {
       _Utils.warn(definitions.messages.no_current_locations);
       cache.totalLocationWarns++;
@@ -3640,7 +3640,6 @@ var AlertManager = class {
    */
   start(metadata) {
     return __async(this, null, function* () {
-      var _a, _b;
       if (!cache.isReady) {
         utils_default.warn(definitions.messages.not_ready);
         return;
@@ -3649,7 +3648,7 @@ var AlertManager = class {
       const settings2 = settings;
       this.isNoaaWeatherWireService = settings2.is_wire;
       cache.isReady = false;
-      while (!utils_default.isReadyToProcess((_b = (_a = settings2.global_settings.filtering.location) == null ? void 0 : _a.filter) != null ? _b : false)) {
+      while (!utils_default.isReadyToProcess()) {
         yield utils_default.sleep(2e3);
       }
       if (this.isNoaaWeatherWireService) {

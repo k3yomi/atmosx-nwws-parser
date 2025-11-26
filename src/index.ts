@@ -171,7 +171,7 @@ export class AlertManager {
         const settings = loader.settings as types.ClientSettingsTypes;
         this.isNoaaWeatherWireService = settings.is_wire;
         loader.cache.isReady = false;
-        while (!Utils.isReadyToProcess(settings.global_settings.filtering.location?.filter ?? false)) {
+        while (!Utils.isReadyToProcess()) {
             await Utils.sleep(2000);
         }
         if (this.isNoaaWeatherWireService) {

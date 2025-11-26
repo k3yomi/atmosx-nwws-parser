@@ -292,16 +292,15 @@ export class Utils {
      *     locations are available.
      *
      * @static
-     * @param {boolean} isFiltering
      * @returns {boolean}
      */
-    public static isReadyToProcess(isFiltering: boolean): boolean {
+    public static isReadyToProcess(): boolean {
         const totalTracks = Object.keys(loader.cache.currentLocations).length;
         if (totalTracks > 0) {
             loader.cache.totalLocationWarns = 0;
             return true;
         }
-        if (!isFiltering) return true;
+        if (totalTracks == 0) { return true };
         if (loader.cache.totalLocationWarns < 3) {
             Utils.warn(loader.definitions.messages.no_current_locations);
             loader.cache.totalLocationWarns++;
