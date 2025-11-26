@@ -474,13 +474,13 @@ var mEvents = class {
     }
     if (eventName === "Tornado Warning") {
       eventName = "Radar Indicated Tornado Warning";
-      if (parameters.tornadoDetection === "RADAR INDICATED") eventName = "Radar Indicated Tornado Warning";
-      if (parameters.tornadoDetection === "OBSERVED") eventName = "Confirmed Tornado Warning";
+      if (torThreat == "RADAR INDICATED") eventName = "Radar Indicated Tornado Warning";
+      if (torThreat == "OBSERVED") eventName = "Confirmed Tornado Warning";
     }
     if (eventName === "Severe Thunderstorm Warning") {
-      if (dmgThreat === "CONSIDERABLE") eventName = "Considerable Severe Thunderstorm Warning";
-      if (dmgThreat === "DESTRUCTIVE") eventName = "Destructive Severe Thunderstorm Warning";
-      if (torThreat === "POSSIBLE") eventName = `${eventName} (TPROB)`;
+      if (dmgThreat == "CONSIDERABLE") eventName = "Considerable Severe Thunderstorm Warning";
+      if (dmgThreat == "DESTRUCTIVE") eventName = "Destructive Severe Thunderstorm Warning";
+      if (torThreat == "POSSIBLE") eventName = `${eventName} (TPROB)`;
     }
     for (const [key, value] of Object.entries(definitions.tags)) {
       if (description.includes(key.toLowerCase())) {
@@ -1048,7 +1048,7 @@ var AtmosXWireParser = class {
         const shapefiles = [{ id: `C`, file: `USCounties` }, { id: `Z`, file: `ForecastZones` }, { id: `Z`, file: `FireZones` }, { id: `Z`, file: `OffShoreZones` }, { id: `Z`, file: `FireCounties` }, { id: `Z`, file: `Marine` }];
         for (let shape of shapefiles) {
           const { id, file } = shape;
-          const filepath = path2.resolve(__dirname, "../../shapefiles", `${file}.shp`);
+          const filepath = path2.resolve(__dirname, "../../shapefiles", `${file}`);
           const { features } = yield shapefile2.read(filepath, filepath);
           console.log(`Importing ${features.length} features from ${file}...`);
           for (let feature of features) {

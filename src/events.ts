@@ -44,13 +44,13 @@ export class mEvents {
         if (eventName === 'Flash Flood Warning') { if (dmgThreat === 'CONSIDERABLE') eventName = 'Considerable Flash Flood Warning'; }
         if (eventName === 'Tornado Warning') {
             eventName = 'Radar Indicated Tornado Warning';
-            if (parameters.tornadoDetection === 'RADAR INDICATED') eventName = 'Radar Indicated Tornado Warning';
-            if (parameters.tornadoDetection === 'OBSERVED') eventName = 'Confirmed Tornado Warning';
+            if (torThreat == 'RADAR INDICATED') eventName = 'Radar Indicated Tornado Warning';
+            if (torThreat == 'OBSERVED') eventName = 'Confirmed Tornado Warning';
         }
         if (eventName === 'Severe Thunderstorm Warning') {
-            if (dmgThreat === 'CONSIDERABLE') eventName = 'Considerable Severe Thunderstorm Warning';
-            if (dmgThreat === 'DESTRUCTIVE') eventName = 'Destructive Severe Thunderstorm Warning';
-            if (torThreat === 'POSSIBLE') eventName = `${eventName} (TPROB)`;
+            if (dmgThreat == 'CONSIDERABLE') eventName = 'Considerable Severe Thunderstorm Warning';
+            if (dmgThreat == 'DESTRUCTIVE') eventName = 'Destructive Severe Thunderstorm Warning';
+            if (torThreat == 'POSSIBLE') eventName = `${eventName} (TPROB)`;
         }
         for (const [key, value] of Object.entries(loader.definitions.tags as Record<string, string>)) {
             if (description.includes(key.toLowerCase())) {
