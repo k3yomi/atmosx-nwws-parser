@@ -1,6 +1,6 @@
 {
 	"name": "atmosx-nwws-parser",
-	"version": "1.0.20317",
+	"version": "1.0.21",
 	"description": "NOAA Weather Wire Parser - Built for standalone and Project AtmosphericX Integration.",
 	"main": "dist/cjs/index.cjs",
 	"module": "dist/esm/index.mjs",
@@ -12,7 +12,7 @@
 	"scripts": {
 		"start": "cd ./test && node ./index.js",
 		"build:tsup": "tsup && cd ./test && node ./index.js",
-		"publish-github": "tsup && npm publish --registry https://npm.pkg.github.com/ --name @k3yomi/atmosx-nwws-parser",
+		"publish-github": "powershell -Command \"(Get-Content package.json) -replace '\"name\": \"atmosx-nwws-parser\"', '\"name\": \"@k3yomi/atmosx-nwws-parser\"' | Set-Content package.json; npx tsup --clean; npm publish --registry https://npm.pkg.github.com/; (Get-Content package.json) -replace '\"name\": \"@k3yomi/atmosx-nwws-parser\"', '\"name\": \"atmosx-nwws-parser\"' | Set-Content package.json\"",
 		"publish": "tsup && npm publish --access public",
 		"publish-beta": "tsup && npm publish --tag beta --access public"
 	},
