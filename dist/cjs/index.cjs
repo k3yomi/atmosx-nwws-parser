@@ -1011,8 +1011,8 @@ var settings = {
     better_event_parsing: true,
     filtering: {
       events: [],
-      filtered_icoa: [],
-      ignored_icoa: [`KWNS`],
+      filtered_icao: [],
+      ignored_icao: [`KWNS`],
       ignored_events: [`Xx`, `Test Message`],
       ugc_filter: [],
       state_filter: [],
@@ -2267,8 +2267,8 @@ var EventParser = class {
         const setting = sets[key];
         if (key === "events" && setting.size > 0 && !setting.has(originalEvent.properties.event.toLowerCase())) return false;
         if (key === "ignored_events" && setting.size > 0 && setting.has(originalEvent.properties.event.toLowerCase())) return false;
-        if (key === "filtered_icoa" && setting.size > 0 && props.sender_icao != null && !setting.has(props.sender_icao.toLowerCase())) return false;
-        if (key === "ignored_icoa" && setting.size > 0 && props.sender_icao != null && setting.has(props.sender_icao.toLowerCase())) return false;
+        if (key === "filtered_icao" && setting.size > 0 && props.sender_icao != null && !setting.has(props.sender_icao.toLowerCase())) return false;
+        if (key === "ignored_icao" && setting.size > 0 && props.sender_icao != null && setting.has(props.sender_icao.toLowerCase())) return false;
         if (key === "ugc_filter" && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc) => setting.has(ugc.toLowerCase()))) return false;
         if (key === "state_filter" && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc) => setting.has(ugc.substring(0, 2).toLowerCase()))) return false;
       }

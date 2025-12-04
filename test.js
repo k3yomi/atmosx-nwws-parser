@@ -38,8 +38,8 @@ const parser = new AlertManager({
         better_event_parsing: true,
         filtering: {
             events: [`Severe Thunderstorm Warning`],
-            filtered_icoa: [],
-            ignored_icoa: [`KWNS`],
+            filtered_icao: ["PAFC"],
+            ignored_icao: [`KWNS`],
             ignored_events: [`Xx`, `Test Message`],
             ugc_filter: [],
             state_filter: [],

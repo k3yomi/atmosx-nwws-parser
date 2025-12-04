@@ -23,8 +23,8 @@ interface LocalLocationFilteringSettings {
 
 interface LocalAlertFilteringSettings { 
     events?: string[]; 
-    filtered_icoa?: string[]; 
-    ignored_icoa?: string[]; 
+    filtered_icao?: string[]; 
+    ignored_icao?: string[]; 
     ugc_filter?: string[]; 
     state_filter?: string[]; 
     ignored_events?: string[]; 
