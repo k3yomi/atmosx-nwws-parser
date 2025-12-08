@@ -36,7 +36,12 @@ export class APIAlerts {
             const vtecValue = Array.isArray(extracted.pVtec) ? extracted.pVtec[0] : extracted.pVtec;
             const splitPVTEC = vtecValue.split('.');
             return `${splitPVTEC[2]}-${splitPVTEC[3]}-${splitPVTEC[4]}-${splitPVTEC[5]}`;
-        })() :  `${extracted.wmoidentifier}`;
+        })() : (() => {
+            const wmoMatch = extracted.wmoidentifier?.match(/([A-Z]{4}\d{2})\s+([A-Z]{4})/);
+            const id = wmoMatch?.[1] || 'N/A';
+            const station = wmoMatch?.[2] || 'N/A';
+            return `${station}-${id}`;
+        })();
     }
 
     /**
@@ -72,7 +77,7 @@ export class APIAlerts {
         for (let feature of messages) {
             const tick = performance.now();
             const getPVTEC = feature?.properties?.parameters?.VTEC?.[0] ?? null;
-            const getWmo = feature?.properties?.parameters?.WMOidentifier[0] ?? null;
+            const getWmo = feature?.properties?.parameters?.WMOidentifier?.[0] ?? null;
             const getUgc = feature?.properties?.geocode?.UGC ?? null;
             const getHeadline = feature?.properties?.parameters?.NWSheadline?.[0] ?? "";
             const getDescription = `${getHeadline} ${feature?.properties?.description ?? ``}`

@@ -2004,7 +2004,13 @@ var APIAlerts = class {
       const vtecValue = Array.isArray(extracted.pVtec) ? extracted.pVtec[0] : extracted.pVtec;
       const splitPVTEC = vtecValue.split(".");
       return `${splitPVTEC[2]}-${splitPVTEC[3]}-${splitPVTEC[4]}-${splitPVTEC[5]}`;
-    })() : `${extracted.wmoidentifier}`;
+    })() : (() => {
+      var _a;
+      const wmoMatch = (_a = extracted.wmoidentifier) == null ? void 0 : _a.match(/([A-Z]{4}\d{2})\s+([A-Z]{4})/);
+      const id = (wmoMatch == null ? void 0 : wmoMatch[1]) || "N/A";
+      const station = (wmoMatch == null ? void 0 : wmoMatch[2]) || "N/A";
+      return `${station}-${id}`;
+    })();
   }
   /**
    * @function getICAO
@@ -2035,17 +2041,17 @@ var APIAlerts = class {
    */
   static event(validated) {
     return __async(this, null, function* () {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia;
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia, _ja;
       let processed = [];
       const messages = Object.values(JSON.parse(validated.message).features);
       for (let feature of messages) {
         const tick = performance.now();
         const getPVTEC = (_d = (_c = (_b = (_a = feature == null ? void 0 : feature.properties) == null ? void 0 : _a.parameters) == null ? void 0 : _b.VTEC) == null ? void 0 : _c[0]) != null ? _d : null;
-        const getWmo = (_g = (_f = (_e = feature == null ? void 0 : feature.properties) == null ? void 0 : _e.parameters) == null ? void 0 : _f.WMOidentifier[0]) != null ? _g : null;
-        const getUgc = (_j = (_i = (_h = feature == null ? void 0 : feature.properties) == null ? void 0 : _h.geocode) == null ? void 0 : _i.UGC) != null ? _j : null;
-        const getHeadline = (_n = (_m = (_l = (_k = feature == null ? void 0 : feature.properties) == null ? void 0 : _k.parameters) == null ? void 0 : _l.NWSheadline) == null ? void 0 : _m[0]) != null ? _n : "";
-        const getDescription = `${getHeadline} ${(_p = (_o = feature == null ? void 0 : feature.properties) == null ? void 0 : _o.description) != null ? _p : ``}`;
-        const getAWIP = (_t = (_s = (_r = (_q = feature == null ? void 0 : feature.properties) == null ? void 0 : _q.parameters) == null ? void 0 : _r.AWIPSidentifier) == null ? void 0 : _s[0]) != null ? _t : null;
+        const getWmo = (_h = (_g = (_f = (_e = feature == null ? void 0 : feature.properties) == null ? void 0 : _e.parameters) == null ? void 0 : _f.WMOidentifier) == null ? void 0 : _g[0]) != null ? _h : null;
+        const getUgc = (_k = (_j = (_i = feature == null ? void 0 : feature.properties) == null ? void 0 : _i.geocode) == null ? void 0 : _j.UGC) != null ? _k : null;
+        const getHeadline = (_o = (_n = (_m = (_l = feature == null ? void 0 : feature.properties) == null ? void 0 : _l.parameters) == null ? void 0 : _m.NWSheadline) == null ? void 0 : _n[0]) != null ? _o : "";
+        const getDescription = `${getHeadline} ${(_q = (_p = feature == null ? void 0 : feature.properties) == null ? void 0 : _p.description) != null ? _q : ``}`;
+        const getAWIP = (_u = (_t = (_s = (_r = feature == null ? void 0 : feature.properties) == null ? void 0 : _r.parameters) == null ? void 0 : _s.AWIPSidentifier) == null ? void 0 : _t[0]) != null ? _u : null;
         const getHeader = events_default.getHeader(__spreadValues({}, { getAwip: { prefix: getAWIP == null ? void 0 : getAWIP.slice(0, -3) } }));
         const getSource = text_default.textProductToString(getDescription, `SOURCE...`, [`.`]) || `N/A`;
         const getOffice = this.getICAO(getPVTEC || ``);
@@ -2056,23 +2062,23 @@ var APIAlerts = class {
           header: getHeader,
           pvtec: getPVTEC || `N/A`,
           history: [{
-            description: (_v = (_u = feature == null ? void 0 : feature.properties) == null ? void 0 : _u.description) != null ? _v : `N/A`,
-            action: (_x = (_w = feature == null ? void 0 : feature.properties) == null ? void 0 : _w.messageType) != null ? _x : `N/A`,
-            time: ((_y = feature == null ? void 0 : feature.properties) == null ? void 0 : _y.sent) ? new Date((_z = feature == null ? void 0 : feature.properties) == null ? void 0 : _z.sent).toLocaleString() : `N/A`
+            description: (_w = (_v = feature == null ? void 0 : feature.properties) == null ? void 0 : _v.description) != null ? _w : `N/A`,
+            action: (_y = (_x = feature == null ? void 0 : feature.properties) == null ? void 0 : _x.messageType) != null ? _y : `N/A`,
+            time: ((_z = feature == null ? void 0 : feature.properties) == null ? void 0 : _z.sent) ? new Date((_A = feature == null ? void 0 : feature.properties) == null ? void 0 : _A.sent).toLocaleString() : `N/A`
           }],
           properties: {
-            locations: (_B = (_A = feature == null ? void 0 : feature.properties) == null ? void 0 : _A.areaDesc) != null ? _B : `N/A`,
-            event: (_D = (_C = feature == null ? void 0 : feature.properties) == null ? void 0 : _C.event) != null ? _D : `N/A`,
-            issued: ((_E = feature == null ? void 0 : feature.properties) == null ? void 0 : _E.sent) ? new Date((_F = feature == null ? void 0 : feature.properties) == null ? void 0 : _F.sent).toLocaleString() : `N/A`,
-            expires: ((_G = feature == null ? void 0 : feature.properties) == null ? void 0 : _G.expires) ? new Date((_H = feature == null ? void 0 : feature.properties) == null ? void 0 : _H.expires).toLocaleString() : `N/A`,
-            parent: (_J = (_I = feature == null ? void 0 : feature.properties) == null ? void 0 : _I.event) != null ? _J : `N/A`,
-            action_type: (_L = (_K = feature == null ? void 0 : feature.properties) == null ? void 0 : _K.messageType) != null ? _L : `N/A`,
-            description: (_N = (_M = feature == null ? void 0 : feature.properties) == null ? void 0 : _M.description) != null ? _N : `N/A`,
+            locations: (_C = (_B = feature == null ? void 0 : feature.properties) == null ? void 0 : _B.areaDesc) != null ? _C : `N/A`,
+            event: (_E = (_D = feature == null ? void 0 : feature.properties) == null ? void 0 : _D.event) != null ? _E : `N/A`,
+            issued: ((_F = feature == null ? void 0 : feature.properties) == null ? void 0 : _F.sent) ? new Date((_G = feature == null ? void 0 : feature.properties) == null ? void 0 : _G.sent).toLocaleString() : `N/A`,
+            expires: ((_H = feature == null ? void 0 : feature.properties) == null ? void 0 : _H.expires) ? new Date((_I = feature == null ? void 0 : feature.properties) == null ? void 0 : _I.expires).toLocaleString() : `N/A`,
+            parent: (_K = (_J = feature == null ? void 0 : feature.properties) == null ? void 0 : _J.event) != null ? _K : `N/A`,
+            action_type: (_M = (_L = feature == null ? void 0 : feature.properties) == null ? void 0 : _L.messageType) != null ? _M : `N/A`,
+            description: (_O = (_N = feature == null ? void 0 : feature.properties) == null ? void 0 : _N.description) != null ? _O : `N/A`,
             sender_name: getOffice.name || `N/A`,
             sender_icao: getOffice.icao || `N/A`,
             attributes: validated.attributes,
             geocode: {
-              UGC: (_Q = (_P = (_O = feature == null ? void 0 : feature.properties) == null ? void 0 : _O.geocode) == null ? void 0 : _P.UGC) != null ? _Q : [`XX000`]
+              UGC: (_R = (_Q = (_P = feature == null ? void 0 : feature.properties) == null ? void 0 : _P.geocode) == null ? void 0 : _Q.UGC) != null ? _R : [`XX000`]
             },
             metadata: {},
             technical: {
@@ -2081,20 +2087,20 @@ var APIAlerts = class {
               hvtec: `N/A`
             },
             parameters: {
-              wmo: ((_T = (_S = (_R = feature == null ? void 0 : feature.properties) == null ? void 0 : _R.parameters) == null ? void 0 : _S.WMOidentifier) == null ? void 0 : _T[0]) || getWmo || `N/A`,
+              wmo: ((_U = (_T = (_S = feature == null ? void 0 : feature.properties) == null ? void 0 : _S.parameters) == null ? void 0 : _T.WMOidentifier) == null ? void 0 : _U[0]) || getWmo || `N/A`,
               source: getSource,
-              max_hail_size: ((_V = (_U = feature == null ? void 0 : feature.properties) == null ? void 0 : _U.parameters) == null ? void 0 : _V.maxHailSize) || `N/A`,
-              max_wind_gust: ((_X = (_W = feature == null ? void 0 : feature.properties) == null ? void 0 : _W.parameters) == null ? void 0 : _X.maxWindGust) || `N/A`,
-              damage_threat: ((_Z = (_Y = feature == null ? void 0 : feature.properties) == null ? void 0 : _Y.parameters) == null ? void 0 : _Z.thunderstormDamageThreat) || [`N/A`],
-              tornado_detection: ((_$ = (__ = feature == null ? void 0 : feature.properties) == null ? void 0 : __.parameters) == null ? void 0 : _$.tornadoDetection) || [`N/A`],
-              flood_detection: ((_ba = (_aa = feature == null ? void 0 : feature.properties) == null ? void 0 : _aa.parameters) == null ? void 0 : _ba.floodDetection) || [`N/A`],
+              max_hail_size: ((_W = (_V = feature == null ? void 0 : feature.properties) == null ? void 0 : _V.parameters) == null ? void 0 : _W.maxHailSize) || `N/A`,
+              max_wind_gust: ((_Y = (_X = feature == null ? void 0 : feature.properties) == null ? void 0 : _X.parameters) == null ? void 0 : _Y.maxWindGust) || `N/A`,
+              damage_threat: ((__ = (_Z = feature == null ? void 0 : feature.properties) == null ? void 0 : _Z.parameters) == null ? void 0 : __.thunderstormDamageThreat) || [`N/A`],
+              tornado_detection: ((_aa = (_$ = feature == null ? void 0 : feature.properties) == null ? void 0 : _$.parameters) == null ? void 0 : _aa.tornadoDetection) || [`N/A`],
+              flood_detection: ((_ca = (_ba = feature == null ? void 0 : feature.properties) == null ? void 0 : _ba.parameters) == null ? void 0 : _ca.floodDetection) || [`N/A`],
               discussion_tornado_intensity: "N/A",
               peakWindGust: `N/A`,
               peakHailSize: `N/A`
             },
-            geometry: ((_ea = (_da = (_ca = feature == null ? void 0 : feature.geometry) == null ? void 0 : _ca.coordinates) == null ? void 0 : _da[0]) == null ? void 0 : _ea.length) ? {
-              type: ((_fa = feature == null ? void 0 : feature.geometry) == null ? void 0 : _fa.type) || "Polygon",
-              coordinates: (_ia = (_ha = (_ga = feature == null ? void 0 : feature.geometry) == null ? void 0 : _ga.coordinates) == null ? void 0 : _ha[0]) == null ? void 0 : _ia.map((coord) => {
+            geometry: ((_fa = (_ea = (_da = feature == null ? void 0 : feature.geometry) == null ? void 0 : _da.coordinates) == null ? void 0 : _ea[0]) == null ? void 0 : _fa.length) ? {
+              type: ((_ga = feature == null ? void 0 : feature.geometry) == null ? void 0 : _ga.type) || "Polygon",
+              coordinates: (_ja = (_ia = (_ha = feature == null ? void 0 : feature.geometry) == null ? void 0 : _ha.coordinates) == null ? void 0 : _ia[0]) == null ? void 0 : _ja.map((coord) => {
                 const [lat, lon] = Array.isArray(coord) ? coord : [0, 0];
                 return [lon, lat];
               })
