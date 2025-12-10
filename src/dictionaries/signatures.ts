@@ -1,7 +1,10 @@
 export const TAGS: Record<string, string> = {
     "LICKELY BECOME SLICK AND HAZARDOUS": "Slick and Hazardous Roads",
     "SLIPPERY ROAD CONDITIONS": "Slippery Roads",
+    "BLOWING SNOW WHICH COULD REDUCE VISIBILITY": "Blowing Snow Reducing Visibility",
     "TRAVEL COULD BE VERY DIFFICULT": "Difficult Travel Conditions",
+    "DIFFICULT TRAVEL CONDITIONS": "Difficult Travel Conditions",
+    "EXPECT DISRUPTIONS": "Expect Disruptions to Travel",
     "A LARGE AND EXTREMELY DANGEROUS TORNADO": "Large and Dangerous Tornado",
     "THIS IS A PARTICULARLY DANGEROUS SITUATION": "Particularly Dangerous Situation",
     "RADAR INDICATED ROTATION": "Radar Indicated Tornado",
