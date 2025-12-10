@@ -604,6 +604,9 @@ var AWIPS = {
 
 // src/dictionaries/signatures.ts
 var TAGS = {
+  "LICKELY BECOME SLICK AND HAZARDOUS": "Slick and Hazardous Roads",
+  "SLIPPERY ROAD CONDITIONS": "Slippery Roads",
+  "TRAVEL COULD BE VERY DIFFICULT": "Difficult Travel Conditions",
   "A LARGE AND EXTREMELY DANGEROUS TORNADO": "Large and Dangerous Tornado",
   "THIS IS A PARTICULARLY DANGEROUS SITUATION": "Particularly Dangerous Situation",
   "RADAR INDICATED ROTATION": "Radar Indicated Tornado",
