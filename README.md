@@ -84,7 +84,7 @@ To use the NOAA Weather Wire Service (NWWS). You would need to obtain credential
 3. Submit the form and wait for approval. You will receive your NWWS credentials via email.
 
 ## Events and Listeners
-> All events are in GeoJSON for events.
+> All events are in GeoJSON.
 
 ### Event `onEvents`
 Triggered when a batch of new alerts are received and processed.
