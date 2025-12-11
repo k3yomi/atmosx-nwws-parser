@@ -174,10 +174,10 @@ export class AlertManager {
         while (!Utils.isReadyToProcess()) {
             await Utils.sleep(2000);
         }
+        await Database.loadDatabase();
         if (this.isNoaaWeatherWireService) {
             (async () => {
                 try {
-                    await Database.loadDatabase();
                     await Xmpp.deploySession();
                     await Utils.loadCollectionCache();
                 } catch (err: unknown) {

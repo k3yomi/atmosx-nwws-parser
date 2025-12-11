@@ -119,22 +119,32 @@ export class UGCParser {
      * @param {string[]} zones
      * @returns {[number, number][]}
      */
-    public static getCoordinates (zones: String[]): [number, number][] {
-        let coordinates: [number, number][] = [];
-        for (let i = 0; i < zones.length; i++) {
-            const id = zones[i].trim();
-            const row = loader.cache.db.prepare(
-                `SELECT geometry FROM shapefiles WHERE id = ?`
-            ).get(id);
-            if (row != undefined) {
-                let geometry = JSON.parse(row.geometry);
+    public static getCoordinates(zones: string[]): any | null {
+        const polygons: any[] = [];
+        for (const zone of zones.map(z => z.trim())) {
+            const row = loader.cache.db.prepare(`SELECT geometry FROM shapefiles WHERE id = ?`).get(zone);
+            if (row !== undefined) {
+                const geometry = JSON.parse(row.geometry);
                 if (geometry?.type === 'Polygon') {
-                    coordinates.push(...geometry.coordinates[0].map((coord: [number, number]) => [coord[1], coord[0]]));
-                    break;
+                    polygons.push({
+                        type: "Feature",
+                        geometry,
+                        properties: {}
+                    });
                 }
             }
         }
-        return coordinates;
+        if (polygons.length === 0) return null;
+        let merged = polygons[0];
+        for (let i = 1; i < polygons.length; i++) {
+            merged = loader.packages.turf.union(merged, polygons[i]);
+        }
+        const outerRing = merged.geometry.type === "Polygon"
+            ? merged.geometry.coordinates[0]
+            : merged.geometry.coordinates[0][0];
+        const skip = loader.settings.global_settings.shapefile_skip;
+        const skippedRing = outerRing.filter((_: any, index: number) => index % skip === 0);
+        return [skippedRing]
     }
 
     /**

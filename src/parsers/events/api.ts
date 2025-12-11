@@ -73,6 +73,7 @@ export class APIAlerts {
      */
     public static async event(validated: types.StanzaCompiled) {
         let processed = [] as unknown[];
+        const settings = loader.settings as types.ClientSettingsTypes;
         const messages = Object.values(JSON.parse(validated.message).features) as types.EventCompiled[];
         for (let feature of messages) {
             const tick = performance.now();
@@ -86,16 +87,7 @@ export class APIAlerts {
             const getSource = TextParser.textProductToString(getDescription, `SOURCE...`, [`.`]) || `N/A`;
             const getOffice = this.getICAO(getPVTEC || ``);
             processed.push({
-                performance: performance.now() - tick,
-                source: `api-parser`,
-                tracking: this.getTracking({ pVtec: getPVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
-                header: getHeader,
-                pvtec: getPVTEC || `N/A`,
-                history: [{
-                    description: feature?.properties?.description ?? `N/A`,
-                    action: feature?.properties?.messageType ?? `N/A`,
-                    time: feature?.properties?.sent ? new Date(feature?.properties?.sent).toLocaleString() : `N/A`
-                }],
+                type: "Feature",
                 properties: {
                     locations: feature?.properties?.areaDesc ?? `N/A`,
                     event: feature?.properties?.event ?? `N/A`,
@@ -128,14 +120,28 @@ export class APIAlerts {
                         peakWindGust: `N/A`,
                         peakHailSize: `N/A`,
                     },
-                    geometry: feature?.geometry?.coordinates?.[0]?.length ? {
-                        type: feature?.geometry?.type || 'Polygon',
-                        coordinates: feature?.geometry?.coordinates?.[0]?.map((coord: number) => {
+                },
+                details: {
+                    performance: performance.now() - tick,
+                    source: `api-parser`,
+                    tracking: this.getTracking({ pVtec: getPVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
+                    header: getHeader,
+                    pvtec: getPVTEC || `N/A`,
+                    history: [{
+                        description: feature?.properties?.description ?? `N/A`,
+                        action: feature?.properties?.messageType ?? `N/A`,
+                        time: feature?.properties?.sent ? new Date(feature?.properties?.sent).toLocaleString() : `N/A`
+                    }],
+                },
+                geometry: feature?.geometry?.coordinates?.[0] != null ? {
+                    type: "Polygon", 
+                    coordinates: [
+                        feature?.geometry?.coordinates?.[0]?.map((coord: number[] | any) => {
                             const [lat, lon] = Array.isArray(coord) ? coord : [0, 0];
-                            return [lon, lat]; 
+                            return [lat, lon];
                         })
-                    } : null
-                }
+                    ]
+                } : await EventParser.getEventGeometry(``, {zones: getUgc})
             })
         }
         EventParser.validateEvents(processed);

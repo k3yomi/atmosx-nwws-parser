@@ -53,6 +53,7 @@ export class CapAlerts {
     public static async event(validated: types.StanzaCompiled) {
         let processed = [] as unknown[];
         const tick = performance.now();
+        const settings = loader.settings as types.ClientSettingsTypes;
         const blocks = validated.message.split(/\[SoF\]/gim)?.map(msg => msg.trim());
         for (const block of blocks) {
             const cachedAttribute = block.match(/STANZA ATTRIBUTES\.\.\.(\{.*\})/);
@@ -75,13 +76,7 @@ export class CapAlerts {
                 const getHeader = EventParser.getHeader({ ...validated.attributes,} as types.StanzaAttributes);
                 const getSource = TextParser.textProductToString(extracted.description, `SOURCE...`, [`.`]) || `N/A`;
                 processed.push({
-                    performance: performance.now() - tick,
-                    source: `cap-parser`,
-                    tracking: this.getTracking(extracted, attributes),
-                    header: getHeader,
-                    pvtec: extracted.vtec || `N/A`,
-                    hvtec: `N/A`,
-                    history: [{ description: extracted.description || `N/A`, issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`, type: extracted.msgtype || `N/A` }],
+                    type: "Feature",
                     properties: {
                         locations: extracted.areadesc || `N/A`,
                         event: extracted.event || `N/A`,
@@ -114,14 +109,25 @@ export class CapAlerts {
                             discussion_wind_intensity: `N/A`,
                             discussion_hail_intensity: `N/A`,
                         },
-                        geometry: extracted.polygon ? { 
-                            type: `Polygon`, 
-                            coordinates: extracted.polygon.split(` `).map((coord: string) => {
-                                const [lat, lon] = coord.split(`,`).map((num: string) => parseFloat(num));
+                    },
+                    details: {
+                        performance: performance.now() - tick,
+                        source: `cap-parser`,
+                        tracking: this.getTracking(extracted, attributes),
+                        header: getHeader,
+                        pvtec: extracted.vtec || `N/A`,
+                        hvtec: `N/A`,
+                        history: [{ description: extracted.description || `N/A`, issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`, type: extracted.msgtype || `N/A` }],
+                    },
+                    geometry: extracted.polygon ? { 
+                        type: "Polygon", 
+                        coordinates: [
+                            extracted.polygon.split(" ").map((coord: string) => {
+                                const [lon, lat] = coord.split(",").map((num: string) => parseFloat(num));
                                 return [lat, lon];
-                            }) 
-                        } : null,
-                    }
+                            })
+                        ]
+                    } : await EventParser.getEventGeometry(``, {zones: [extracted.ugc]}),
                 })
             }
         }

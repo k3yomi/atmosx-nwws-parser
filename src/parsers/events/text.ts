@@ -29,8 +29,8 @@ export class TextAlerts {
      * @param {types.EventProperties} baseProperties 
      * @returns {string} 
      */
-    private static getTracking(baseProperties: types.EventProperties) {
-        return `${baseProperties.sender_icao}-${baseProperties.metadata.attributes.ttaaii}-${baseProperties.metadata.attributes.id.slice(-4)}`
+    private static getTracking(properties: types.EventProperties) {
+        return `${properties.sender_icao}-${properties.raw.attributes.ttaaii}-${properties.raw.attributes.id.slice(-4)}`
     }
 
     /**
@@ -79,18 +79,23 @@ export class TextAlerts {
                 const tick = performance.now();
                 const message = messages[i]
                 const attributes = cachedAttribute != null ? JSON.parse(cachedAttribute[1]) : validated;
-                const getBaseProperties = await EventParser.getBaseProperties(message, attributes) as types.EventProperties;
-                const getHeader = EventParser.getHeader({ ...validated.attributes, ...getBaseProperties.metadata } as types.StanzaAttributes, getBaseProperties);
+                const baseProperties = await EventParser.getBaseProperties(message, attributes) as types.EventProperties;
+                const baseGeometry = await EventParser.getEventGeometry(message);
+                const getHeader = EventParser.getHeader({ ...validated.attributes, ...baseProperties.raw } as types.StanzaAttributes, baseProperties)
                 const getEvent = this.getEvent(message, attributes);
                 processed.push({
-                    performance: performance.now() - tick,
-                    source: `text-parser`,
-                    tracking: this.getTracking(getBaseProperties),
-                    header: getHeader,
-                    pvtec: `N/A`,
-                    hvtec: `N/A`,
-                    history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: `Issued` }],
-                    properties: { event: getEvent, parent: getEvent, action_type: `Issued`, ...getBaseProperties, }
+                    properties: { event: getEvent, parent: getEvent, action_type: `Issued`, ...baseProperties },
+                    details: {
+                        type: "Feature",
+                        performance: performance.now() - tick,
+                        source: `text-parser`,
+                        tracking: this.getTracking(baseProperties),
+                        header: getHeader,
+                        pvtec: `N/A`,
+                        hvtec: `N/A`,
+                        history: [{ description: baseProperties.description, issued: baseProperties.issued, type: `Issued` }],
+                    },
+                    geometry: baseGeometry,
                 })
             }
         }

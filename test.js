@@ -56,8 +56,10 @@ const parser = new AlertManager({
     }
 })
 
-parser.on(`onAlerts`, (alerts) => {
+parser.on(`onEvents`, (alerts) => {
    for (const alert of alerts) {
-       console.log(`[${alert.properties.issued}] ${alert.properties.event} for ${alert.properties.locations} (ID: ${alert.tracking})`);
-   }
+        if (alert.geometry != null) {
+            console.log(`[${alert.properties.issued}] ${alert.properties.event} for ${alert.properties.locations} (ID: ${alert.details.tracking})`);
+        }
+    }
 });

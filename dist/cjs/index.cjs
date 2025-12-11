@@ -101,6 +101,7 @@ var xmpp = __toESM(require("@xmpp/client"));
 var shapefile = __toESM(require("shapefile"));
 var xml2js = __toESM(require("xml2js"));
 var jobs = __toESM(require("croner"));
+var turf = __toESM(require("turf"));
 var import_better_sqlite3 = __toESM(require("better-sqlite3"));
 var import_axios = __toESM(require("axios"));
 var import_crypto = __toESM(require("crypto"));
@@ -961,7 +962,8 @@ var packages = {
   crypto: import_crypto.default,
   os: import_os.default,
   say: import_say.default,
-  child: import_child_process.default
+  child: import_child_process.default,
+  turf
 };
 var cache = {
   isReady: true,
@@ -1004,8 +1006,7 @@ var settings = {
       disable_ugc: false,
       disable_vtec: false,
       disable_text: false,
-      cap_only: false,
-      shapefile_coordinates: false
+      cap_only: false
     }
   },
   national_weather_service_settings: {
@@ -1015,6 +1016,8 @@ var settings = {
   global_settings: {
     parent_events_only: true,
     better_event_parsing: true,
+    shapefile_coordinates: false,
+    shapefile_skip: 15,
     filtering: {
       events: [],
       filtered_icao: [],
@@ -1274,7 +1277,7 @@ var TextParser = class {
       const lat = parseFloat(coordStrings[i]) / 100;
       const lon = -parseFloat(coordStrings[i + 1]) / 100;
       if (!isNaN(lat) && !isNaN(lon)) {
-        coordinates.push([lat, lon]);
+        coordinates.push([lon, lat]);
       }
     }
     if (coordinates.length > 2) {
@@ -1485,21 +1488,29 @@ var UGCParser = class {
    * @returns {[number, number][]}
    */
   static getCoordinates(zones) {
-    let coordinates = [];
-    for (let i = 0; i < zones.length; i++) {
-      const id = zones[i].trim();
-      const row = cache.db.prepare(
-        `SELECT geometry FROM shapefiles WHERE id = ?`
-      ).get(id);
-      if (row != void 0) {
-        let geometry = JSON.parse(row.geometry);
+    const polygons = [];
+    for (const zone of zones.map((z) => z.trim())) {
+      const row = cache.db.prepare(`SELECT geometry FROM shapefiles WHERE id = ?`).get(zone);
+      if (row !== void 0) {
+        const geometry = JSON.parse(row.geometry);
         if ((geometry == null ? void 0 : geometry.type) === "Polygon") {
-          coordinates.push(...geometry.coordinates[0].map((coord) => [coord[1], coord[0]]));
-          break;
+          polygons.push({
+            type: "Feature",
+            geometry,
+            properties: {}
+          });
         }
       }
     }
-    return coordinates;
+    if (polygons.length === 0) return null;
+    let merged = polygons[0];
+    for (let i = 1; i < polygons.length; i++) {
+      merged = packages.turf.union(merged, polygons[i]);
+    }
+    const outerRing = merged.geometry.type === "Polygon" ? merged.geometry.coordinates[0] : merged.geometry.coordinates[0][0];
+    const skip = settings.global_settings.shapefile_skip;
+    const skippedRing = outerRing.filter((_, index) => index % skip === 0);
+    return [skippedRing];
   }
   /**
    * @function getZones
@@ -1671,17 +1682,22 @@ var VTECAlerts = class {
           if (getPVTEC != null && getUGC != null) {
             for (let j = 0; j < getPVTEC.length; j++) {
               const pVtec = getPVTEC[j];
-              const getBaseProperties = yield events_default.getBaseProperties(message, attributes, getUGC, pVtec, getHVTEC);
-              const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, validated.attributes), getBaseProperties.metadata), getBaseProperties, pVtec);
+              const baseProperties = yield events_default.getBaseProperties(message, attributes, getUGC, pVtec, getHVTEC);
+              const baseGeometry = yield events_default.getEventGeometry(message, getUGC);
+              const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, validated.attributes), baseProperties.raw), baseProperties, pVtec);
               processed.push({
-                performance: performance.now() - tick,
-                source: `pvtec-parser`,
-                tracking: pVtec.tracking,
-                header: getHeader,
-                pvtec: pVtec.raw,
-                hvtec: getHVTEC != null ? getHVTEC.raw : `N/A`,
-                history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: pVtec.status }],
-                properties: __spreadValues({ event: pVtec.event, parent: pVtec.event, action_type: pVtec.status }, getBaseProperties)
+                type: "Feature",
+                properties: __spreadValues({ event: pVtec.event, parent: pVtec.event, action_type: pVtec.status }, baseProperties),
+                details: {
+                  performance: performance.now() - tick,
+                  source: `pvtec-parser`,
+                  tracking: pVtec.tracking,
+                  header: getHeader,
+                  pvtec: pVtec.raw,
+                  hvtec: getHVTEC != null ? getHVTEC.raw : `N/A`,
+                  history: [{ description: baseProperties.description, issued: baseProperties.issued, type: pVtec.status }]
+                },
+                geometry: baseGeometry
               });
             }
           }
@@ -1707,7 +1723,7 @@ var UGCAlerts = class {
    * @returns {string} 
    */
   static getTracking(baseProperties) {
-    return `${baseProperties.sender_icao}-${baseProperties.metadata.attributes.ttaaii}-${baseProperties.metadata.attributes.id.slice(-4)}`;
+    return `${baseProperties.sender_icao}-${baseProperties.raw.attributes.ttaaii}-${baseProperties.raw.attributes.id.slice(-4)}`;
   }
   /**
    * @function getEvent
@@ -1757,18 +1773,23 @@ var UGCAlerts = class {
           const getUGC = yield ugc_default.ugcExtractor(message);
           if (getUGC != null) {
             const attributes = cachedAttribute != null ? JSON.parse(cachedAttribute[1]) : validated;
-            const getBaseProperties = yield events_default.getBaseProperties(message, attributes, getUGC);
-            const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, attributes), getBaseProperties.metadata), getBaseProperties);
+            const baseProperties = yield events_default.getBaseProperties(message, attributes, getUGC);
+            const baseGeometry = yield events_default.getEventGeometry(message, getUGC);
+            const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, attributes), baseProperties.raw), baseProperties);
             const getEvent = this.getEvent(message, attributes);
             processed.push({
-              performance: performance.now() - tick,
-              source: `ugc-parser`,
-              tracking: this.getTracking(getBaseProperties),
-              header: getHeader,
-              pvtec: `N/A`,
-              hvtec: `N/A`,
-              history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: `Issued` }],
-              properties: __spreadValues({ event: getEvent, parent: getEvent, action_type: `Issued` }, getBaseProperties)
+              type: "Feature",
+              properties: __spreadValues({ event: getEvent, parent: getEvent, action_type: `Issued` }, baseProperties),
+              details: {
+                performance: performance.now() - tick,
+                source: `ugc-parser`,
+                tracking: this.getTracking(baseProperties),
+                header: getHeader,
+                pvtec: `N/A`,
+                hvtec: `N/A`,
+                history: [{ description: baseProperties.description, issued: baseProperties.issued, type: `Issued` }]
+              },
+              geometry: baseGeometry
             });
           }
         }
@@ -1792,8 +1813,8 @@ var TextAlerts = class {
    * @param {types.EventProperties} baseProperties 
    * @returns {string} 
    */
-  static getTracking(baseProperties) {
-    return `${baseProperties.sender_icao}-${baseProperties.metadata.attributes.ttaaii}-${baseProperties.metadata.attributes.id.slice(-4)}`;
+  static getTracking(properties) {
+    return `${properties.sender_icao}-${properties.raw.attributes.ttaaii}-${properties.raw.attributes.id.slice(-4)}`;
   }
   /**
    * @function getEvent
@@ -1842,18 +1863,23 @@ var TextAlerts = class {
           const tick = performance.now();
           const message = messages[i];
           const attributes = cachedAttribute != null ? JSON.parse(cachedAttribute[1]) : validated;
-          const getBaseProperties = yield events_default.getBaseProperties(message, attributes);
-          const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, validated.attributes), getBaseProperties.metadata), getBaseProperties);
+          const baseProperties = yield events_default.getBaseProperties(message, attributes);
+          const baseGeometry = yield events_default.getEventGeometry(message);
+          const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, validated.attributes), baseProperties.raw), baseProperties);
           const getEvent = this.getEvent(message, attributes);
           processed.push({
-            performance: performance.now() - tick,
-            source: `text-parser`,
-            tracking: this.getTracking(getBaseProperties),
-            header: getHeader,
-            pvtec: `N/A`,
-            hvtec: `N/A`,
-            history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: `Issued` }],
-            properties: __spreadValues({ event: getEvent, parent: getEvent, action_type: `Issued` }, getBaseProperties)
+            properties: __spreadValues({ event: getEvent, parent: getEvent, action_type: `Issued` }, baseProperties),
+            details: {
+              type: "Feature",
+              performance: performance.now() - tick,
+              source: `text-parser`,
+              tracking: this.getTracking(baseProperties),
+              header: getHeader,
+              pvtec: `N/A`,
+              hvtec: `N/A`,
+              history: [{ description: baseProperties.description, issued: baseProperties.issued, type: `Issued` }]
+            },
+            geometry: baseGeometry
           });
         }
       }
@@ -1900,6 +1926,7 @@ var CapAlerts = class {
       var _a, _b;
       let processed = [];
       const tick = performance.now();
+      const settings2 = settings;
       const blocks = (_a = validated.message.split(/\[SoF\]/gim)) == null ? void 0 : _a.map((msg) => msg.trim());
       for (const block of blocks) {
         const cachedAttribute = block.match(/STANZA ATTRIBUTES\.\.\.(\{.*\})/);
@@ -1935,13 +1962,7 @@ var CapAlerts = class {
           const getHeader = events_default.getHeader(__spreadValues({}, validated.attributes));
           const getSource = text_default.textProductToString(extracted.description, `SOURCE...`, [`.`]) || `N/A`;
           processed.push({
-            performance: performance.now() - tick,
-            source: `cap-parser`,
-            tracking: this.getTracking(extracted, attributes),
-            header: getHeader,
-            pvtec: extracted.vtec || `N/A`,
-            hvtec: `N/A`,
-            history: [{ description: extracted.description || `N/A`, issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`, type: extracted.msgtype || `N/A` }],
+            type: "Feature",
             properties: {
               locations: extracted.areadesc || `N/A`,
               event: extracted.event || `N/A`,
@@ -1973,15 +1994,26 @@ var CapAlerts = class {
                 discussion_tornado_intensity: `N/A`,
                 discussion_wind_intensity: `N/A`,
                 discussion_hail_intensity: `N/A`
-              },
-              geometry: extracted.polygon ? {
-                type: `Polygon`,
-                coordinates: extracted.polygon.split(` `).map((coord) => {
-                  const [lat, lon] = coord.split(`,`).map((num) => parseFloat(num));
+              }
+            },
+            details: {
+              performance: performance.now() - tick,
+              source: `cap-parser`,
+              tracking: this.getTracking(extracted, attributes),
+              header: getHeader,
+              pvtec: extracted.vtec || `N/A`,
+              hvtec: `N/A`,
+              history: [{ description: extracted.description || `N/A`, issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`, type: extracted.msgtype || `N/A` }]
+            },
+            geometry: extracted.polygon ? {
+              type: "Polygon",
+              coordinates: [
+                extracted.polygon.split(" ").map((coord) => {
+                  const [lon, lat] = coord.split(",").map((num) => parseFloat(num));
                   return [lat, lon];
                 })
-              } : null
-            }
+              ]
+            } : yield events_default.getEventGeometry(``, { zones: [extracted.ugc] })
           });
         }
       }
@@ -2047,8 +2079,9 @@ var APIAlerts = class {
    */
   static event(validated) {
     return __async(this, null, function* () {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia, _ja;
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha;
       let processed = [];
+      const settings2 = settings;
       const messages = Object.values(JSON.parse(validated.message).features);
       for (let feature of messages) {
         const tick = performance.now();
@@ -2062,29 +2095,20 @@ var APIAlerts = class {
         const getSource = text_default.textProductToString(getDescription, `SOURCE...`, [`.`]) || `N/A`;
         const getOffice = this.getICAO(getPVTEC || ``);
         processed.push({
-          performance: performance.now() - tick,
-          source: `api-parser`,
-          tracking: this.getTracking({ pVtec: getPVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
-          header: getHeader,
-          pvtec: getPVTEC || `N/A`,
-          history: [{
-            description: (_w = (_v = feature == null ? void 0 : feature.properties) == null ? void 0 : _v.description) != null ? _w : `N/A`,
-            action: (_y = (_x = feature == null ? void 0 : feature.properties) == null ? void 0 : _x.messageType) != null ? _y : `N/A`,
-            time: ((_z = feature == null ? void 0 : feature.properties) == null ? void 0 : _z.sent) ? new Date((_A = feature == null ? void 0 : feature.properties) == null ? void 0 : _A.sent).toLocaleString() : `N/A`
-          }],
+          type: "Feature",
           properties: {
-            locations: (_C = (_B = feature == null ? void 0 : feature.properties) == null ? void 0 : _B.areaDesc) != null ? _C : `N/A`,
-            event: (_E = (_D = feature == null ? void 0 : feature.properties) == null ? void 0 : _D.event) != null ? _E : `N/A`,
-            issued: ((_F = feature == null ? void 0 : feature.properties) == null ? void 0 : _F.sent) ? new Date((_G = feature == null ? void 0 : feature.properties) == null ? void 0 : _G.sent).toLocaleString() : `N/A`,
-            expires: ((_H = feature == null ? void 0 : feature.properties) == null ? void 0 : _H.expires) ? new Date((_I = feature == null ? void 0 : feature.properties) == null ? void 0 : _I.expires).toLocaleString() : `N/A`,
-            parent: (_K = (_J = feature == null ? void 0 : feature.properties) == null ? void 0 : _J.event) != null ? _K : `N/A`,
-            action_type: (_M = (_L = feature == null ? void 0 : feature.properties) == null ? void 0 : _L.messageType) != null ? _M : `N/A`,
-            description: (_O = (_N = feature == null ? void 0 : feature.properties) == null ? void 0 : _N.description) != null ? _O : `N/A`,
+            locations: (_w = (_v = feature == null ? void 0 : feature.properties) == null ? void 0 : _v.areaDesc) != null ? _w : `N/A`,
+            event: (_y = (_x = feature == null ? void 0 : feature.properties) == null ? void 0 : _x.event) != null ? _y : `N/A`,
+            issued: ((_z = feature == null ? void 0 : feature.properties) == null ? void 0 : _z.sent) ? new Date((_A = feature == null ? void 0 : feature.properties) == null ? void 0 : _A.sent).toLocaleString() : `N/A`,
+            expires: ((_B = feature == null ? void 0 : feature.properties) == null ? void 0 : _B.expires) ? new Date((_C = feature == null ? void 0 : feature.properties) == null ? void 0 : _C.expires).toLocaleString() : `N/A`,
+            parent: (_E = (_D = feature == null ? void 0 : feature.properties) == null ? void 0 : _D.event) != null ? _E : `N/A`,
+            action_type: (_G = (_F = feature == null ? void 0 : feature.properties) == null ? void 0 : _F.messageType) != null ? _G : `N/A`,
+            description: (_I = (_H = feature == null ? void 0 : feature.properties) == null ? void 0 : _H.description) != null ? _I : `N/A`,
             sender_name: getOffice.name || `N/A`,
             sender_icao: getOffice.icao || `N/A`,
             attributes: validated.attributes,
             geocode: {
-              UGC: (_R = (_Q = (_P = feature == null ? void 0 : feature.properties) == null ? void 0 : _P.geocode) == null ? void 0 : _Q.UGC) != null ? _R : [`XX000`]
+              UGC: (_L = (_K = (_J = feature == null ? void 0 : feature.properties) == null ? void 0 : _J.geocode) == null ? void 0 : _K.UGC) != null ? _L : [`XX000`]
             },
             metadata: {},
             technical: {
@@ -2093,25 +2117,39 @@ var APIAlerts = class {
               hvtec: `N/A`
             },
             parameters: {
-              wmo: ((_U = (_T = (_S = feature == null ? void 0 : feature.properties) == null ? void 0 : _S.parameters) == null ? void 0 : _T.WMOidentifier) == null ? void 0 : _U[0]) || getWmo || `N/A`,
+              wmo: ((_O = (_N = (_M = feature == null ? void 0 : feature.properties) == null ? void 0 : _M.parameters) == null ? void 0 : _N.WMOidentifier) == null ? void 0 : _O[0]) || getWmo || `N/A`,
               source: getSource,
-              max_hail_size: ((_W = (_V = feature == null ? void 0 : feature.properties) == null ? void 0 : _V.parameters) == null ? void 0 : _W.maxHailSize) || `N/A`,
-              max_wind_gust: ((_Y = (_X = feature == null ? void 0 : feature.properties) == null ? void 0 : _X.parameters) == null ? void 0 : _Y.maxWindGust) || `N/A`,
-              damage_threat: ((__ = (_Z = feature == null ? void 0 : feature.properties) == null ? void 0 : _Z.parameters) == null ? void 0 : __.thunderstormDamageThreat) || [`N/A`],
-              tornado_detection: ((_aa = (_$ = feature == null ? void 0 : feature.properties) == null ? void 0 : _$.parameters) == null ? void 0 : _aa.tornadoDetection) || [`N/A`],
-              flood_detection: ((_ca = (_ba = feature == null ? void 0 : feature.properties) == null ? void 0 : _ba.parameters) == null ? void 0 : _ca.floodDetection) || [`N/A`],
+              max_hail_size: ((_Q = (_P = feature == null ? void 0 : feature.properties) == null ? void 0 : _P.parameters) == null ? void 0 : _Q.maxHailSize) || `N/A`,
+              max_wind_gust: ((_S = (_R = feature == null ? void 0 : feature.properties) == null ? void 0 : _R.parameters) == null ? void 0 : _S.maxWindGust) || `N/A`,
+              damage_threat: ((_U = (_T = feature == null ? void 0 : feature.properties) == null ? void 0 : _T.parameters) == null ? void 0 : _U.thunderstormDamageThreat) || [`N/A`],
+              tornado_detection: ((_W = (_V = feature == null ? void 0 : feature.properties) == null ? void 0 : _V.parameters) == null ? void 0 : _W.tornadoDetection) || [`N/A`],
+              flood_detection: ((_Y = (_X = feature == null ? void 0 : feature.properties) == null ? void 0 : _X.parameters) == null ? void 0 : _Y.floodDetection) || [`N/A`],
               discussion_tornado_intensity: "N/A",
               peakWindGust: `N/A`,
               peakHailSize: `N/A`
-            },
-            geometry: ((_fa = (_ea = (_da = feature == null ? void 0 : feature.geometry) == null ? void 0 : _da.coordinates) == null ? void 0 : _ea[0]) == null ? void 0 : _fa.length) ? {
-              type: ((_ga = feature == null ? void 0 : feature.geometry) == null ? void 0 : _ga.type) || "Polygon",
-              coordinates: (_ja = (_ia = (_ha = feature == null ? void 0 : feature.geometry) == null ? void 0 : _ha.coordinates) == null ? void 0 : _ia[0]) == null ? void 0 : _ja.map((coord) => {
+            }
+          },
+          details: {
+            performance: performance.now() - tick,
+            source: `api-parser`,
+            tracking: this.getTracking({ pVtec: getPVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
+            header: getHeader,
+            pvtec: getPVTEC || `N/A`,
+            history: [{
+              description: (__ = (_Z = feature == null ? void 0 : feature.properties) == null ? void 0 : _Z.description) != null ? __ : `N/A`,
+              action: (_aa = (_$ = feature == null ? void 0 : feature.properties) == null ? void 0 : _$.messageType) != null ? _aa : `N/A`,
+              time: ((_ba = feature == null ? void 0 : feature.properties) == null ? void 0 : _ba.sent) ? new Date((_ca = feature == null ? void 0 : feature.properties) == null ? void 0 : _ca.sent).toLocaleString() : `N/A`
+            }]
+          },
+          geometry: ((_ea = (_da = feature == null ? void 0 : feature.geometry) == null ? void 0 : _da.coordinates) == null ? void 0 : _ea[0]) != null ? {
+            type: "Polygon",
+            coordinates: [
+              (_ha = (_ga = (_fa = feature == null ? void 0 : feature.geometry) == null ? void 0 : _fa.coordinates) == null ? void 0 : _ga[0]) == null ? void 0 : _ha.map((coord) => {
                 const [lat, lon] = Array.isArray(coord) ? coord : [0, 0];
-                return [lon, lat];
+                return [lat, lon];
               })
-            } : null
-          }
+            ]
+          } : yield events_default.getEventGeometry(``, { zones: getUgc })
         });
       }
       events_default.validateEvents(processed);
@@ -2150,7 +2188,6 @@ var EventParser = class {
         flood: (_g = text_default.textProductToString(message, `FLASH FLOOD...`)) != null ? _g : `N/A`,
         damage: (_h = text_default.textProductToString(message, `DAMAGE THREAT...`)) != null ? _h : `N/A`,
         source: (_i = text_default.textProductToString(message, `SOURCE...`, [`.`])) != null ? _i : `N/A`,
-        polygon: text_default.textProductToPolygon(message),
         description: text_default.textProductToDescription(message, (_j = pVtec == null ? void 0 : pVtec.raw) != null ? _j : null),
         wmo: (_l = (_k = message.match(definitions.regular_expressions.wmo)) == null ? void 0 : _k[0]) != null ? _l : `N/A`,
         mdTorIntensity: (_m = text_default.textProductToString(message, `MOST PROBABLE PEAK TORNADO INTENSITY...`)) != null ? _m : `N/A`,
@@ -2168,8 +2205,7 @@ var EventParser = class {
         description: definitions2.description,
         sender_name: getOffice.name,
         sender_icao: getOffice.icao,
-        metadata: __spreadValues({}, Object.fromEntries(Object.entries(metadata).filter(([key]) => key !== "message"))),
-        technical: { ugc, vtec: pVtec, hvtec: hVtec },
+        raw: __spreadValues({}, Object.fromEntries(Object.entries(metadata).filter(([key]) => key !== "message"))),
         parameters: {
           wmo: Array.isArray(definitions2.wmo) ? definitions2.wmo[0] : (_r = definitions2.wmo) != null ? _r : `N/A`,
           source: definitions2.source,
@@ -2181,14 +2217,34 @@ var EventParser = class {
           discussion_tornado_intensity: definitions2.mdTorIntensity,
           discussion_wind_intensity: definitions2.mdWindGusts,
           discussion_hail_intensity: definitions2.mdHailSize
-        },
-        geometry: definitions2.polygon.length > 0 ? { type: "Polygon", coordinates: definitions2.polygon } : null
+        }
       };
-      if (settings2.noaa_weather_wire_service_settings.preferences.shapefile_coordinates && base.geometry == null && ugc != null) {
-        const coordinates = yield ugc_default.getCoordinates(ugc.zones);
-        base.geometry = { type: "Polygon", coordinates };
-      }
       return base;
+    });
+  }
+  /**
+   * @function getEventGeometry
+   * @description
+   *   Determines the geometry of an event using polygon data fromEntries
+   *   in the message or UGC shapefile coordinates if enabled in settings. Falls
+   *   back to null if no geometry can be determined.
+   * 
+   * @static
+   * @param {string} message
+   * @param {types.UGCEntry} [ugc=null]
+   * @returns {Promise<types.geometry>}
+   */
+  static getEventGeometry(message, ugc = null) {
+    return __async(this, null, function* () {
+      const settings2 = settings;
+      const polygonText = text_default.textProductToPolygon(message);
+      let geometry = null;
+      geometry = polygonText.length > 0 ? { type: "Polygon", coordinates: polygonText } : null;
+      if (settings2.global_settings.shapefile_coordinates && polygonText.length == 0 && ugc != null) {
+        const coordinates = yield ugc_default.getCoordinates(ugc.zones);
+        geometry = { type: "Polygon", coordinates };
+      }
+      return geometry;
     });
   }
   /**
@@ -2268,11 +2324,11 @@ var EventParser = class {
       const originalEvent = this.buildDefaultSignature(alert);
       const props = originalEvent == null ? void 0 : originalEvent.properties;
       const ugcs = (_b2 = (_a2 = props == null ? void 0 : props.geocode) == null ? void 0 : _a2.UGC) != null ? _b2 : [];
-      const _c2 = originalEvent, { performance: performance2, header } = _c2, eventWithoutPerformance = __objRest(_c2, ["performance", "header"]);
+      const _c2 = originalEvent, { details } = _c2, eventWithoutPerformance = __objRest(_c2, ["details"]);
       originalEvent.properties.parent = originalEvent.properties.event;
       originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools == null ? void 0 : bools.better_event_parsing, bools == null ? void 0 : bools.parent_events_only);
       originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(eventWithoutPerformance)).digest("hex");
-      originalEvent.properties.distance = this.getLocationDistances(props, locationSettings == null ? void 0 : locationSettings.unit);
+      originalEvent.properties.distance = this.getLocationDistances(props, originalEvent.geometry, locationSettings == null ? void 0 : locationSettings.unit);
       if (originalEvent.properties.is_test == true && (bools == null ? void 0 : bools.ignore_text_products)) return false;
       if ((bools == null ? void 0 : bools.check_expired) && originalEvent.properties.is_cancelled == true) return false;
       for (const key in sets) {
@@ -2289,7 +2345,7 @@ var EventParser = class {
       return true;
     });
     if (filtered.length > 0) {
-      cache.events.emit(`onAlerts`, filtered);
+      cache.events.emit(`onEvents`, filtered);
     }
   }
   /**
@@ -2398,14 +2454,15 @@ var EventParser = class {
    * @private
    * @static
    * @param {types.EventProperties} [properties]
+   * @param {types.EventCompiled} [event]
    * @param {string} [unit='miles']
    * @returns {Record<string, { distance: number, unit: string}>}
    */
-  static getLocationDistances(properties, unit) {
-    if (properties.geometry != null) {
+  static getLocationDistances(properties, geometry, unit = "miles") {
+    if (geometry != null) {
       for (const key in cache.currentLocations) {
         const coordinates = cache.currentLocations[key];
-        const singleCoord = properties.geometry.coordinates;
+        const singleCoord = geometry.coordinates;
         const center = singleCoord.reduce((acc, [lat, lon]) => [acc[0] + lat, acc[1] + lon], [0, 0]).map((sum) => sum / singleCoord.length);
         const validUnit = unit === "miles" || unit === "kilometers" ? unit : "miles";
         const distance = utils_default.calculateDistance({ lat: coordinates.lat, lon: coordinates.lon }, { lat: center[0], lon: center[1] }, validUnit);
@@ -3663,10 +3720,10 @@ var AlertManager = class {
       while (!utils_default.isReadyToProcess()) {
         yield utils_default.sleep(2e3);
       }
+      yield database_default.loadDatabase();
       if (this.isNoaaWeatherWireService) {
         (() => __async(this, null, function* () {
           try {
-            yield database_default.loadDatabase();
             yield xmpp_default.deploySession();
             yield utils_default.loadCollectionCache();
           } catch (err) {

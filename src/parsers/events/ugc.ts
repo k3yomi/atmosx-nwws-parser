@@ -31,7 +31,7 @@ export class UGCAlerts {
      * @returns {string} 
      */
     private static getTracking(baseProperties: types.EventProperties) {
-        return `${baseProperties.sender_icao}-${baseProperties.metadata.attributes.ttaaii}-${baseProperties.metadata.attributes.id.slice(-4)}`
+        return `${baseProperties.sender_icao}-${baseProperties.raw.attributes.ttaaii}-${baseProperties.raw.attributes.id.slice(-4)}`
     }
 
     /**
@@ -81,18 +81,23 @@ export class UGCAlerts {
                 const getUGC = await UgcParser.ugcExtractor(message) as types.UGCEntry
                 if (getUGC != null) {
                     const attributes = cachedAttribute != null ? JSON.parse(cachedAttribute[1]) : validated;
-                    const getBaseProperties = await EventParser.getBaseProperties(message, attributes, getUGC) as types.EventProperties;
-                    const getHeader = EventParser.getHeader({ ...attributes, ...getBaseProperties.metadata } as types.StanzaAttributes, getBaseProperties);
+                    const baseProperties = await EventParser.getBaseProperties(message, attributes, getUGC) as types.EventProperties;
+                    const baseGeometry = await EventParser.getEventGeometry(message, getUGC);
+                    const getHeader = EventParser.getHeader({ ...attributes, ...baseProperties.raw } as types.StanzaAttributes, baseProperties);
                     const getEvent = this.getEvent(message, attributes);
                     processed.push({
-                        performance: performance.now() - tick,
-                        source: `ugc-parser`,
-                        tracking: this.getTracking(getBaseProperties),
-                        header: getHeader,
-                        pvtec: `N/A`,
-                        hvtec: `N/A`,
-                        history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: `Issued` }],
-                        properties: { event: getEvent, parent: getEvent, action_type: `Issued`, ...getBaseProperties, }
+                        type: "Feature",
+                        properties: { event: getEvent, parent: getEvent, action_type: `Issued`, ...baseProperties, },
+                        details: {
+                            performance: performance.now() - tick,
+                            source: `ugc-parser`,
+                            tracking: this.getTracking(baseProperties),
+                            header: getHeader,
+                            pvtec: `N/A`,
+                            hvtec: `N/A`,
+                            history: [{ description: baseProperties.description, issued: baseProperties.issued, type: `Issued` }],
+                        },
+                        geometry: baseGeometry,
                     })
                 }
             }

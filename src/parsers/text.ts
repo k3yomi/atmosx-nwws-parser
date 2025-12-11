@@ -63,7 +63,7 @@ export class TextParser {
         for (let i = 0; i < coordStrings.length - 1; i += 2) {
             const lat = parseFloat(coordStrings[i]) / 100;
             const lon = -parseFloat(coordStrings[i + 1]) / 100;
-            if (!isNaN(lat) && !isNaN(lon)) { coordinates.push([lat, lon]); }
+            if (!isNaN(lat) && !isNaN(lon)) { coordinates.push([lon, lat]); }
         }
         if (coordinates.length > 2) { coordinates.push(coordinates[0]); }
         return coordinates;

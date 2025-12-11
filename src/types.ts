@@ -35,6 +35,8 @@ interface LocalAlertFilteringSettings {
 interface LocalGlobalSettings {
     parent_events_only?: boolean;
     better_event_parsing?: boolean;
+    shapefile_coordinates?: boolean;
+    shapefile_skip?: number;
     eas_settings?: LocalEasSettings;
     filtering?: LocalAlertFilteringSettings;
 }
@@ -62,7 +64,6 @@ interface LocalAlertPreferenceSettings {
     disable_vtec?: boolean;
     disable_text?: boolean;
     cap_only?: boolean;
-    shapefile_coordinates?: boolean;
 }
 
 interface LocalNoaaWeatherWireServiceSettings {
@@ -97,12 +98,6 @@ interface LocalEventHistory {
     type?: string;
 }
 
-interface LocalGeoJSON {
-    type?: string;
-    coordinates?: [number, number][];
-    geometry?: { type?: string, coordinates?: [number, number][] };
-    properties?: Record<string, unknown>;
-}
 
 interface LocalEventParameters {
     wmo?: string;
@@ -134,17 +129,11 @@ interface LocalEventProperties {
     issued?: string;
     expires?: string;
     geocode?: { UGC: string[] };
-    technical: { 
-        ugc?: UGCEntry | null;
-        pVtec?: PVtecEntry | null,
-        hVtec?: HVtecEntry | null;
-    }
     description?: string;
     sender_name?: string;
     sender_icao?: string;
-    metadata?: DefaultAttributesType;
+    raw?: DefaultAttributesType;
     parameters?: LocalEventParameters;
-    geometry?: LocalGeoJSON | null;
     messageType?: string;
     sent?: string;
     areaDesc?: string;
@@ -215,6 +204,11 @@ export interface HVtecEntry {
     raw?: string,
 }
 
+export interface geometry { 
+    type?: string;
+    coordinates?: [number, number][];
+}
+
 
 export interface EventCompiled {
     performance?: number;
@@ -223,7 +217,7 @@ export interface EventCompiled {
     pvtec?: string;
     hvtec?: string;
     history?: LocalEventHistory[];
-    properties?: LocalEventProperties;
+    properties?: LocalEventProperties
     geometry?: { type?: string; coordinates?: [number, number][] } | null;
 }
 

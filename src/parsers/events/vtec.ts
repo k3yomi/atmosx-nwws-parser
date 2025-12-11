@@ -50,17 +50,22 @@ export class VTECAlerts {
                 if (getPVTEC != null && getUGC != null) {
                     for (let j = 0; j < getPVTEC.length; j++) {
                         const pVtec = getPVTEC[j];
-                        const getBaseProperties = await EventParser.getBaseProperties(message, attributes, getUGC, pVtec, getHVTEC) as types.EventProperties;
-                        const getHeader = EventParser.getHeader({ ...validated.attributes, ...getBaseProperties.metadata } as types.StanzaAttributes, getBaseProperties, pVtec);
+                        const baseProperties = await EventParser.getBaseProperties(message, attributes, getUGC, pVtec, getHVTEC) as types.EventProperties;
+                        const baseGeometry = await EventParser.getEventGeometry(message, getUGC);
+                        const getHeader = EventParser.getHeader({ ...validated.attributes, ...baseProperties.raw } as types.StanzaAttributes, baseProperties, pVtec);
                         processed.push({
-                            performance: performance.now() - tick,
-                            source: `pvtec-parser`,
-                            tracking: pVtec.tracking,
-                            header: getHeader,
-                            pvtec: pVtec.raw,
-                            hvtec: getHVTEC != null ? getHVTEC.raw : `N/A`,
-                            history: [{ description: getBaseProperties.description, issued: getBaseProperties.issued, type: pVtec.status }],
-                            properties: { event: pVtec.event, parent: pVtec.event, action_type: pVtec.status, ...getBaseProperties, }
+                            type: "Feature",
+                            properties: { event: pVtec.event, parent: pVtec.event, action_type: pVtec.status, ...baseProperties, },
+                            details: {
+                                performance: performance.now() - tick,
+                                source: `pvtec-parser`,
+                                tracking: pVtec.tracking,
+                                header: getHeader,
+                                pvtec: pVtec.raw,
+                                hvtec: getHVTEC != null ? getHVTEC.raw : `N/A`,
+                                history: [{ description: baseProperties.description, issued: baseProperties.issued, type: pVtec.status }],
+                            },
+                            geometry: baseGeometry
                         })
                     }
                 }

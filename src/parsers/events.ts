@@ -40,7 +40,6 @@ export class EventParser {
             flood: TextParser.textProductToString(message, `FLASH FLOOD...`) ?? `N/A`,
             damage: TextParser.textProductToString(message, `DAMAGE THREAT...`) ?? `N/A`,
             source: TextParser.textProductToString(message, `SOURCE...`, [`.`]) ?? `N/A`,
-            polygon: TextParser.textProductToPolygon(message),
             description: TextParser.textProductToDescription(message, pVtec?.raw ?? null),
             wmo: message.match(loader.definitions.regular_expressions.wmo)?.[0] ?? `N/A`,
             mdTorIntensity: TextParser.textProductToString(message, `MOST PROBABLE PEAK TORNADO INTENSITY...`) ?? `N/A`,
@@ -58,8 +57,7 @@ export class EventParser {
             description: definitions.description,
             sender_name: getOffice.name,
             sender_icao: getOffice.icao,
-            metadata: {...Object.fromEntries(Object.entries(metadata).filter(([key]) => key !== 'message'))},
-            technical: { ugc: ugc, vtec: pVtec, hvtec: hVtec },
+            raw: {...Object.fromEntries(Object.entries(metadata).filter(([key]) => key !== 'message'))},
             parameters: {
                 wmo: Array.isArray(definitions.wmo) ? definitions.wmo[0] : (definitions.wmo ?? `N/A`),
                 source: definitions.source,
@@ -72,13 +70,32 @@ export class EventParser {
                 discussion_wind_intensity: definitions.mdWindGusts,
                 discussion_hail_intensity:  definitions.mdHailSize,
             },
-            geometry: definitions.polygon.length > 0 ? { type: "Polygon", coordinates: definitions.polygon } : null
         };
-        if (settings.noaa_weather_wire_service_settings.preferences.shapefile_coordinates && base.geometry == null && ugc != null) {
-            const coordinates = await UGCParser.getCoordinates(ugc.zones);
-            base.geometry = { type: "Polygon", coordinates };
-        }
         return base;
+    }
+
+    /**
+     * @function getEventGeometry
+     * @description
+     *   Determines the geometry of an event using polygon data fromEntries
+     *   in the message or UGC shapefile coordinates if enabled in settings. Falls
+     *   back to null if no geometry can be determined.
+     * 
+     * @static
+     * @param {string} message
+     * @param {types.UGCEntry} [ugc=null]
+     * @returns {Promise<types.geometry>}
+     */
+    public static async getEventGeometry(message: string, ugc: types.UGCEntry = null) : Promise<types.geometry> {
+        const settings = loader.settings as types.ClientSettingsTypes;
+        const polygonText = TextParser.textProductToPolygon(message);
+        let geometry = null;
+        geometry = polygonText.length > 0 ? { type: "Polygon", coordinates: polygonText } : null;
+        if (settings.global_settings.shapefile_coordinates && polygonText.length == 0 && ugc != null) {
+            const coordinates = await UGCParser.getCoordinates(ugc.zones) as any;
+            geometry = { type: "Polygon", coordinates: coordinates };
+        }
+        return geometry;
     }
     
     /**
@@ -148,11 +165,11 @@ export class EventParser {
             const originalEvent = this.buildDefaultSignature(alert);
             const props = originalEvent?.properties;
             const ugcs = props?.geocode?.UGC ?? [];
-            const { performance, header, ...eventWithoutPerformance } = originalEvent;
+            const { details, ...eventWithoutPerformance } = originalEvent
             originalEvent.properties.parent = originalEvent.properties.event;          
             originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools?.better_event_parsing, bools?.parent_events_only);
             originalEvent.hash = loader.packages.crypto.createHash('md5').update(JSON.stringify(eventWithoutPerformance)).digest('hex');
-            originalEvent.properties.distance = this.getLocationDistances(props, locationSettings?.unit);
+            originalEvent.properties.distance = this.getLocationDistances(props, originalEvent.geometry, locationSettings?.unit);
             if (originalEvent.properties.is_test == true && bools?.ignore_text_products) return false;
             if (bools?.check_expired && originalEvent.properties.is_cancelled == true) return false;
             for (const key in sets) {
@@ -168,7 +185,7 @@ export class EventParser {
             loader.cache.events.emit(`on${originalEvent.properties.event.replace(/\s+/g, '')}`) 
             return true;
         })
-        if (filtered.length > 0) { loader.cache.events.emit(`onAlerts`, filtered); }
+        if (filtered.length > 0) { loader.cache.events.emit(`onEvents`, filtered); }
     }
 
     /**
@@ -285,14 +302,15 @@ export class EventParser {
      * @private
      * @static
      * @param {types.EventProperties} [properties]
+     * @param {types.EventCompiled} [event]
      * @param {string} [unit='miles']
      * @returns {Record<string, { distance: number, unit: string}>}
      */
-    private static getLocationDistances(properties?: types.EventProperties, unit?: string) {
-        if (properties.geometry != null) {
+    private static getLocationDistances(properties?: types.EventProperties, geometry?: types.geometry, unit: string = 'miles') {
+        if (geometry != null) {
             for (const key in loader.cache.currentLocations) {
                 const coordinates = loader.cache.currentLocations[key];
-                const singleCoord = properties.geometry.coordinates;
+                const singleCoord = geometry.coordinates;
                 const center = singleCoord.reduce((acc, [lat, lon]) => ([acc[0] + lat, acc[1] + lon]), [0, 0]).map(sum => sum / singleCoord.length);
                 const validUnit = unit === 'miles' || unit === 'kilometers' ? unit : 'miles';
                 const distance = Utils.calculateDistance({ lat: coordinates.lat, lon: coordinates.lon }, { lat: center[0], lon: center[1] }, validUnit);
@@ -330,7 +348,7 @@ export class EventParser {
         if (statusCorrelation) { 
             props.action_type = statusCorrelation.forward ?? props.action_type; 
             props.is_updated = !!statusCorrelation.update; props.is_issued = !!statusCorrelation.new;
-            props.is_cancelled = !!statusCorrelation.cancel; 
+            props.is_cancelled = !!statusCorrelation.cancel;
         } else { setAction(`I`); }
         if (props.description) { 
             const detectedPhrase = loader.definitions.cancelSignatures.find(sig => props.description.toLowerCase().includes(sig.toLowerCase()));

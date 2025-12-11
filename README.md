@@ -45,7 +45,6 @@ const parser = new AlertManager({
             disable_vtec: false,
             disable_text: false,
             cap_only: false,
-            shapefile_coordinates: false,
         }
     },
     national_weather_service_settings: {
@@ -55,6 +54,8 @@ const parser = new AlertManager({
     global_settings: {
         parent_events_only: true,
         better_event_parsing: true,
+        shapefile_coordinates: false,
+        shapefile_skip: 10,
         filtering: {
             events: [`Severe Thunderstorm Warning`],
             filtered_icao: [],
@@ -83,11 +84,12 @@ To use the NOAA Weather Wire Service (NWWS). You would need to obtain credential
 3. Submit the form and wait for approval. You will receive your NWWS credentials via email.
 
 ## Events and Listeners
+> All events are in GeoJSON for events.
 
-### Event `onAlerts`
-Triggered when a batch of new alerts are received and processed. This will come with an array of alert objects.
+### Event `onEvents`
+Triggered when a batch of new alerts are received and processed.
 ```javascript
-parser.on(`onAlerts`, (alerts) => {
+parser.on(`onEvents`, (alerts) => {
     console.log(`Received ${alerts.length} new alerts.`);
     alerts.forEach(alert => {
         console.log(`${alert.properties.event} for ${alert.properties.locations}`);

@@ -19,6 +19,7 @@ import * as xmpp from '@xmpp/client';
 import * as shapefile from 'shapefile';
 import * as xml2js from 'xml2js';
 import * as jobs from 'croner';
+import * as turf from "turf";
 import sqlite3 from 'better-sqlite3';
 import axios from 'axios';
 import crypto from 'crypto';
@@ -48,6 +49,7 @@ export const packages = {
     os, 
     say,
     child,
+    turf,
 };
 
 export const cache = {
@@ -93,7 +95,6 @@ export const settings = {
             disable_vtec: false,
             disable_text: false,
             cap_only: false,
-            shapefile_coordinates: false,
         }
     },
     national_weather_service_settings: {
@@ -103,6 +104,8 @@ export const settings = {
     global_settings: {
         parent_events_only: true,
         better_event_parsing: true,
+        shapefile_coordinates: false,
+        shapefile_skip: 15,
         filtering: {
             events: [],
             filtered_icao: [],
