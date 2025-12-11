@@ -9,7 +9,6 @@ import UGCAlerts from './events/ugc';
 import TextAlerts from './events/text';
 import CAPAlerts from './events/cap';
 import APIAlerts from './events/api';
-import Utils from '../utils';
 
 
 export class EventParser {
@@ -147,7 +146,7 @@ export class EventParser {
      * @param {unknown[]} events
      * @returns {void}
      */
-    public static validateEvents(events: unknown[]) {
+    public static async validateEvents(events: unknown[]) {
         if (events.length == 0) return;
         const filteringSettings = loader.settings?.global_settings?.filtering;
         const easSettings = loader.settings?.global_settings?.eas_settings;
@@ -160,8 +159,8 @@ export class EventParser {
             if (Array.isArray(setting)) { sets[key] = new Set(setting.map(item => item.toLowerCase())); }
             if (typeof setting === 'boolean') { bools[key] = setting; }
         }
-        const filtered = events.filter((alert: types.EventCompiled) => {
-            const originalEvent = this.buildDefaultSignature(alert);
+        const filtered = events.filter((event: types.EventCompiled) => {
+            const originalEvent = this.buildDefaultSignature(event);
             const props = originalEvent?.properties;
             const ugcs = props?.geocode?.UGC ?? [];
             const { details, ...eventWithoutPerformance } = originalEvent
@@ -183,6 +182,10 @@ export class EventParser {
             loader.cache.events.emit(`on${originalEvent.properties.event.replace(/\s+/g, '')}`) 
             return true;
         })
+        for (const event of filtered as types.EventCompiled[]) {
+            const geometry = await this.getEventGeometry(event.properties.description, {zones: event.properties.geocode != null ? event.properties.geocode.UGC : null})
+            event.geometry = geometry;
+        }
         if (filtered.length > 0) { loader.cache.events.emit(`onEvents`, filtered); }
     }
 

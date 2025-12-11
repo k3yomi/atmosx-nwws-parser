@@ -1,4 +1,5 @@
 export const TAGS: Record<string, string> = {
+    "FROSTBITE AND HYPOTHERMIA ARE LIKELY": "Frostbite and Hypothermia Likely",
     "LICKELY BECOME SLICK AND HAZARDOUS": "Slick and Hazardous Roads",
     "SLIPPERY ROAD CONDITIONS": "Slippery Roads",
     "BLOWING SNOW WHICH COULD REDUCE VISIBILITY": "Blowing Snow Reducing Visibility",

@@ -119,15 +119,6 @@ export class CapAlerts {
                         hvtec: `N/A`,
                         history: [{ description: extracted.description || `N/A`, issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`, type: extracted.msgtype || `N/A` }],
                     },
-                    geometry: extracted.polygon ? { 
-                        type: "Polygon", 
-                        coordinates: [
-                            extracted.polygon.split(" ").map((coord: string) => {
-                                const [lon, lat] = coord.split(",").map((num: string) => parseFloat(num));
-                                return [lat, lon];
-                            })
-                        ]
-                    } : await EventParser.getEventGeometry(``, {zones: JSON.parse(`[\"${extracted.ugc}\"]`)}),
                 })
             }
         }

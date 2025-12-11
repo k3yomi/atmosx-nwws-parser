@@ -51,7 +51,6 @@ export class VTECAlerts {
                     for (let j = 0; j < getPVTEC.length; j++) {
                         const pVtec = getPVTEC[j];
                         const baseProperties = await EventParser.getBaseProperties(message, attributes, getUGC, pVtec, getHVTEC) as types.EventProperties;
-                        const baseGeometry = await EventParser.getEventGeometry(message, getUGC);
                         const getHeader = EventParser.getHeader({ ...validated.attributes, ...baseProperties.raw } as types.StanzaAttributes, baseProperties, pVtec);
                         processed.push({
                             type: "Feature",
@@ -65,7 +64,6 @@ export class VTECAlerts {
                                 hvtec: getHVTEC != null ? getHVTEC.raw : `N/A`,
                                 history: [{ description: baseProperties.description, issued: baseProperties.issued, type: pVtec.status }],
                             },
-                            geometry: baseGeometry
                         })
                     }
                 }

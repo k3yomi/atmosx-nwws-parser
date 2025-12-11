@@ -82,7 +82,6 @@ export class UGCAlerts {
                 if (getUGC != null) {
                     const attributes = cachedAttribute != null ? JSON.parse(cachedAttribute[1]) : validated;
                     const baseProperties = await EventParser.getBaseProperties(message, attributes, getUGC) as types.EventProperties;
-                    const baseGeometry = await EventParser.getEventGeometry(message, getUGC);
                     const getHeader = EventParser.getHeader({ ...attributes, ...baseProperties.raw } as types.StanzaAttributes, baseProperties);
                     const getEvent = this.getEvent(message, attributes);
                     processed.push({
@@ -96,8 +95,7 @@ export class UGCAlerts {
                             pvtec: `N/A`,
                             hvtec: `N/A`,
                             history: [{ description: baseProperties.description, issued: baseProperties.issued, type: `Issued` }],
-                        },
-                        geometry: baseGeometry,
+                        }
                     })
                 }
             }

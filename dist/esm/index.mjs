@@ -562,6 +562,7 @@ var AWIPS = {
 
 // src/dictionaries/signatures.ts
 var TAGS = {
+  "FROSTBITE AND HYPOTHERMIA ARE LIKELY": "Frostbite and Hypothermia Likely",
   "LICKELY BECOME SLICK AND HAZARDOUS": "Slick and Hazardous Roads",
   "SLIPPERY ROAD CONDITIONS": "Slippery Roads",
   "BLOWING SNOW WHICH COULD REDUCE VISIBILITY": "Blowing Snow Reducing Visibility",
@@ -1632,7 +1633,6 @@ var VTECAlerts = class {
             for (let j = 0; j < getPVTEC.length; j++) {
               const pVtec = getPVTEC[j];
               const baseProperties = yield events_default.getBaseProperties(message, attributes, getUGC, pVtec, getHVTEC);
-              const baseGeometry = yield events_default.getEventGeometry(message, getUGC);
               const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, validated.attributes), baseProperties.raw), baseProperties, pVtec);
               processed.push({
                 type: "Feature",
@@ -1645,8 +1645,7 @@ var VTECAlerts = class {
                   pvtec: pVtec.raw,
                   hvtec: getHVTEC != null ? getHVTEC.raw : `N/A`,
                   history: [{ description: baseProperties.description, issued: baseProperties.issued, type: pVtec.status }]
-                },
-                geometry: baseGeometry
+                }
               });
             }
           }
@@ -1723,7 +1722,6 @@ var UGCAlerts = class {
           if (getUGC != null) {
             const attributes = cachedAttribute != null ? JSON.parse(cachedAttribute[1]) : validated;
             const baseProperties = yield events_default.getBaseProperties(message, attributes, getUGC);
-            const baseGeometry = yield events_default.getEventGeometry(message, getUGC);
             const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, attributes), baseProperties.raw), baseProperties);
             const getEvent = this.getEvent(message, attributes);
             processed.push({
@@ -1737,8 +1735,7 @@ var UGCAlerts = class {
                 pvtec: `N/A`,
                 hvtec: `N/A`,
                 history: [{ description: baseProperties.description, issued: baseProperties.issued, type: `Issued` }]
-              },
-              geometry: baseGeometry
+              }
             });
           }
         }
@@ -1813,7 +1810,6 @@ var TextAlerts = class {
           const message = messages[i];
           const attributes = cachedAttribute != null ? JSON.parse(cachedAttribute[1]) : validated;
           const baseProperties = yield events_default.getBaseProperties(message, attributes);
-          const baseGeometry = yield events_default.getEventGeometry(message);
           const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, validated.attributes), baseProperties.raw), baseProperties);
           const getEvent = this.getEvent(message, attributes);
           processed.push({
@@ -1827,8 +1823,7 @@ var TextAlerts = class {
               pvtec: `N/A`,
               hvtec: `N/A`,
               history: [{ description: baseProperties.description, issued: baseProperties.issued, type: `Issued` }]
-            },
-            geometry: baseGeometry
+            }
           });
         }
       }
@@ -1953,16 +1948,7 @@ var CapAlerts = class {
               pvtec: extracted.vtec || `N/A`,
               hvtec: `N/A`,
               history: [{ description: extracted.description || `N/A`, issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`, type: extracted.msgtype || `N/A` }]
-            },
-            geometry: extracted.polygon ? {
-              type: "Polygon",
-              coordinates: [
-                extracted.polygon.split(" ").map((coord) => {
-                  const [lon, lat] = coord.split(",").map((num) => parseFloat(num));
-                  return [lat, lon];
-                })
-              ]
-            } : yield events_default.getEventGeometry(``, { zones: JSON.parse(`["${extracted.ugc}"]`) })
+            }
           });
         }
       }
@@ -2028,7 +2014,7 @@ var APIAlerts = class {
    */
   static event(validated) {
     return __async(this, null, function* () {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia, _ja, _ka, _la, _ma, _na, _oa, _pa, _qa, _ra, _sa, _ta, _ua;
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia, _ja, _ka, _la, _ma, _na, _oa, _pa;
       let processed = [];
       const settings2 = settings;
       const messages = Object.values(JSON.parse(validated.message).features);
@@ -2089,16 +2075,7 @@ var APIAlerts = class {
               action: (_na = (_ma = feature == null ? void 0 : feature.properties) == null ? void 0 : _ma.messageType) != null ? _na : `N/A`,
               time: ((_oa = feature == null ? void 0 : feature.properties) == null ? void 0 : _oa.sent) ? new Date((_pa = feature == null ? void 0 : feature.properties) == null ? void 0 : _pa.sent).toLocaleString() : `N/A`
             }]
-          },
-          geometry: ((_ra = (_qa = feature == null ? void 0 : feature.geometry) == null ? void 0 : _qa.coordinates) == null ? void 0 : _ra[0]) != null ? {
-            type: "Polygon",
-            coordinates: [
-              (_ua = (_ta = (_sa = feature == null ? void 0 : feature.geometry) == null ? void 0 : _sa.coordinates) == null ? void 0 : _ta[0]) == null ? void 0 : _ua.map((coord) => {
-                const [lat, lon] = Array.isArray(coord) ? coord : [0, 0];
-                return [lat, lon];
-              })
-            ]
-          } : yield events_default.getEventGeometry(``, { zones: getUgc })
+          }
         });
       }
       events_default.validateEvents(processed);
@@ -2250,50 +2227,56 @@ var EventParser = class {
    * @returns {void}
    */
   static validateEvents(events2) {
-    var _a, _b, _c, _d, _e;
-    if (events2.length == 0) return;
-    const filteringSettings = (_b = (_a = settings) == null ? void 0 : _a.global_settings) == null ? void 0 : _b.filtering;
-    const easSettings = (_d = (_c = settings) == null ? void 0 : _c.global_settings) == null ? void 0 : _d.eas_settings;
-    const globalSettings = (_e = settings) == null ? void 0 : _e.global_settings;
-    const sets = {};
-    const bools = {};
-    const megered = __spreadValues(__spreadValues(__spreadValues({}, filteringSettings), easSettings), globalSettings);
-    for (const key in megered) {
-      const setting = megered[key];
-      if (Array.isArray(setting)) {
-        sets[key] = new Set(setting.map((item) => item.toLowerCase()));
+    return __async(this, null, function* () {
+      var _a, _b, _c, _d, _e;
+      if (events2.length == 0) return;
+      const filteringSettings = (_b = (_a = settings) == null ? void 0 : _a.global_settings) == null ? void 0 : _b.filtering;
+      const easSettings = (_d = (_c = settings) == null ? void 0 : _c.global_settings) == null ? void 0 : _d.eas_settings;
+      const globalSettings = (_e = settings) == null ? void 0 : _e.global_settings;
+      const sets = {};
+      const bools = {};
+      const megered = __spreadValues(__spreadValues(__spreadValues({}, filteringSettings), easSettings), globalSettings);
+      for (const key in megered) {
+        const setting = megered[key];
+        if (Array.isArray(setting)) {
+          sets[key] = new Set(setting.map((item) => item.toLowerCase()));
+        }
+        if (typeof setting === "boolean") {
+          bools[key] = setting;
+        }
       }
-      if (typeof setting === "boolean") {
-        bools[key] = setting;
+      const filtered = events2.filter((event) => {
+        var _a2, _b2;
+        const originalEvent = this.buildDefaultSignature(event);
+        const props = originalEvent == null ? void 0 : originalEvent.properties;
+        const ugcs = (_b2 = (_a2 = props == null ? void 0 : props.geocode) == null ? void 0 : _a2.UGC) != null ? _b2 : [];
+        const _c2 = originalEvent, { details } = _c2, eventWithoutPerformance = __objRest(_c2, ["details"]);
+        originalEvent.properties.parent = originalEvent.properties.event;
+        originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools == null ? void 0 : bools.better_event_parsing, bools == null ? void 0 : bools.parent_events_only);
+        originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(eventWithoutPerformance)).digest("hex");
+        if (originalEvent.properties.is_test == true && (bools == null ? void 0 : bools.ignore_test_products)) return false;
+        if ((bools == null ? void 0 : bools.check_expired) && originalEvent.properties.is_cancelled == true) return false;
+        for (const key in sets) {
+          const setting = sets[key];
+          if (key === "events" && setting.size > 0 && !setting.has(originalEvent.properties.event.toLowerCase())) return false;
+          if (key === "ignored_events" && setting.size > 0 && setting.has(originalEvent.properties.event.toLowerCase())) return false;
+          if (key === "filtered_icao" && setting.size > 0 && props.sender_icao != null && !setting.has(props.sender_icao.toLowerCase())) return false;
+          if (key === "ignored_icao" && setting.size > 0 && props.sender_icao != null && setting.has(props.sender_icao.toLowerCase())) return false;
+          if (key === "ugc_filter" && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc) => setting.has(ugc.toLowerCase()))) return false;
+          if (key === "state_filter" && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc) => setting.has(ugc.substring(0, 2).toLowerCase()))) return false;
+        }
+        cache.events.emit(`on${originalEvent.properties.parent.replace(/\s+/g, "")}`);
+        cache.events.emit(`on${originalEvent.properties.event.replace(/\s+/g, "")}`);
+        return true;
+      });
+      for (const event of filtered) {
+        const geometry = yield this.getEventGeometry(event.properties.description, { zones: event.properties.geocode != null ? event.properties.geocode.UGC : null });
+        event.geometry = geometry;
       }
-    }
-    const filtered = events2.filter((alert) => {
-      var _a2, _b2;
-      const originalEvent = this.buildDefaultSignature(alert);
-      const props = originalEvent == null ? void 0 : originalEvent.properties;
-      const ugcs = (_b2 = (_a2 = props == null ? void 0 : props.geocode) == null ? void 0 : _a2.UGC) != null ? _b2 : [];
-      const _c2 = originalEvent, { details } = _c2, eventWithoutPerformance = __objRest(_c2, ["details"]);
-      originalEvent.properties.parent = originalEvent.properties.event;
-      originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools == null ? void 0 : bools.better_event_parsing, bools == null ? void 0 : bools.parent_events_only);
-      originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(eventWithoutPerformance)).digest("hex");
-      if (originalEvent.properties.is_test == true && (bools == null ? void 0 : bools.ignore_test_products)) return false;
-      if ((bools == null ? void 0 : bools.check_expired) && originalEvent.properties.is_cancelled == true) return false;
-      for (const key in sets) {
-        const setting = sets[key];
-        if (key === "events" && setting.size > 0 && !setting.has(originalEvent.properties.event.toLowerCase())) return false;
-        if (key === "ignored_events" && setting.size > 0 && setting.has(originalEvent.properties.event.toLowerCase())) return false;
-        if (key === "filtered_icao" && setting.size > 0 && props.sender_icao != null && !setting.has(props.sender_icao.toLowerCase())) return false;
-        if (key === "ignored_icao" && setting.size > 0 && props.sender_icao != null && setting.has(props.sender_icao.toLowerCase())) return false;
-        if (key === "ugc_filter" && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc) => setting.has(ugc.toLowerCase()))) return false;
-        if (key === "state_filter" && setting.size > 0 && ugcs.length > 0 && !ugcs.some((ugc) => setting.has(ugc.substring(0, 2).toLowerCase()))) return false;
+      if (filtered.length > 0) {
+        cache.events.emit(`onEvents`, filtered);
       }
-      cache.events.emit(`on${originalEvent.properties.parent.replace(/\s+/g, "")}`);
-      cache.events.emit(`on${originalEvent.properties.event.replace(/\s+/g, "")}`);
-      return true;
     });
-    if (filtered.length > 0) {
-      cache.events.emit(`onEvents`, filtered);
-    }
   }
   /**
    * @function getHeader

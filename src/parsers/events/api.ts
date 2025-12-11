@@ -133,15 +133,6 @@ export class APIAlerts {
                         time: feature?.properties?.sent ? new Date(feature?.properties?.sent).toLocaleString() : `N/A`
                     }],
                 },
-                geometry: feature?.geometry?.coordinates?.[0] != null ? {
-                    type: "Polygon", 
-                    coordinates: [
-                        feature?.geometry?.coordinates?.[0]?.map((coord: number[] | any) => {
-                            const [lat, lon] = Array.isArray(coord) ? coord : [0, 0];
-                            return [lat, lon];
-                        })
-                    ]  
-                } : await EventParser.getEventGeometry(``, {zones: getUgc})
             })
         }
         EventParser.validateEvents(processed);

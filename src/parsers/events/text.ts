@@ -80,7 +80,6 @@ export class TextAlerts {
                 const message = messages[i]
                 const attributes = cachedAttribute != null ? JSON.parse(cachedAttribute[1]) : validated;
                 const baseProperties = await EventParser.getBaseProperties(message, attributes) as types.EventProperties;
-                const baseGeometry = await EventParser.getEventGeometry(message);
                 const getHeader = EventParser.getHeader({ ...validated.attributes, ...baseProperties.raw } as types.StanzaAttributes, baseProperties)
                 const getEvent = this.getEvent(message, attributes);
                 processed.push({
@@ -95,7 +94,6 @@ export class TextAlerts {
                         hvtec: `N/A`,
                         history: [{ description: baseProperties.description, issued: baseProperties.issued, type: `Issued` }],
                     },
-                    geometry: baseGeometry,
                 })
             }
         }
