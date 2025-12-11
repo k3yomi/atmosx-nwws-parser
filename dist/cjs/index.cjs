@@ -1092,13 +1092,9 @@ var definitions = {
     not_ready: `You can NOT create another instance without shutting down the current one first, please make sure to call the stop() method first!`,
     invalid_nickname: `The nickname you provided is invalid, please provide a valid nickname to continue.`,
     eas_no_directory: `You have not set a directory for EAS audio files to be saved to, please set the 'directory' setting in the global settings to enable EAS audio generation.`,
-    invalid_coordinates: `The coordinates you provided are invalid, please provide valid latitude and longitude values. Attempted: {lat}, {lon}.`,
-    no_current_locations: `No current location has been set, operations will be haulted until a location is set or location filtering is disabled.`,
-    disabled_location_warning: `Exceeded maximum warnings for invalid or missing lat/lon coordinates. Location filtering has been ignored until you set valid coordinates or disable location filtering.`,
     reconnect_too_fast: `The client is attempting to reconnect too fast. This may be due to network instability. Reconnection attempt has been halted for safety.`,
     dump_cache: `Found {count} cached alert files and will begin dumping them shortly...`,
-    dump_cache_complete: `Completed dumping all cached alert files.`,
-    eas_missing_festival: `Festival TTS engine is not installed or not found in PATH. Please install Festival to enable EAS audio generation on Linux and macOS systems.`
+    dump_cache_complete: `Completed dumping all cached alert files.`
   }
 };
 
