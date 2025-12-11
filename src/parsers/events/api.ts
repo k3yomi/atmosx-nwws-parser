@@ -102,36 +102,31 @@ export class APIAlerts {
                     geocode: {
                         UGC: feature?.properties?.geocode?.UGC ?? [`XX000`]
                     },
-                    metadata: {},
-                    technical: {
-                        vtec: getPVTEC ?? `N/A`,
-                        ugc: getUgc ? getUgc.join(`,`) : `N/A`,
-                        hvtec: `N/A`,
-                    },
+                    raw: {},
                     parameters: {
                         wmo: feature?.properties?.parameters?.WMOidentifier?.[0] ?? getWmo ?? `N/A`,
                         source: getSource,
                         max_hail_size: feature?.properties?.parameters?.maxHailSize ?? `N/A`,
                         max_wind_gust: feature?.properties?.parameters?.maxWindGust ?? `N/A`,
-                        damage_threat: feature?.properties?.parameters?.thunderstormDamageThreat?.[0] ?? [`N/A`],
-                        tornado_detection: feature?.properties?.parameters?.tornadoDetection?.[0] ?? [`N/A`],
-                        flood_detection: feature?.properties?.parameters?.floodDetection?.[0] ?? [`N/A`],
+                        damage_threat: feature?.properties?.parameters?.thunderstormDamageThreat?.[0] ?? `N/A`,
+                        tornado_detection: feature?.properties?.parameters?.tornadoDetection?.[0] ?? `N/A`,
+                        flood_detection: feature?.properties?.parameters?.floodDetection?.[0] ?? `N/A`,
                         discussion_tornado_intensity: "N/A", 
                         peakWindGust: `N/A`,
                         peakHailSize: `N/A`,
                     },
-                },
-                details: {
-                    performance: performance.now() - tick,
-                    source: `api-parser`,
-                    tracking: this.getTracking({ pVtec: getPVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
-                    header: getHeader,
-                    pvtec: getPVTEC ?? `N/A`,
-                    history: [{
-                        description: feature?.properties?.description ?? `N/A`,
-                        action: feature?.properties?.messageType ?? `N/A`,
-                        time: feature?.properties?.sent ? new Date(feature?.properties?.sent).toLocaleString() : `N/A`
-                    }],
+                    details: {
+                        performance: performance.now() - tick,
+                        source: `api-parser`,
+                        tracking: this.getTracking({ pVtec: getPVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
+                        header: getHeader,
+                        pvtec: getPVTEC ?? `N/A`,
+                        history: [{
+                            description: feature?.properties?.description ?? `N/A`,
+                            action: feature?.properties?.messageType ?? `N/A`,
+                            time: feature?.properties?.sent ? new Date(feature?.properties?.sent).toLocaleString() : `N/A`
+                        }],
+                    },
                 },
             })
         }

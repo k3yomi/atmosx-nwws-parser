@@ -54,15 +54,20 @@ export class VTECAlerts {
                         const getHeader = EventParser.getHeader({ ...validated.attributes, ...baseProperties.raw } as types.StanzaAttributes, baseProperties, pVtec);
                         processed.push({
                             type: "Feature",
-                            properties: { event: pVtec.event, parent: pVtec.event, action_type: pVtec.status, ...baseProperties, },
-                            details: {
-                                performance: performance.now() - tick,
-                                source: `pvtec-parser`,
-                                tracking: pVtec.tracking,
-                                header: getHeader,
-                                pvtec: pVtec.raw,
-                                hvtec: getHVTEC != null ? getHVTEC.raw : `N/A`,
-                                history: [{ description: baseProperties.description, issued: baseProperties.issued, type: pVtec.status }],
+                            properties: { 
+                                event: pVtec.event, 
+                                parent: pVtec.event, 
+                                action_type: pVtec.status, 
+                                ...baseProperties, 
+                                details: {
+                                    performance: performance.now() - tick,
+                                    source: `pvtec-parser`,
+                                    tracking: pVtec.tracking,
+                                    header: getHeader,
+                                    pvtec: pVtec.raw,
+                                    hvtec: getHVTEC != null ? getHVTEC.raw : `N/A`,
+                                    history: [{ description: baseProperties.description, issued: baseProperties.issued, type: pVtec.status }],
+                                },
                             },
                         })
                     }

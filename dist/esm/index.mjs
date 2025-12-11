@@ -1636,16 +1636,21 @@ var VTECAlerts = class {
               const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, validated.attributes), baseProperties.raw), baseProperties, pVtec);
               processed.push({
                 type: "Feature",
-                properties: __spreadValues({ event: pVtec.event, parent: pVtec.event, action_type: pVtec.status }, baseProperties),
-                details: {
-                  performance: performance.now() - tick,
-                  source: `pvtec-parser`,
-                  tracking: pVtec.tracking,
-                  header: getHeader,
-                  pvtec: pVtec.raw,
-                  hvtec: getHVTEC != null ? getHVTEC.raw : `N/A`,
-                  history: [{ description: baseProperties.description, issued: baseProperties.issued, type: pVtec.status }]
-                }
+                properties: __spreadProps(__spreadValues({
+                  event: pVtec.event,
+                  parent: pVtec.event,
+                  action_type: pVtec.status
+                }, baseProperties), {
+                  details: {
+                    performance: performance.now() - tick,
+                    source: `pvtec-parser`,
+                    tracking: pVtec.tracking,
+                    header: getHeader,
+                    pvtec: pVtec.raw,
+                    hvtec: getHVTEC != null ? getHVTEC.raw : `N/A`,
+                    history: [{ description: baseProperties.description, issued: baseProperties.issued, type: pVtec.status }]
+                  }
+                })
               });
             }
           }
@@ -1726,16 +1731,21 @@ var UGCAlerts = class {
             const getEvent = this.getEvent(message, attributes);
             processed.push({
               type: "Feature",
-              properties: __spreadValues({ event: getEvent, parent: getEvent, action_type: `Issued` }, baseProperties),
-              details: {
-                performance: performance.now() - tick,
-                source: `ugc-parser`,
-                tracking: this.getTracking(baseProperties),
-                header: getHeader,
-                pvtec: `N/A`,
-                hvtec: `N/A`,
-                history: [{ description: baseProperties.description, issued: baseProperties.issued, type: `Issued` }]
-              }
+              properties: __spreadProps(__spreadValues({
+                event: getEvent,
+                parent: getEvent,
+                action_type: `Issued`
+              }, baseProperties), {
+                details: {
+                  performance: performance.now() - tick,
+                  source: `ugc-parser`,
+                  tracking: this.getTracking(baseProperties),
+                  header: getHeader,
+                  pvtec: `N/A`,
+                  hvtec: `N/A`,
+                  history: [{ description: baseProperties.description, issued: baseProperties.issued, type: `Issued` }]
+                }
+              })
             });
           }
         }
@@ -1813,17 +1823,22 @@ var TextAlerts = class {
           const getHeader = events_default.getHeader(__spreadValues(__spreadValues({}, validated.attributes), baseProperties.raw), baseProperties);
           const getEvent = this.getEvent(message, attributes);
           processed.push({
-            properties: __spreadValues({ event: getEvent, parent: getEvent, action_type: `Issued` }, baseProperties),
-            details: {
-              type: "Feature",
-              performance: performance.now() - tick,
-              source: `text-parser`,
-              tracking: this.getTracking(baseProperties),
-              header: getHeader,
-              pvtec: `N/A`,
-              hvtec: `N/A`,
-              history: [{ description: baseProperties.description, issued: baseProperties.issued, type: `Issued` }]
-            }
+            properties: __spreadProps(__spreadValues({
+              event: getEvent,
+              parent: getEvent,
+              action_type: `Issued`
+            }, baseProperties), {
+              details: {
+                type: "Feature",
+                performance: performance.now() - tick,
+                source: `text-parser`,
+                tracking: this.getTracking(baseProperties),
+                header: getHeader,
+                pvtec: `N/A`,
+                hvtec: `N/A`,
+                history: [{ description: baseProperties.description, issued: baseProperties.issued, type: `Issued` }]
+              }
+            })
           });
         }
       }
@@ -1867,7 +1882,7 @@ var CapAlerts = class {
    */
   static event(validated) {
     return __async(this, null, function* () {
-      var _a, _b;
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s;
       let processed = [];
       const tick = performance.now();
       const settings2 = settings;
@@ -1904,50 +1919,45 @@ var CapAlerts = class {
             `flooddetection`
           ]);
           const getHeader = events_default.getHeader(__spreadValues({}, validated.attributes));
-          const getSource = text_default.textProductToString(extracted.description, `SOURCE...`, [`.`]) || `N/A`;
+          const getSource = (_c = text_default.textProductToString(extracted.description, `SOURCE...`, [`.`])) != null ? _c : `N/A`;
           processed.push({
             type: "Feature",
             properties: {
-              locations: extracted.areadesc || `N/A`,
-              event: extracted.event || `N/A`,
+              locations: (_d = extracted.areadesc) != null ? _d : `N/A`,
+              event: (_e = extracted.event) != null ? _e : `N/A`,
               issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`,
               expires: extracted.expires ? new Date(extracted.expires).toLocaleString() : `N/A`,
-              parent: extracted.event || `N/A`,
-              action_type: extracted.msgtype || `N/A`,
-              description: extracted.description || `N/A`,
-              sender_name: extracted.sendername || `N/A`,
+              parent: (_f = extracted.event) != null ? _f : `N/A`,
+              action_type: (_g = extracted.msgtype) != null ? _g : `N/A`,
+              description: (_h = extracted.description) != null ? _h : `N/A`,
+              sender_name: (_i = extracted.sendername) != null ? _i : `N/A`,
               sender_icao: extracted.wmoidentifier ? extracted.wmoidentifier.substring(extracted.wmoidentifier.length - 4) : `N/A`,
               attributes,
               geocode: {
                 UGC: [extracted.ugc]
               },
-              metadata: { attributes },
-              technical: {
-                vtec: extracted.vtec || `N/A`,
-                ugc: extracted.ugc || `N/A`,
-                hvtec: `N/A`
-              },
+              raw: { attributes },
               parameters: {
-                wmo: extracted.wmoidentifier || `N/A`,
+                wmo: (_j = extracted.wmoidentifier) != null ? _j : `N/A`,
                 source: getSource,
-                max_hail_size: extracted.maxHailSize || `N/A`,
-                max_wind_gust: extracted.maxWindGust || `N/A`,
-                damage_threat: extracted.thunderstormdamagethreat || `N/A`,
-                tornado_detection: extracted.tornadodetection || extracted.waterspoutdetection || `N/A`,
-                flood_detection: extracted.flooddetection || `N/A`,
+                max_hail_size: (_k = extracted.maxHailSize) != null ? _k : `N/A`,
+                max_wind_gust: (_l = extracted.maxWindGust) != null ? _l : `N/A`,
+                damage_threat: (_m = extracted.thunderstormdamagethreat) != null ? _m : `N/A`,
+                tornado_detection: (_o = (_n = extracted.tornadodetection) != null ? _n : extracted.waterspoutdetection) != null ? _o : `N/A`,
+                flood_detection: (_p = extracted.flooddetection) != null ? _p : `N/A`,
                 discussion_tornado_intensity: `N/A`,
                 discussion_wind_intensity: `N/A`,
                 discussion_hail_intensity: `N/A`
+              },
+              details: {
+                performance: performance.now() - tick,
+                source: `cap-parser`,
+                tracking: this.getTracking(extracted, attributes),
+                header: getHeader,
+                pvtec: (_q = extracted.vtec) != null ? _q : `N/A`,
+                hvtec: `N/A`,
+                history: [{ description: (_r = extracted.description) != null ? _r : `N/A`, issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`, type: (_s = extracted.msgtype) != null ? _s : `N/A` }]
               }
-            },
-            details: {
-              performance: performance.now() - tick,
-              source: `cap-parser`,
-              tracking: this.getTracking(extracted, attributes),
-              header: getHeader,
-              pvtec: extracted.vtec || `N/A`,
-              hvtec: `N/A`,
-              history: [{ description: extracted.description || `N/A`, issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`, type: extracted.msgtype || `N/A` }]
             }
           });
         }
@@ -2045,36 +2055,31 @@ var APIAlerts = class {
             geocode: {
               UGC: (_O = (_N = (_M = feature == null ? void 0 : feature.properties) == null ? void 0 : _M.geocode) == null ? void 0 : _N.UGC) != null ? _O : [`XX000`]
             },
-            metadata: {},
-            technical: {
-              vtec: getPVTEC != null ? getPVTEC : `N/A`,
-              ugc: getUgc ? getUgc.join(`,`) : `N/A`,
-              hvtec: `N/A`
-            },
+            raw: {},
             parameters: {
               wmo: (_T = (_S = (_R = (_Q = (_P = feature == null ? void 0 : feature.properties) == null ? void 0 : _P.parameters) == null ? void 0 : _Q.WMOidentifier) == null ? void 0 : _R[0]) != null ? _S : getWmo) != null ? _T : `N/A`,
               source: getSource,
               max_hail_size: (_W = (_V = (_U = feature == null ? void 0 : feature.properties) == null ? void 0 : _U.parameters) == null ? void 0 : _V.maxHailSize) != null ? _W : `N/A`,
               max_wind_gust: (_Z = (_Y = (_X = feature == null ? void 0 : feature.properties) == null ? void 0 : _X.parameters) == null ? void 0 : _Y.maxWindGust) != null ? _Z : `N/A`,
-              damage_threat: (_ba = (_aa = (_$ = (__ = feature == null ? void 0 : feature.properties) == null ? void 0 : __.parameters) == null ? void 0 : _$.thunderstormDamageThreat) == null ? void 0 : _aa[0]) != null ? _ba : [`N/A`],
-              tornado_detection: (_fa = (_ea = (_da = (_ca = feature == null ? void 0 : feature.properties) == null ? void 0 : _ca.parameters) == null ? void 0 : _da.tornadoDetection) == null ? void 0 : _ea[0]) != null ? _fa : [`N/A`],
-              flood_detection: (_ja = (_ia = (_ha = (_ga = feature == null ? void 0 : feature.properties) == null ? void 0 : _ga.parameters) == null ? void 0 : _ha.floodDetection) == null ? void 0 : _ia[0]) != null ? _ja : [`N/A`],
+              damage_threat: (_ba = (_aa = (_$ = (__ = feature == null ? void 0 : feature.properties) == null ? void 0 : __.parameters) == null ? void 0 : _$.thunderstormDamageThreat) == null ? void 0 : _aa[0]) != null ? _ba : `N/A`,
+              tornado_detection: (_fa = (_ea = (_da = (_ca = feature == null ? void 0 : feature.properties) == null ? void 0 : _ca.parameters) == null ? void 0 : _da.tornadoDetection) == null ? void 0 : _ea[0]) != null ? _fa : `N/A`,
+              flood_detection: (_ja = (_ia = (_ha = (_ga = feature == null ? void 0 : feature.properties) == null ? void 0 : _ga.parameters) == null ? void 0 : _ha.floodDetection) == null ? void 0 : _ia[0]) != null ? _ja : `N/A`,
               discussion_tornado_intensity: "N/A",
               peakWindGust: `N/A`,
               peakHailSize: `N/A`
+            },
+            details: {
+              performance: performance.now() - tick,
+              source: `api-parser`,
+              tracking: this.getTracking({ pVtec: getPVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
+              header: getHeader,
+              pvtec: getPVTEC != null ? getPVTEC : `N/A`,
+              history: [{
+                description: (_la = (_ka = feature == null ? void 0 : feature.properties) == null ? void 0 : _ka.description) != null ? _la : `N/A`,
+                action: (_na = (_ma = feature == null ? void 0 : feature.properties) == null ? void 0 : _ma.messageType) != null ? _na : `N/A`,
+                time: ((_oa = feature == null ? void 0 : feature.properties) == null ? void 0 : _oa.sent) ? new Date((_pa = feature == null ? void 0 : feature.properties) == null ? void 0 : _pa.sent).toLocaleString() : `N/A`
+              }]
             }
-          },
-          details: {
-            performance: performance.now() - tick,
-            source: `api-parser`,
-            tracking: this.getTracking({ pVtec: getPVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
-            header: getHeader,
-            pvtec: getPVTEC != null ? getPVTEC : `N/A`,
-            history: [{
-              description: (_la = (_ka = feature == null ? void 0 : feature.properties) == null ? void 0 : _ka.description) != null ? _la : `N/A`,
-              action: (_na = (_ma = feature == null ? void 0 : feature.properties) == null ? void 0 : _ma.messageType) != null ? _na : `N/A`,
-              time: ((_oa = feature == null ? void 0 : feature.properties) == null ? void 0 : _oa.sent) ? new Date((_pa = feature == null ? void 0 : feature.properties) == null ? void 0 : _pa.sent).toLocaleString() : `N/A`
-            }]
           }
         });
       }
@@ -2250,10 +2255,10 @@ var EventParser = class {
         const originalEvent = this.buildDefaultSignature(event);
         const props = originalEvent == null ? void 0 : originalEvent.properties;
         const ugcs = (_b2 = (_a2 = props == null ? void 0 : props.geocode) == null ? void 0 : _a2.UGC) != null ? _b2 : [];
-        const _c2 = originalEvent, { details } = _c2, eventWithoutPerformance = __objRest(_c2, ["details"]);
+        const _c2 = originalEvent.properties, { details } = _c2, eventWithoutPerformance = __objRest(_c2, ["details"]);
         originalEvent.properties.parent = originalEvent.properties.event;
         originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools == null ? void 0 : bools.better_event_parsing, bools == null ? void 0 : bools.parent_events_only);
-        originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(eventWithoutPerformance)).digest("hex");
+        originalEvent.properties.hash = packages.crypto.createHash("md5").update(JSON.stringify(eventWithoutPerformance)).digest("hex");
         if (originalEvent.properties.is_test == true && (bools == null ? void 0 : bools.ignore_test_products)) return false;
         if ((bools == null ? void 0 : bools.check_expired) && originalEvent.properties.is_cancelled == true) return false;
         for (const key in sets) {

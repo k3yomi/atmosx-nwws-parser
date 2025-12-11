@@ -74,50 +74,45 @@ export class CapAlerts {
                     `tornadodamagethreat`, `waterspoutdetection`, `flooddetection`,
                 ]);
                 const getHeader = EventParser.getHeader({ ...validated.attributes,} as types.StanzaAttributes);
-                const getSource = TextParser.textProductToString(extracted.description, `SOURCE...`, [`.`]) || `N/A`;
+                const getSource = TextParser.textProductToString(extracted.description, `SOURCE...`, [`.`]) ?? `N/A`;
                 processed.push({
                     type: "Feature",
                     properties: {
-                        locations: extracted.areadesc || `N/A`,
-                        event: extracted.event || `N/A`,
+                        locations: extracted.areadesc ?? `N/A`,
+                        event: extracted.event ?? `N/A`,
                         issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`,
                         expires: extracted.expires ? new Date(extracted.expires).toLocaleString() : `N/A`,
-                        parent: extracted.event || `N/A`,
-                        action_type: extracted.msgtype || `N/A`,
-                        description: extracted.description || `N/A`,
-                        sender_name: extracted.sendername || `N/A`,
+                        parent: extracted.event ?? `N/A`,
+                        action_type: extracted.msgtype ?? `N/A`,
+                        description: extracted.description ?? `N/A`,
+                        sender_name: extracted.sendername ?? `N/A`,
                         sender_icao: extracted.wmoidentifier ? extracted.wmoidentifier.substring(extracted.wmoidentifier.length - 4) : `N/A`,
                         attributes: attributes,
                         geocode: {
                             UGC: [extracted.ugc],
                         },
-                        metadata: {attributes},
-                        technical: {
-                            vtec: extracted.vtec || `N/A`,
-                            ugc: extracted.ugc || `N/A`,
-                            hvtec: `N/A`,
-                        },
+                        raw: {attributes},
                         parameters: {
-                            wmo: extracted.wmoidentifier || `N/A`,
+                            wmo: extracted.wmoidentifier ?? `N/A`,
                             source: getSource,
-                            max_hail_size: extracted.maxHailSize || `N/A`,
-                            max_wind_gust: extracted.maxWindGust || `N/A`,
-                            damage_threat: extracted.thunderstormdamagethreat || `N/A`,
-                            tornado_detection: extracted.tornadodetection || extracted.waterspoutdetection || `N/A`,
-                            flood_detection: extracted.flooddetection || `N/A`,
+                            max_hail_size: extracted.maxHailSize ?? `N/A`,
+                            max_wind_gust: extracted.maxWindGust ?? `N/A`,
+                            damage_threat: extracted.thunderstormdamagethreat ?? `N/A`,
+                            tornado_detection: extracted.tornadodetection ?? extracted.waterspoutdetection ?? `N/A`,
+                            flood_detection: extracted.flooddetection ?? `N/A`,
                             discussion_tornado_intensity: `N/A`,
                             discussion_wind_intensity: `N/A`,
                             discussion_hail_intensity: `N/A`,
                         },
-                    },
-                    details: {
-                        performance: performance.now() - tick,
-                        source: `cap-parser`,
-                        tracking: this.getTracking(extracted, attributes),
-                        header: getHeader,
-                        pvtec: extracted.vtec || `N/A`,
-                        hvtec: `N/A`,
-                        history: [{ description: extracted.description || `N/A`, issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`, type: extracted.msgtype || `N/A` }],
+                        details: {
+                            performance: performance.now() - tick,
+                            source: `cap-parser`,
+                            tracking: this.getTracking(extracted, attributes),
+                            header: getHeader,
+                            pvtec: extracted.vtec ?? `N/A`,
+                            hvtec: `N/A`,
+                            history: [{ description: extracted.description ?? `N/A`, issued: extracted.sent ? new Date(extracted.sent).toLocaleString() : `N/A`, type: extracted.msgtype ?? `N/A` }],
+                        },
                     },
                 })
             }

@@ -163,10 +163,10 @@ export class EventParser {
             const originalEvent = this.buildDefaultSignature(event);
             const props = originalEvent?.properties;
             const ugcs = props?.geocode?.UGC ?? [];
-            const { details, ...eventWithoutPerformance } = originalEvent
+            const { details, ...eventWithoutPerformance } = originalEvent.properties
             originalEvent.properties.parent = originalEvent.properties.event;          
             originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools?.better_event_parsing, bools?.parent_events_only);
-            originalEvent.hash = loader.packages.crypto.createHash('md5').update(JSON.stringify(eventWithoutPerformance)).digest('hex');
+            originalEvent.properties.hash = loader.packages.crypto.createHash('md5').update(JSON.stringify(eventWithoutPerformance)).digest('hex');
             if (originalEvent.properties.is_test == true && bools?.ignore_test_products) return false;
             if (bools?.check_expired && originalEvent.properties.is_cancelled == true) return false;
             for (const key in sets) {

@@ -83,16 +83,21 @@ export class TextAlerts {
                 const getHeader = EventParser.getHeader({ ...validated.attributes, ...baseProperties.raw } as types.StanzaAttributes, baseProperties)
                 const getEvent = this.getEvent(message, attributes);
                 processed.push({
-                    properties: { event: getEvent, parent: getEvent, action_type: `Issued`, ...baseProperties },
-                    details: {
-                        type: "Feature",
-                        performance: performance.now() - tick,
-                        source: `text-parser`,
-                        tracking: this.getTracking(baseProperties),
-                        header: getHeader,
-                        pvtec: `N/A`,
-                        hvtec: `N/A`,
-                        history: [{ description: baseProperties.description, issued: baseProperties.issued, type: `Issued` }],
+                    properties: { 
+                        event: getEvent, 
+                        parent: getEvent, 
+                        action_type: `Issued`, 
+                        ...baseProperties,
+                        details: {
+                            type: "Feature",
+                            performance: performance.now() - tick,
+                            source: `text-parser`,
+                            tracking: this.getTracking(baseProperties),
+                            header: getHeader,
+                            pvtec: `N/A`,
+                            hvtec: `N/A`,
+                            history: [{ description: baseProperties.description, issued: baseProperties.issued, type: `Issued` }],
+                        }, 
                     },
                 })
             }
