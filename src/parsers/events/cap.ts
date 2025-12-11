@@ -90,6 +90,7 @@ export class CapAlerts {
                         attributes: attributes,
                         geocode: {
                             UGC: [extracted.ugc],
+                            GENERATED: null,
                         },
                         raw: {attributes},
                         parameters: {

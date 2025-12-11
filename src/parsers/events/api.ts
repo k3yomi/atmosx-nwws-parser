@@ -100,7 +100,8 @@ export class APIAlerts {
                     sender_icao: getOffice.icao ?? `N/A`,
                     attributes: validated.attributes,
                     geocode: {
-                        UGC: feature?.properties?.geocode?.UGC ?? [`XX000`]
+                        UGC: feature?.properties?.geocode?.UGC ?? [`XX000`], 
+                        GENERATED: null,
                     },
                     raw: {},
                     parameters: {

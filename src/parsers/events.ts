@@ -40,6 +40,7 @@ export class EventParser {
             damage: TextParser.textProductToString(message, `DAMAGE THREAT...`) ?? `N/A`,
             source: TextParser.textProductToString(message, `SOURCE...`, [`.`]) ?? `N/A`,
             description: TextParser.textProductToDescription(message, pVtec?.raw ?? null),
+            polygon: TextParser.textProductToPolygon(message),
             wmo: message.match(loader.definitions.regular_expressions.wmo)?.[0] ?? `N/A`,
             mdTorIntensity: TextParser.textProductToString(message, `MOST PROBABLE PEAK TORNADO INTENSITY...`) ?? `N/A`,
             mdWindGusts: TextParser.textProductToString(message, `MOST PROBABLE PEAK WIND GUST...`) ?? `N/A`,
@@ -52,7 +53,7 @@ export class EventParser {
             locations: ugc?.locations.join(`; `) ?? `No Location Specified (UGC Missing)`,
             issued: getCorrectIssued,
             expires: getCorrectExpiry,
-            geocode: { UGC: ugc?.zones ?? [`XX000`] },
+            geocode: { UGC: ugc?.zones ?? [`XX000`], GENERATED: definitions.polygon.length > 0 ? Buffer.from(JSON.stringify(definitions.polygon)).toString('base64')  : null},
             description: definitions.description,
             sender_name: getOffice.name,
             sender_icao: getOffice.icao,
@@ -85,12 +86,10 @@ export class EventParser {
      * @param {types.UGCEntry} [ugc=null]
      * @returns {Promise<types.geometry>}
      */
-    public static async getEventGeometry(message: string, ugc: types.UGCEntry = null) : Promise<types.geometry> {
+    public static async getEventGeometry(generated: string, ugc: types.UGCEntry = null) : Promise<types.geometry> {
         const settings = loader.settings as types.ClientSettingsTypes;
-        const polygonText = TextParser.textProductToPolygon(message);
-        let geometry = { type: "Polygon", coordinates: null };
-        geometry = polygonText.length > 0 ? { type: "Polygon", coordinates: [polygonText] } : null;
-        if (settings.global_settings.shapefile_coordinates && polygonText.length == 0 && ugc != null) {
+        let geometry = { type: "Polygon", coordinates: generated != null ? [JSON.parse(Buffer.from(generated, 'base64').toString('utf-8'))] : null };
+        if (settings.global_settings.shapefile_coordinates && generated == null && ugc != null) {
             const coordinates = await UGCParser.getCoordinates(ugc.zones) as any;
             geometry = { type: "Polygon", coordinates: (coordinates != null) ? [coordinates] : null };
         }
@@ -182,10 +181,12 @@ export class EventParser {
             loader.cache.events.emit(`on${originalEvent.properties.event.replace(/\s+/g, '')}`) 
             return true;
         })
-        for (const event of filtered as types.EventCompiled[]) {
-            const geometry = await this.getEventGeometry(event.properties.description, {zones: event.properties.geocode != null ? event.properties.geocode.UGC : null})
-            event.geometry = geometry;
-        }
+            for (const event of filtered as types.EventCompiled[]) {
+                if (!loader.settings.global_settings.ignore_geometry_parsing) {
+                const geometry = await this.getEventGeometry(event.properties.geocode.GENERATED, {zones: event.properties.geocode != null ? event.properties.geocode.UGC : null})
+                event.geometry = geometry;
+            }
+        } 
         if (filtered.length > 0) { loader.cache.events.emit(`onEvents`, filtered); }
     }
 

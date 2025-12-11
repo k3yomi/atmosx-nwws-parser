@@ -125,7 +125,7 @@ interface LocalEventProperties {
     locations?: string;
     issued?: string;
     expires?: string;
-    geocode?: { UGC: string[] };
+    geocode?: { UGC: string[], GENERATED?: string | null };
     description?: string;
     sender_name?: string;
     sender_icao?: string;

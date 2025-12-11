@@ -973,6 +973,7 @@ var settings = {
   global_settings: {
     parent_events_only: true,
     better_event_parsing: true,
+    ignore_geometry_parsing: false,
     shapefile_coordinates: false,
     shapefile_skip: 15,
     filtering: {
@@ -1934,7 +1935,8 @@ var CapAlerts = class {
               sender_icao: extracted.wmoidentifier ? extracted.wmoidentifier.substring(extracted.wmoidentifier.length - 4) : `N/A`,
               attributes,
               geocode: {
-                UGC: [extracted.ugc]
+                UGC: [extracted.ugc],
+                GENERATED: null
               },
               raw: { attributes },
               parameters: {
@@ -2053,7 +2055,8 @@ var APIAlerts = class {
             sender_icao: (_L = getOffice.icao) != null ? _L : `N/A`,
             attributes: validated.attributes,
             geocode: {
-              UGC: (_O = (_N = (_M = feature == null ? void 0 : feature.properties) == null ? void 0 : _M.geocode) == null ? void 0 : _N.UGC) != null ? _O : [`XX000`]
+              UGC: (_O = (_N = (_M = feature == null ? void 0 : feature.properties) == null ? void 0 : _M.geocode) == null ? void 0 : _N.UGC) != null ? _O : [`XX000`],
+              GENERATED: null
             },
             raw: {},
             parameters: {
@@ -2120,6 +2123,7 @@ var EventParser = class {
         damage: (_h = text_default.textProductToString(message, `DAMAGE THREAT...`)) != null ? _h : `N/A`,
         source: (_i = text_default.textProductToString(message, `SOURCE...`, [`.`])) != null ? _i : `N/A`,
         description: text_default.textProductToDescription(message, (_j = pVtec == null ? void 0 : pVtec.raw) != null ? _j : null),
+        polygon: text_default.textProductToPolygon(message),
         wmo: (_l = (_k = message.match(definitions.regular_expressions.wmo)) == null ? void 0 : _k[0]) != null ? _l : `N/A`,
         mdTorIntensity: (_m = text_default.textProductToString(message, `MOST PROBABLE PEAK TORNADO INTENSITY...`)) != null ? _m : `N/A`,
         mdWindGusts: (_n = text_default.textProductToString(message, `MOST PROBABLE PEAK WIND GUST...`)) != null ? _n : `N/A`,
@@ -2132,7 +2136,7 @@ var EventParser = class {
         locations: (_p = ugc == null ? void 0 : ugc.locations.join(`; `)) != null ? _p : `No Location Specified (UGC Missing)`,
         issued: getCorrectIssued,
         expires: getCorrectExpiry,
-        geocode: { UGC: (_q = ugc == null ? void 0 : ugc.zones) != null ? _q : [`XX000`] },
+        geocode: { UGC: (_q = ugc == null ? void 0 : ugc.zones) != null ? _q : [`XX000`], GENERATED: definitions2.polygon.length > 0 ? Buffer.from(JSON.stringify(definitions2.polygon)).toString("base64") : null },
         description: definitions2.description,
         sender_name: getOffice.name,
         sender_icao: getOffice.icao,
@@ -2165,13 +2169,11 @@ var EventParser = class {
    * @param {types.UGCEntry} [ugc=null]
    * @returns {Promise<types.geometry>}
    */
-  static getEventGeometry(message, ugc = null) {
+  static getEventGeometry(generated, ugc = null) {
     return __async(this, null, function* () {
       const settings2 = settings;
-      const polygonText = text_default.textProductToPolygon(message);
-      let geometry = { type: "Polygon", coordinates: null };
-      geometry = polygonText.length > 0 ? { type: "Polygon", coordinates: [polygonText] } : null;
-      if (settings2.global_settings.shapefile_coordinates && polygonText.length == 0 && ugc != null) {
+      let geometry = { type: "Polygon", coordinates: generated != null ? [JSON.parse(Buffer.from(generated, "base64").toString("utf-8"))] : null };
+      if (settings2.global_settings.shapefile_coordinates && generated == null && ugc != null) {
         const coordinates = yield ugc_default.getCoordinates(ugc.zones);
         geometry = { type: "Polygon", coordinates: coordinates != null ? [coordinates] : null };
       }
@@ -2275,8 +2277,10 @@ var EventParser = class {
         return true;
       });
       for (const event of filtered) {
-        const geometry = yield this.getEventGeometry(event.properties.description, { zones: event.properties.geocode != null ? event.properties.geocode.UGC : null });
-        event.geometry = geometry;
+        if (!settings.global_settings.ignore_geometry_parsing) {
+          const geometry = yield this.getEventGeometry(event.properties.geocode.GENERATED, { zones: event.properties.geocode != null ? event.properties.geocode.UGC : null });
+          event.geometry = geometry;
+        }
       }
       if (filtered.length > 0) {
         cache.events.emit(`onEvents`, filtered);
@@ -3447,6 +3451,24 @@ var AlertManager = class {
       return;
     }
     settings2.noaa_weather_wire_service_settings.credentials.nickname = trimmed;
+  }
+  /**
+   * @function getEventPolygon
+   * @description
+   *    Retrieves the geographical polygon for a given event based on its
+   *    GENERATED geocode and UGC zones.
+   * 
+   * @async
+   * @param {types.EventCompiled} event
+   * @returns {Promise<GeoJSON.Polygon | null>}
+   */
+  getEventPolygon(event) {
+    return __async(this, null, function* () {
+      var _a, _b, _c, _d;
+      const hasGenerated = (_b = (_a = event.properties.geocode) == null ? void 0 : _a.GENERATED) != null ? _b : null;
+      const getUgc = (_d = (_c = event.properties.geocode) == null ? void 0 : _c.UGC) != null ? _d : null;
+      return yield events_default.getEventGeometry(hasGenerated, { zones: getUgc });
+    });
   }
   /**
    * @function createEasAudio

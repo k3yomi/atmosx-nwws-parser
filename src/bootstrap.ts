@@ -103,6 +103,7 @@ export const settings = {
     global_settings: {
         parent_events_only: true,
         better_event_parsing: true,
+        ignore_geometry_parsing: false,
         shapefile_coordinates: false,
         shapefile_skip: 15,
         filtering: {

@@ -49,6 +49,22 @@ export class AlertManager {
     }
 
     /**
+     * @function getEventPolygon
+     * @description
+     *    Retrieves the geographical polygon for a given event based on its
+     *    GENERATED geocode and UGC zones.
+     * 
+     * @async
+     * @param {types.EventCompiled} event
+     * @returns {Promise<GeoJSON.Polygon | null>}
+     */
+    public async getEventPolygon(event: types.EventCompiled) {
+        const hasGenerated = event.properties.geocode?.GENERATED ?? null;
+        const getUgc = event.properties.geocode?.UGC ?? null;
+        return await EventParser.getEventGeometry(hasGenerated, {zones: getUgc});
+    }
+
+    /**
      * @function createEasAudio
      * @description
      *     Generates an EAS (Emergency Alert System) audio file using the provided

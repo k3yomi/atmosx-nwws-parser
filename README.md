@@ -161,6 +161,13 @@ const alertTypes = parser.getAllAlertTypes();
 console.log(alertTypes);
 ```
 
+### Function `getEventPolygon(event)`
+Retrieves the geographical polygon for a given event based on its GENERATED geocode and UGC zones. (Returns in GeoJSON format)
+```javascript
+const polygon = await parser.getEventPolygon(event);
+console.log(polygon);
+```
+
 ### Function `searchStanzaDatabase(query)`
 Searches the internal stanza database for messages matching the provided query.
 ```javascript

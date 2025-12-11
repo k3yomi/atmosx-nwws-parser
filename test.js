@@ -26,7 +26,6 @@ const parser = new AlertManager({
             disable_vtec: false,
             disable_text: false,
             cap_only: false,
-            shapefile_coordinates: false,
         }
     },
     national_weather_service_settings: {
@@ -36,6 +35,8 @@ const parser = new AlertManager({
     global_settings: {
         parent_events_only: true,
         better_event_parsing: true,
+        ignore_geometry_parsing: false,
+        shapefile_coordinates: true,
         filtering: {
             events: [`Severe Thunderstorm Warning`],
             filtered_icao: ["PAFC"],
