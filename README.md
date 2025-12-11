@@ -65,9 +65,6 @@ const parser = new AlertManager({
             state_filter: [],
             check_expired: true,
             ignore_test_products: true,
-            location: {
-                unit: `miles`
-            },
         },
         eas_settings: {
             directory: null,
