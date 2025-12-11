@@ -89,11 +89,11 @@ export class EventParser {
     public static async getEventGeometry(message: string, ugc: types.UGCEntry = null) : Promise<types.geometry> {
         const settings = loader.settings as types.ClientSettingsTypes;
         const polygonText = TextParser.textProductToPolygon(message);
-        let geometry = null;
-        geometry = polygonText.length > 0 ? { type: "Polygon", coordinates: polygonText } : null;
+        let geometry = { type: "Polygon", coordinates: null };
+        geometry = polygonText.length > 0 ? { type: "Polygon", coordinates: [polygonText] } : null;
         if (settings.global_settings.shapefile_coordinates && polygonText.length == 0 && ugc != null) {
             const coordinates = await UGCParser.getCoordinates(ugc.zones) as any;
-            geometry = { type: "Polygon", coordinates: coordinates };
+            geometry = { type: "Polygon", coordinates: (coordinates != null) ? [coordinates] : null };
         }
         return geometry;
     }
@@ -139,7 +139,7 @@ export class EventParser {
      * @function validateEvents
      * @description
      *     Processes an array of event objects and filters them based on
-     *     global and EAS filtering settings, location constraints, and
+     *     global and EAS filtering settings, and
      *     other criteria such as expired or test products. Valid events
      *     trigger relevant event emitters.
      *
@@ -150,12 +150,11 @@ export class EventParser {
     public static validateEvents(events: unknown[]) {
         if (events.length == 0) return;
         const filteringSettings = loader.settings?.global_settings?.filtering;
-        const locationSettings = filteringSettings?.location;
         const easSettings = loader.settings?.global_settings?.eas_settings;
         const globalSettings = loader.settings?.global_settings;
         const sets = {} as Record<string, Set<string>>;
         const bools = {} as Record<string, boolean>;
-        const megered = {...filteringSettings, ...easSettings, ...globalSettings, ...locationSettings };
+        const megered = {...filteringSettings, ...easSettings, ...globalSettings };
         for (const key in megered) {
             const setting = megered[key];
             if (Array.isArray(setting)) { sets[key] = new Set(setting.map(item => item.toLowerCase())); }
@@ -169,8 +168,7 @@ export class EventParser {
             originalEvent.properties.parent = originalEvent.properties.event;          
             originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools?.better_event_parsing, bools?.parent_events_only);
             originalEvent.hash = loader.packages.crypto.createHash('md5').update(JSON.stringify(eventWithoutPerformance)).digest('hex');
-            originalEvent.properties.distance = this.getLocationDistances(props, originalEvent.geometry, locationSettings?.unit);
-            if (originalEvent.properties.is_test == true && bools?.ignore_text_products) return false;
+            if (originalEvent.properties.is_test == true && bools?.ignore_test_products) return false;
             if (bools?.check_expired && originalEvent.properties.is_cancelled == true) return false;
             for (const key in sets) {
                 const setting = sets[key];
@@ -291,35 +289,6 @@ export class EventParser {
             new Date(new Date().getTime() + 1 * 60 * 60 * 1000).toLocaleString())
         if (time == `Invalid Date`) return `Until Further Notice`;
         return time;
-    }
-
-    /**
-     * @function getLocationDistances
-     * @description
-     *     Calculates distances from an event's geometry to all current tracked locations.
-     *     Optionally filters locations by a maximum distance.
-     *
-     * @private
-     * @static
-     * @param {types.EventProperties} [properties]
-     * @param {types.EventCompiled} [event]
-     * @param {string} [unit='miles']
-     * @returns {Record<string, { distance: number, unit: string}>}
-     */
-    private static getLocationDistances(properties?: types.EventProperties, geometry?: types.geometry, unit: string = 'miles') {
-        if (geometry != null) {
-            for (const key in loader.cache.currentLocations) {
-                const coordinates = loader.cache.currentLocations[key];
-                const singleCoord = geometry.coordinates;
-                const center = singleCoord.reduce((acc, [lat, lon]) => ([acc[0] + lat, acc[1] + lon]), [0, 0]).map(sum => sum / singleCoord.length);
-                const validUnit = unit === 'miles' || unit === 'kilometers' ? unit : 'miles';
-                const distance = Utils.calculateDistance({ lat: coordinates.lat, lon: coordinates.lon }, { lat: center[0], lon: center[1] }, validUnit);
-                if (!properties.distance) { properties.distance = {}; }
-                properties.distance[key] = { unit, distance };
-            }
-            return properties.distance
-        }
-        return {}
     }
 
     /**

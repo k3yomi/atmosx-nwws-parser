@@ -64,7 +64,7 @@ const parser = new AlertManager({
             ugc_filter: [],
             state_filter: [],
             check_expired: true,
-            ignore_text_products: true,
+            ignore_test_products: true,
             location: {
                 unit: `miles`
             },
@@ -149,12 +149,6 @@ parser.on(`log`, (message) => {
 Sets the display name for the XMPP client. This requires reconnection to take effect.
 ```javascript
 parser.setDisplayName(`My Weather Parser`);
-```
-
-### Function `setCurrentLocation(name, {latitude, longitude})`
-Sets the current location for the parser, which can be used for location-based filtering.
-```javascript
-parser.setCurrentLocation(`My Location`, {34.05, -118.25 });
 ```
 
 ### Function `createEasAudio(description, header)`

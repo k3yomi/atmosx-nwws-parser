@@ -4,7 +4,6 @@ var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
 var __getOwnPropSymbols = Object.getOwnPropertySymbols;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __propIsEnum = Object.prototype.propertyIsEnumerable;
-var __pow = Math.pow;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __spreadValues = (a, b) => {
   for (var prop in b || (b = {}))
@@ -937,8 +936,7 @@ var cache = {
   totalLocationWarns: 0,
   events: new events.EventEmitter(),
   isProcessingAudioQueue: false,
-  audioQueue: [],
-  currentLocations: {}
+  audioQueue: []
 };
 var settings = {
   database: path.join(process.cwd(), "shapefiles.db"),
@@ -984,10 +982,7 @@ var settings = {
       ugc_filter: [],
       state_filter: [],
       check_expired: true,
-      ignore_text_products: true,
-      location: {
-        unit: `miles`
-      }
+      ignore_test_products: true
     },
     eas_settings: {
       directory: null,
@@ -1446,29 +1441,29 @@ var UGCParser = class {
    * @returns {[number, number][]}
    */
   static getCoordinates(zones) {
+    const list = [...new Set(zones.map((z) => z.trim()))];
+    if (list.length === 0) return null;
+    const placeholders = list.map(() => "?").join(",");
+    const rows = cache.db.prepare(`SELECT geometry FROM shapefiles WHERE id IN (${placeholders})`).all(...list);
     const polygons = [];
-    for (const zone of zones.map((z) => z.trim())) {
-      const row = cache.db.prepare(`SELECT geometry FROM shapefiles WHERE id = ?`).get(zone);
-      if (row !== void 0) {
-        const geometry = JSON.parse(row.geometry);
-        if ((geometry == null ? void 0 : geometry.type) === "Polygon") {
-          polygons.push({
-            type: "Feature",
-            geometry,
-            properties: {}
-          });
-        }
+    for (const row of rows) {
+      if (!(row == null ? void 0 : row.geometry)) continue;
+      const geom = JSON.parse(row.geometry);
+      if ((geom == null ? void 0 : geom.type) === "Polygon") {
+        polygons.push({ type: "Feature", geometry: geom, properties: {} });
       }
     }
     if (polygons.length === 0) return null;
     let merged = polygons[0];
     for (let i = 1; i < polygons.length; i++) {
-      merged = packages.turf.union(merged, polygons[i]);
+      const u = packages.turf.union(merged, polygons[i]);
+      if (u && u.geometry) merged = u;
     }
+    if (!(merged == null ? void 0 : merged.geometry)) return null;
     const outerRing = merged.geometry.type === "Polygon" ? merged.geometry.coordinates[0] : merged.geometry.coordinates[0][0];
     const skip = settings.global_settings.shapefile_skip;
-    const skippedRing = outerRing.filter((_, index) => index % skip === 0);
-    return [skippedRing];
+    const skipped = outerRing.filter((_, idx) => idx % skip === 0);
+    return skipped.length ? skipped : null;
   }
   /**
    * @function getZones
@@ -1971,7 +1966,7 @@ var CapAlerts = class {
                   return [lat, lon];
                 })
               ]
-            } : yield events_default.getEventGeometry(``, { zones: [extracted.ugc] })
+            } : yield events_default.getEventGeometry(``, { zones: JSON.parse(`["${extracted.ugc}"]`) })
           });
         }
       }
@@ -2001,10 +1996,10 @@ var APIAlerts = class {
       const splitPVTEC = vtecValue.split(".");
       return `${splitPVTEC[2]}-${splitPVTEC[3]}-${splitPVTEC[4]}-${splitPVTEC[5]}`;
     })() : (() => {
-      var _a;
+      var _a, _b, _c;
       const wmoMatch = (_a = extracted.wmoidentifier) == null ? void 0 : _a.match(/([A-Z]{4}\d{2})\s+([A-Z]{4})/);
-      const id = (wmoMatch == null ? void 0 : wmoMatch[1]) || "N/A";
-      const station = (wmoMatch == null ? void 0 : wmoMatch[2]) || "N/A";
+      const id = (_b = wmoMatch == null ? void 0 : wmoMatch[1]) != null ? _b : "N/A";
+      const station = (_c = wmoMatch == null ? void 0 : wmoMatch[2]) != null ? _c : "N/A";
       return `${station}-${id}`;
     })();
   }
@@ -2037,7 +2032,7 @@ var APIAlerts = class {
    */
   static event(validated) {
     return __async(this, null, function* () {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha;
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia, _ja, _ka, _la, _ma, _na, _oa, _pa, _qa, _ra, _sa, _ta, _ua;
       let processed = [];
       const settings2 = settings;
       const messages = Object.values(JSON.parse(validated.message).features);
@@ -2050,38 +2045,38 @@ var APIAlerts = class {
         const getDescription = `${getHeadline} ${(_q = (_p = feature == null ? void 0 : feature.properties) == null ? void 0 : _p.description) != null ? _q : ``}`;
         const getAWIP = (_u = (_t = (_s = (_r = feature == null ? void 0 : feature.properties) == null ? void 0 : _r.parameters) == null ? void 0 : _s.AWIPSidentifier) == null ? void 0 : _t[0]) != null ? _u : null;
         const getHeader = events_default.getHeader(__spreadValues({}, { getAwip: { prefix: getAWIP == null ? void 0 : getAWIP.slice(0, -3) } }));
-        const getSource = text_default.textProductToString(getDescription, `SOURCE...`, [`.`]) || `N/A`;
-        const getOffice = this.getICAO(getPVTEC || ``);
+        const getSource = (_v = text_default.textProductToString(getDescription, `SOURCE...`, [`.`])) != null ? _v : `N/A`;
+        const getOffice = this.getICAO(getPVTEC != null ? getPVTEC : ``);
         processed.push({
           type: "Feature",
           properties: {
-            locations: (_w = (_v = feature == null ? void 0 : feature.properties) == null ? void 0 : _v.areaDesc) != null ? _w : `N/A`,
-            event: (_y = (_x = feature == null ? void 0 : feature.properties) == null ? void 0 : _x.event) != null ? _y : `N/A`,
-            issued: ((_z = feature == null ? void 0 : feature.properties) == null ? void 0 : _z.sent) ? new Date((_A = feature == null ? void 0 : feature.properties) == null ? void 0 : _A.sent).toLocaleString() : `N/A`,
-            expires: ((_B = feature == null ? void 0 : feature.properties) == null ? void 0 : _B.expires) ? new Date((_C = feature == null ? void 0 : feature.properties) == null ? void 0 : _C.expires).toLocaleString() : `N/A`,
-            parent: (_E = (_D = feature == null ? void 0 : feature.properties) == null ? void 0 : _D.event) != null ? _E : `N/A`,
-            action_type: (_G = (_F = feature == null ? void 0 : feature.properties) == null ? void 0 : _F.messageType) != null ? _G : `N/A`,
-            description: (_I = (_H = feature == null ? void 0 : feature.properties) == null ? void 0 : _H.description) != null ? _I : `N/A`,
-            sender_name: getOffice.name || `N/A`,
-            sender_icao: getOffice.icao || `N/A`,
+            locations: (_x = (_w = feature == null ? void 0 : feature.properties) == null ? void 0 : _w.areaDesc) != null ? _x : `N/A`,
+            event: (_z = (_y = feature == null ? void 0 : feature.properties) == null ? void 0 : _y.event) != null ? _z : `N/A`,
+            issued: ((_A = feature == null ? void 0 : feature.properties) == null ? void 0 : _A.sent) ? new Date((_B = feature == null ? void 0 : feature.properties) == null ? void 0 : _B.sent).toLocaleString() : `N/A`,
+            expires: ((_C = feature == null ? void 0 : feature.properties) == null ? void 0 : _C.expires) ? new Date((_D = feature == null ? void 0 : feature.properties) == null ? void 0 : _D.expires).toLocaleString() : `N/A`,
+            parent: (_F = (_E = feature == null ? void 0 : feature.properties) == null ? void 0 : _E.event) != null ? _F : `N/A`,
+            action_type: (_H = (_G = feature == null ? void 0 : feature.properties) == null ? void 0 : _G.messageType) != null ? _H : `N/A`,
+            description: (_J = (_I = feature == null ? void 0 : feature.properties) == null ? void 0 : _I.description) != null ? _J : `N/A`,
+            sender_name: (_K = getOffice.name) != null ? _K : `N/A`,
+            sender_icao: (_L = getOffice.icao) != null ? _L : `N/A`,
             attributes: validated.attributes,
             geocode: {
-              UGC: (_L = (_K = (_J = feature == null ? void 0 : feature.properties) == null ? void 0 : _J.geocode) == null ? void 0 : _K.UGC) != null ? _L : [`XX000`]
+              UGC: (_O = (_N = (_M = feature == null ? void 0 : feature.properties) == null ? void 0 : _M.geocode) == null ? void 0 : _N.UGC) != null ? _O : [`XX000`]
             },
             metadata: {},
             technical: {
-              vtec: getPVTEC || `N/A`,
+              vtec: getPVTEC != null ? getPVTEC : `N/A`,
               ugc: getUgc ? getUgc.join(`,`) : `N/A`,
               hvtec: `N/A`
             },
             parameters: {
-              wmo: ((_O = (_N = (_M = feature == null ? void 0 : feature.properties) == null ? void 0 : _M.parameters) == null ? void 0 : _N.WMOidentifier) == null ? void 0 : _O[0]) || getWmo || `N/A`,
+              wmo: (_T = (_S = (_R = (_Q = (_P = feature == null ? void 0 : feature.properties) == null ? void 0 : _P.parameters) == null ? void 0 : _Q.WMOidentifier) == null ? void 0 : _R[0]) != null ? _S : getWmo) != null ? _T : `N/A`,
               source: getSource,
-              max_hail_size: ((_Q = (_P = feature == null ? void 0 : feature.properties) == null ? void 0 : _P.parameters) == null ? void 0 : _Q.maxHailSize) || `N/A`,
-              max_wind_gust: ((_S = (_R = feature == null ? void 0 : feature.properties) == null ? void 0 : _R.parameters) == null ? void 0 : _S.maxWindGust) || `N/A`,
-              damage_threat: ((_U = (_T = feature == null ? void 0 : feature.properties) == null ? void 0 : _T.parameters) == null ? void 0 : _U.thunderstormDamageThreat) || [`N/A`],
-              tornado_detection: ((_W = (_V = feature == null ? void 0 : feature.properties) == null ? void 0 : _V.parameters) == null ? void 0 : _W.tornadoDetection) || [`N/A`],
-              flood_detection: ((_Y = (_X = feature == null ? void 0 : feature.properties) == null ? void 0 : _X.parameters) == null ? void 0 : _Y.floodDetection) || [`N/A`],
+              max_hail_size: (_W = (_V = (_U = feature == null ? void 0 : feature.properties) == null ? void 0 : _U.parameters) == null ? void 0 : _V.maxHailSize) != null ? _W : `N/A`,
+              max_wind_gust: (_Z = (_Y = (_X = feature == null ? void 0 : feature.properties) == null ? void 0 : _X.parameters) == null ? void 0 : _Y.maxWindGust) != null ? _Z : `N/A`,
+              damage_threat: (_ba = (_aa = (_$ = (__ = feature == null ? void 0 : feature.properties) == null ? void 0 : __.parameters) == null ? void 0 : _$.thunderstormDamageThreat) == null ? void 0 : _aa[0]) != null ? _ba : [`N/A`],
+              tornado_detection: (_fa = (_ea = (_da = (_ca = feature == null ? void 0 : feature.properties) == null ? void 0 : _ca.parameters) == null ? void 0 : _da.tornadoDetection) == null ? void 0 : _ea[0]) != null ? _fa : [`N/A`],
+              flood_detection: (_ja = (_ia = (_ha = (_ga = feature == null ? void 0 : feature.properties) == null ? void 0 : _ga.parameters) == null ? void 0 : _ha.floodDetection) == null ? void 0 : _ia[0]) != null ? _ja : [`N/A`],
               discussion_tornado_intensity: "N/A",
               peakWindGust: `N/A`,
               peakHailSize: `N/A`
@@ -2092,17 +2087,17 @@ var APIAlerts = class {
             source: `api-parser`,
             tracking: this.getTracking({ pVtec: getPVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
             header: getHeader,
-            pvtec: getPVTEC || `N/A`,
+            pvtec: getPVTEC != null ? getPVTEC : `N/A`,
             history: [{
-              description: (__ = (_Z = feature == null ? void 0 : feature.properties) == null ? void 0 : _Z.description) != null ? __ : `N/A`,
-              action: (_aa = (_$ = feature == null ? void 0 : feature.properties) == null ? void 0 : _$.messageType) != null ? _aa : `N/A`,
-              time: ((_ba = feature == null ? void 0 : feature.properties) == null ? void 0 : _ba.sent) ? new Date((_ca = feature == null ? void 0 : feature.properties) == null ? void 0 : _ca.sent).toLocaleString() : `N/A`
+              description: (_la = (_ka = feature == null ? void 0 : feature.properties) == null ? void 0 : _ka.description) != null ? _la : `N/A`,
+              action: (_na = (_ma = feature == null ? void 0 : feature.properties) == null ? void 0 : _ma.messageType) != null ? _na : `N/A`,
+              time: ((_oa = feature == null ? void 0 : feature.properties) == null ? void 0 : _oa.sent) ? new Date((_pa = feature == null ? void 0 : feature.properties) == null ? void 0 : _pa.sent).toLocaleString() : `N/A`
             }]
           },
-          geometry: ((_ea = (_da = feature == null ? void 0 : feature.geometry) == null ? void 0 : _da.coordinates) == null ? void 0 : _ea[0]) != null ? {
+          geometry: ((_ra = (_qa = feature == null ? void 0 : feature.geometry) == null ? void 0 : _qa.coordinates) == null ? void 0 : _ra[0]) != null ? {
             type: "Polygon",
             coordinates: [
-              (_ha = (_ga = (_fa = feature == null ? void 0 : feature.geometry) == null ? void 0 : _fa.coordinates) == null ? void 0 : _ga[0]) == null ? void 0 : _ha.map((coord) => {
+              (_ua = (_ta = (_sa = feature == null ? void 0 : feature.geometry) == null ? void 0 : _sa.coordinates) == null ? void 0 : _ta[0]) == null ? void 0 : _ua.map((coord) => {
                 const [lat, lon] = Array.isArray(coord) ? coord : [0, 0];
                 return [lat, lon];
               })
@@ -2196,11 +2191,11 @@ var EventParser = class {
     return __async(this, null, function* () {
       const settings2 = settings;
       const polygonText = text_default.textProductToPolygon(message);
-      let geometry = null;
-      geometry = polygonText.length > 0 ? { type: "Polygon", coordinates: polygonText } : null;
+      let geometry = { type: "Polygon", coordinates: null };
+      geometry = polygonText.length > 0 ? { type: "Polygon", coordinates: [polygonText] } : null;
       if (settings2.global_settings.shapefile_coordinates && polygonText.length == 0 && ugc != null) {
         const coordinates = yield ugc_default.getCoordinates(ugc.zones);
-        geometry = { type: "Polygon", coordinates };
+        geometry = { type: "Polygon", coordinates: coordinates != null ? [coordinates] : null };
       }
       return geometry;
     });
@@ -2250,7 +2245,7 @@ var EventParser = class {
    * @function validateEvents
    * @description
    *     Processes an array of event objects and filters them based on
-   *     global and EAS filtering settings, location constraints, and
+   *     global and EAS filtering settings, and
    *     other criteria such as expired or test products. Valid events
    *     trigger relevant event emitters.
    *
@@ -2262,12 +2257,11 @@ var EventParser = class {
     var _a, _b, _c, _d, _e;
     if (events2.length == 0) return;
     const filteringSettings = (_b = (_a = settings) == null ? void 0 : _a.global_settings) == null ? void 0 : _b.filtering;
-    const locationSettings = filteringSettings == null ? void 0 : filteringSettings.location;
     const easSettings = (_d = (_c = settings) == null ? void 0 : _c.global_settings) == null ? void 0 : _d.eas_settings;
     const globalSettings = (_e = settings) == null ? void 0 : _e.global_settings;
     const sets = {};
     const bools = {};
-    const megered = __spreadValues(__spreadValues(__spreadValues(__spreadValues({}, filteringSettings), easSettings), globalSettings), locationSettings);
+    const megered = __spreadValues(__spreadValues(__spreadValues({}, filteringSettings), easSettings), globalSettings);
     for (const key in megered) {
       const setting = megered[key];
       if (Array.isArray(setting)) {
@@ -2286,8 +2280,7 @@ var EventParser = class {
       originalEvent.properties.parent = originalEvent.properties.event;
       originalEvent.properties.event = this.betterParsedEventName(originalEvent, bools == null ? void 0 : bools.better_event_parsing, bools == null ? void 0 : bools.parent_events_only);
       originalEvent.hash = packages.crypto.createHash("md5").update(JSON.stringify(eventWithoutPerformance)).digest("hex");
-      originalEvent.properties.distance = this.getLocationDistances(props, originalEvent.geometry, locationSettings == null ? void 0 : locationSettings.unit);
-      if (originalEvent.properties.is_test == true && (bools == null ? void 0 : bools.ignore_text_products)) return false;
+      if (originalEvent.properties.is_test == true && (bools == null ? void 0 : bools.ignore_test_products)) return false;
       if ((bools == null ? void 0 : bools.check_expired) && originalEvent.properties.is_cancelled == true) return false;
       for (const key in sets) {
         const setting = sets[key];
@@ -2402,36 +2395,6 @@ var EventParser = class {
     const time = (pVtec == null ? void 0 : pVtec.expires) && !isNaN(new Date(pVtec.expires).getTime()) ? new Date(pVtec.expires).toLocaleString() : (ugc == null ? void 0 : ugc.expiry) != null ? new Date(ugc.expiry).toLocaleString() : new Date((/* @__PURE__ */ new Date()).getTime() + 1 * 60 * 60 * 1e3).toLocaleString();
     if (time == `Invalid Date`) return `Until Further Notice`;
     return time;
-  }
-  /**
-   * @function getLocationDistances
-   * @description
-   *     Calculates distances from an event's geometry to all current tracked locations.
-   *     Optionally filters locations by a maximum distance.
-   *
-   * @private
-   * @static
-   * @param {types.EventProperties} [properties]
-   * @param {types.EventCompiled} [event]
-   * @param {string} [unit='miles']
-   * @returns {Record<string, { distance: number, unit: string}>}
-   */
-  static getLocationDistances(properties, geometry, unit = "miles") {
-    if (geometry != null) {
-      for (const key in cache.currentLocations) {
-        const coordinates = cache.currentLocations[key];
-        const singleCoord = geometry.coordinates;
-        const center = singleCoord.reduce((acc, [lat, lon]) => [acc[0] + lat, acc[1] + lon], [0, 0]).map((sum) => sum / singleCoord.length);
-        const validUnit = unit === "miles" || unit === "kilometers" ? unit : "miles";
-        const distance = utils_default.calculateDistance({ lat: coordinates.lat, lon: coordinates.lon }, { lat: center[0], lon: center[1] }, validUnit);
-        if (!properties.distance) {
-          properties.distance = {};
-        }
-        properties.distance[key] = { unit, distance };
-      }
-      return properties.distance;
-    }
-    return {};
   }
   /**
    * @function buildDefaultSignature
@@ -2577,6 +2540,7 @@ var Database = class {
             `).run();
         const shapefileCount = cache.db.prepare(`SELECT COUNT(*) AS count FROM shapefiles`).get().count;
         if (shapefileCount === 0) {
+          yield utils_default.sleep(1e3);
           utils_default.warn(definitions.messages.shapefile_creation);
           for (const shape of definitions.shapefiles) {
             const filepath = path2.resolve(__dirname, "../../shapefiles", shape.file);
@@ -2991,59 +2955,6 @@ var Utils = class _Utils {
       }
     }
     return target;
-  }
-  /**
-   * @function calculateDistance
-   * @description
-   *     Calculates the great-circle distance between two geographic coordinates
-   *     using the haversine formula.
-   *
-   * @static
-   * @param {types.Coordinates} coord1
-   * @param {types.Coordinates} coord2
-   * @param {'miles' | 'kilometers'} [unit='miles']
-   * @returns {number}
-   */
-  static calculateDistance(coord1, coord2, unit = "miles") {
-    if (!coord1 || !coord2) return 0;
-    const { lat: lat1, lon: lon1 } = coord1;
-    const { lat: lat2, lon: lon2 } = coord2;
-    if ([lat1, lon1, lat2, lon2].some((v) => typeof v !== "number")) return 0;
-    const toRad = (deg) => deg * Math.PI / 180;
-    const R = unit === "miles" ? 3958.8 : 6371;
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a = __pow(Math.sin(dLat / 2), 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * __pow(Math.sin(dLon / 2), 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return Math.round(R * c * 100) / 100;
-  }
-  /**
-   * @function isReadyToProcess
-   * @description
-   *     Determines whether processing can continue based on the current
-   *     tracked locations and filter state. Emits limited warnings if no
-   *     locations are available.
-   *
-   * @static
-   * @returns {boolean}
-   */
-  static isReadyToProcess() {
-    const totalTracks = Object.keys(cache.currentLocations).length;
-    if (totalTracks > 0) {
-      cache.totalLocationWarns = 0;
-      return true;
-    }
-    if (totalTracks == 0) {
-      return true;
-    }
-    ;
-    if (cache.totalLocationWarns < 3) {
-      _Utils.warn(definitions.messages.no_current_locations);
-      cache.totalLocationWarns++;
-      return false;
-    }
-    _Utils.warn(definitions.messages.disabled_location_warning, true);
-    return true;
   }
 };
 var utils_default = Utils;
@@ -3554,28 +3465,6 @@ var AlertManager = class {
     settings2.noaa_weather_wire_service_settings.credentials.nickname = trimmed;
   }
   /**
-   * @function setCurrentLocation
-   * @description
-   *     Sets the current location with a name and geographic coordinates.
-   *     Validates the coordinates before updating the cache, emitting warnings
-   *     if values are missing or invalid.
-   *
-   * @param {string} locationName
-   * @param {types.Coordinates} [coordinates]
-   */
-  setCurrentLocation(locationName, coordinates) {
-    if (!coordinates) {
-      utils_default.warn(`Coordinates not provided for location: ${locationName}`);
-      return;
-    }
-    const { lat, lon } = coordinates;
-    if (typeof lat !== "number" || typeof lon !== "number" || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-      utils_default.warn(definitions.messages.invalid_coordinates.replace("{lat}", String(lat)).replace("{lon}", String(lon)));
-      return;
-    }
-    cache.currentLocations[locationName] = coordinates;
-  }
-  /**
    * @function createEasAudio
    * @description
    *     Generates an EAS (Emergency Alert System) audio file using the provided
@@ -3675,9 +3564,6 @@ var AlertManager = class {
       const settings2 = settings;
       this.isNoaaWeatherWireService = settings2.is_wire;
       cache.isReady = false;
-      while (!utils_default.isReadyToProcess()) {
-        yield utils_default.sleep(2e3);
-      }
       yield database_default.loadDatabase();
       if (this.isNoaaWeatherWireService) {
         (() => __async(this, null, function* () {

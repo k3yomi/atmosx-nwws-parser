@@ -38,8 +38,8 @@ export class APIAlerts {
             return `${splitPVTEC[2]}-${splitPVTEC[3]}-${splitPVTEC[4]}-${splitPVTEC[5]}`;
         })() : (() => {
             const wmoMatch = extracted.wmoidentifier?.match(/([A-Z]{4}\d{2})\s+([A-Z]{4})/);
-            const id = wmoMatch?.[1] || 'N/A';
-            const station = wmoMatch?.[2] || 'N/A';
+            const id = wmoMatch?.[1] ?? 'N/A';
+            const station = wmoMatch?.[2] ?? 'N/A';
             return `${station}-${id}`;
         })();
     }
@@ -84,8 +84,8 @@ export class APIAlerts {
             const getDescription = `${getHeadline} ${feature?.properties?.description ?? ``}`
             const getAWIP = feature?.properties?.parameters?.AWIPSidentifier?.[0] ?? null;
             const getHeader = EventParser.getHeader({ ...{ getAwip: {prefix: getAWIP?.slice(0, -3) }},} as types.StanzaAttributes);
-            const getSource = TextParser.textProductToString(getDescription, `SOURCE...`, [`.`]) || `N/A`;
-            const getOffice = this.getICAO(getPVTEC || ``);
+            const getSource = TextParser.textProductToString(getDescription, `SOURCE...`, [`.`]) ?? `N/A`;
+            const getOffice = this.getICAO(getPVTEC ?? ``);
             processed.push({
                 type: "Feature",
                 properties: {
@@ -96,26 +96,26 @@ export class APIAlerts {
                     parent: feature?.properties?.event ?? `N/A`,
                     action_type: feature?.properties?.messageType ?? `N/A`,
                     description: feature?.properties?.description ?? `N/A`,
-                    sender_name: getOffice.name || `N/A`,
-                    sender_icao: getOffice.icao || `N/A`,
+                    sender_name: getOffice.name ?? `N/A`,
+                    sender_icao: getOffice.icao ?? `N/A`,
                     attributes: validated.attributes,
                     geocode: {
                         UGC: feature?.properties?.geocode?.UGC ?? [`XX000`]
                     },
                     metadata: {},
                     technical: {
-                        vtec: getPVTEC || `N/A`,
+                        vtec: getPVTEC ?? `N/A`,
                         ugc: getUgc ? getUgc.join(`,`) : `N/A`,
                         hvtec: `N/A`,
                     },
                     parameters: {
-                        wmo: feature?.properties?.parameters?.WMOidentifier?.[0] || getWmo || `N/A`,
+                        wmo: feature?.properties?.parameters?.WMOidentifier?.[0] ?? getWmo ?? `N/A`,
                         source: getSource,
-                        max_hail_size: feature?.properties?.parameters?.maxHailSize || `N/A`,
-                        max_wind_gust: feature?.properties?.parameters?.maxWindGust || `N/A`,
-                        damage_threat: feature?.properties?.parameters?.thunderstormDamageThreat || [`N/A`],
-                        tornado_detection: feature?.properties?.parameters?.tornadoDetection || [`N/A`],
-                        flood_detection: feature?.properties?.parameters?.floodDetection || [`N/A`],
+                        max_hail_size: feature?.properties?.parameters?.maxHailSize ?? `N/A`,
+                        max_wind_gust: feature?.properties?.parameters?.maxWindGust ?? `N/A`,
+                        damage_threat: feature?.properties?.parameters?.thunderstormDamageThreat?.[0] ?? [`N/A`],
+                        tornado_detection: feature?.properties?.parameters?.tornadoDetection?.[0] ?? [`N/A`],
+                        flood_detection: feature?.properties?.parameters?.floodDetection?.[0] ?? [`N/A`],
                         discussion_tornado_intensity: "N/A", 
                         peakWindGust: `N/A`,
                         peakHailSize: `N/A`,
@@ -126,7 +126,7 @@ export class APIAlerts {
                     source: `api-parser`,
                     tracking: this.getTracking({ pVtec: getPVTEC, wmoidentifier: getWmo, ugc: getUgc ? getUgc.join(`,`) : null }),
                     header: getHeader,
-                    pvtec: getPVTEC || `N/A`,
+                    pvtec: getPVTEC ?? `N/A`,
                     history: [{
                         description: feature?.properties?.description ?? `N/A`,
                         action: feature?.properties?.messageType ?? `N/A`,
@@ -140,7 +140,7 @@ export class APIAlerts {
                             const [lat, lon] = Array.isArray(coord) ? coord : [0, 0];
                             return [lat, lon];
                         })
-                    ]
+                    ]  
                 } : await EventParser.getEventGeometry(``, {zones: getUgc})
             })
         }

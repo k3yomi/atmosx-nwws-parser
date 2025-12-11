@@ -67,7 +67,6 @@ export const cache = {
     events: new events.EventEmitter(),
     isProcessingAudioQueue: false,
     audioQueue: [],
-    currentLocations: {},
 };
 
 export const settings = { 
@@ -114,10 +113,7 @@ export const settings = {
             ugc_filter: [],
             state_filter: [],
             check_expired: true,
-            ignore_text_products: true,
-            location: {
-                unit: `miles`
-            },
+            ignore_test_products: true,
         },
         eas_settings: {
             directory: null,

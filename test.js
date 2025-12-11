@@ -44,7 +44,7 @@ const parser = new AlertManager({
             ugc_filter: [],
             state_filter: [],
             check_expired: true,
-            ignore_text_products: true,
+            ignore_test_products: true,
             location: {
                 unit: `miles`
             },

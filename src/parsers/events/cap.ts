@@ -127,7 +127,7 @@ export class CapAlerts {
                                 return [lat, lon];
                             })
                         ]
-                    } : await EventParser.getEventGeometry(``, {zones: [extracted.ugc]}),
+                    } : await EventParser.getEventGeometry(``, {zones: JSON.parse(`[\"${extracted.ugc}\"]`)}),
                 })
             }
         }

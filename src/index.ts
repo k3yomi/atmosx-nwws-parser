@@ -49,29 +49,6 @@ export class AlertManager {
     }
 
     /**
-     * @function setCurrentLocation
-     * @description
-     *     Sets the current location with a name and geographic coordinates.
-     *     Validates the coordinates before updating the cache, emitting warnings
-     *     if values are missing or invalid.
-     *
-     * @param {string} locationName
-     * @param {types.Coordinates} [coordinates]
-     */
-    public setCurrentLocation(locationName: string, coordinates?: types.Coordinates): void {
-        if (!coordinates) {
-            Utils.warn(`Coordinates not provided for location: ${locationName}`);
-            return;
-        }
-        const { lat, lon } = coordinates;
-        if (typeof lat !== 'number' || typeof lon !== 'number' || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-            Utils.warn(loader.definitions.messages.invalid_coordinates.replace('{lat}', String(lat)).replace('{lon}', String(lon)));
-            return;
-        }
-        loader.cache.currentLocations[locationName] = coordinates;
-    }
-
-    /**
      * @function createEasAudio
      * @description
      *     Generates an EAS (Emergency Alert System) audio file using the provided
@@ -171,9 +148,6 @@ export class AlertManager {
         const settings = loader.settings as types.ClientSettingsTypes;
         this.isNoaaWeatherWireService = settings.is_wire;
         loader.cache.isReady = false;
-        while (!Utils.isReadyToProcess()) {
-            await Utils.sleep(2000);
-        }
         await Database.loadDatabase();
         if (this.isNoaaWeatherWireService) {
             (async () => {

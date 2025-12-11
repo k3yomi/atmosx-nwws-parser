@@ -120,31 +120,30 @@ export class UGCParser {
      * @returns {[number, number][]}
      */
     public static getCoordinates(zones: string[]): any | null {
-        const polygons: any[] = [];
-        for (const zone of zones.map(z => z.trim())) {
-            const row = loader.cache.db.prepare(`SELECT geometry FROM shapefiles WHERE id = ?`).get(zone);
-            if (row !== undefined) {
-                const geometry = JSON.parse(row.geometry);
-                if (geometry?.type === 'Polygon') {
-                    polygons.push({
-                        type: "Feature",
-                        geometry,
-                        properties: {}
-                    });
-                }
+        const list = [...new Set(zones.map(z => z.trim()))];
+        if (list.length === 0) return null;
+        const placeholders = list.map(() => "?").join(",");
+        const rows = loader.cache.db.prepare(`SELECT geometry FROM shapefiles WHERE id IN (${placeholders})`).all(...list);
+        const polygons = [];
+        for (const row of rows) {
+            if (!row?.geometry) continue;
+            const geom = JSON.parse(row.geometry);
+            if (geom?.type === "Polygon") {
+                polygons.push({ type: "Feature", geometry: geom, properties: {} });
             }
         }
         if (polygons.length === 0) return null;
         let merged = polygons[0];
         for (let i = 1; i < polygons.length; i++) {
-            merged = loader.packages.turf.union(merged, polygons[i]);
+            const u = loader.packages.turf.union(merged, polygons[i]);
+            if (u && u.geometry) merged = u;
         }
-        const outerRing = merged.geometry.type === "Polygon"
-            ? merged.geometry.coordinates[0]
+        if (!merged?.geometry) return null;
+        const outerRing = merged.geometry.type === "Polygon" ? merged.geometry.coordinates[0]
             : merged.geometry.coordinates[0][0];
         const skip = loader.settings.global_settings.shapefile_skip;
-        const skippedRing = outerRing.filter((_: any, index: number) => index % skip === 0);
-        return [skippedRing]
+        const skipped = outerRing.filter((_: any, idx: number) => idx % skip === 0);
+        return skipped.length ? skipped : null;
     }
 
     /**

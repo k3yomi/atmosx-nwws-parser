@@ -105,6 +105,7 @@ export class Database {
             `).run();
             const shapefileCount = loader.cache.db.prepare(`SELECT COUNT(*) AS count FROM shapefiles`).get().count;
             if (shapefileCount === 0) {
+                await Utils.sleep(1000);
                 Utils.warn(loader.definitions.messages.shapefile_creation);
                 for (const shape of loader.definitions.shapefiles) {
                     const filepath = path.resolve(__dirname, '../../shapefiles', shape.file);

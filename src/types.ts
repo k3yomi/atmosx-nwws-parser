@@ -17,9 +17,7 @@ interface LocalEasSettings {
     intro_wav?: string;
 }
 
-interface LocalLocationFilteringSettings { 
-    unit?: 'miles' | 'kilometers';
-}
+
 
 interface LocalAlertFilteringSettings { 
     events?: string[]; 
@@ -29,7 +27,6 @@ interface LocalAlertFilteringSettings {
     state_filter?: string[]; 
     ignored_events?: string[]; 
     check_expired?: boolean;
-    location?: LocalLocationFilteringSettings;
 }
 
 interface LocalGlobalSettings {
@@ -137,7 +134,6 @@ interface LocalEventProperties {
     messageType?: string;
     sent?: string;
     areaDesc?: string;
-    distance?: Record<string, { distance: number, unit: string}>,
 }
 
 // --- Exports --- //

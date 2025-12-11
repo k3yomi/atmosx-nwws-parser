@@ -255,60 +255,6 @@ export class Utils {
         }
         return target;
     }
-
-    /**
-     * @function calculateDistance
-     * @description
-     *     Calculates the great-circle distance between two geographic coordinates
-     *     using the haversine formula.
-     *
-     * @static
-     * @param {types.Coordinates} coord1
-     * @param {types.Coordinates} coord2
-     * @param {'miles' | 'kilometers'} [unit='miles']
-     * @returns {number}
-     */
-    public static calculateDistance(coord1: types.Coordinates, coord2: types.Coordinates, unit: 'miles' | 'kilometers' = 'miles'): number {
-        if (!coord1 || !coord2) return 0;
-        const { lat: lat1, lon: lon1 } = coord1;
-        const { lat: lat2, lon: lon2 } = coord2;
-        if ([lat1, lon1, lat2, lon2].some(v => typeof v !== 'number')) return 0;
-        const toRad = (deg: number) => deg * Math.PI / 180;
-        const R = unit === 'miles' ? 3958.8 : 6371;
-        const dLat = toRad(lat2 - lat1);
-        const dLon = toRad(lon2 - lon1);
-        const a =
-            Math.sin(dLat / 2) ** 2 +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return Math.round(R * c * 100) / 100;
-    }
-
-    /**
-     * @function isReadyToProcess
-     * @description
-     *     Determines whether processing can continue based on the current
-     *     tracked locations and filter state. Emits limited warnings if no
-     *     locations are available.
-     *
-     * @static
-     * @returns {boolean}
-     */
-    public static isReadyToProcess(): boolean {
-        const totalTracks = Object.keys(loader.cache.currentLocations).length;
-        if (totalTracks > 0) {
-            loader.cache.totalLocationWarns = 0;
-            return true;
-        }
-        if (totalTracks == 0) { return true };
-        if (loader.cache.totalLocationWarns < 3) {
-            Utils.warn(loader.definitions.messages.no_current_locations);
-            loader.cache.totalLocationWarns++;
-            return false;
-        }
-        Utils.warn(loader.definitions.messages.disabled_location_warning, true);
-        return true;
-    }
 }
 
 export default Utils;
