@@ -113,8 +113,8 @@ export class APIAlerts {
                         tornado_detection: feature?.properties?.parameters?.tornadoDetection?.[0] ?? `N/A`,
                         flood_detection: feature?.properties?.parameters?.floodDetection?.[0] ?? `N/A`,
                         discussion_tornado_intensity: "N/A", 
-                        peakWindGust: `N/A`,
-                        peakHailSize: `N/A`,
+                        discussion_wind_intensity: `N/A`,
+                        discussion_hail_intensity: `N/A`,
                     },
                     details: {
                         performance: performance.now() - tick,

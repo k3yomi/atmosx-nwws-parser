@@ -2068,8 +2068,8 @@ var APIAlerts = class {
               tornado_detection: (_fa = (_ea = (_da = (_ca = feature == null ? void 0 : feature.properties) == null ? void 0 : _ca.parameters) == null ? void 0 : _da.tornadoDetection) == null ? void 0 : _ea[0]) != null ? _fa : `N/A`,
               flood_detection: (_ja = (_ia = (_ha = (_ga = feature == null ? void 0 : feature.properties) == null ? void 0 : _ga.parameters) == null ? void 0 : _ha.floodDetection) == null ? void 0 : _ia[0]) != null ? _ja : `N/A`,
               discussion_tornado_intensity: "N/A",
-              peakWindGust: `N/A`,
-              peakHailSize: `N/A`
+              discussion_wind_intensity: `N/A`,
+              discussion_hail_intensity: `N/A`
             },
             details: {
               performance: performance.now() - tick,
