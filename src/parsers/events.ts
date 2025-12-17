@@ -313,10 +313,11 @@ export class EventParser {
         const defEventTags = loader.definitions.tags;
         const tags = Object.entries(defEventTags).filter(([key]) => props?.description.toLowerCase().includes(key.toLowerCase())).map(([, value]) => value)
         props.tags = tags.length > 0 ? tags : [`N/A`];
-        const setAction = (type: `C` | `U` | `I`) => { 
+        const setAction = (type: `C` | `U` | `I` | `E`) => { 
             props.is_cancelled = type === `C`; 
             props.is_updated = type === `U`; 
             props.is_issued = type === `I`; 
+            props.is_expired = type === `E`;
         };
         if (statusCorrelation) { 
             props.action_type = statusCorrelation.forward ?? props.action_type; 
@@ -332,7 +333,7 @@ export class EventParser {
             const isTestProduct = loader.definitions.productTypes[getType] == `Test Product`
             if (isTestProduct) { setAction(`C`); props.is_test = true; }
         }
-        if (new Date(props?.expires).getTime() < new Date().getTime()) { setAction(`C`); }
+        if (new Date(props?.expires).getTime() < new Date().getTime()) { setAction(`E`); }
         return event;
     }
 }

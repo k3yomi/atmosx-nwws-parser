@@ -2407,6 +2407,7 @@ var EventParser = class {
       props.is_cancelled = type === `C`;
       props.is_updated = type === `U`;
       props.is_issued = type === `I`;
+      props.is_expired = type === `E`;
     };
     if (statusCorrelation) {
       props.action_type = (_b = statusCorrelation.forward) != null ? _b : props.action_type;
@@ -2431,7 +2432,7 @@ var EventParser = class {
       }
     }
     if (new Date(props == null ? void 0 : props.expires).getTime() < (/* @__PURE__ */ new Date()).getTime()) {
-      setAction(`C`);
+      setAction(`E`);
     }
     return event;
   }
