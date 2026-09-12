@@ -114,6 +114,7 @@ export const Bootstrap = {
             DisableGeometryParsing: false,
             UseShapefileCoordinates: true,
             SPCWatchesOnly: true,
+            CensusPopulationData: true,
             NodeTTL: 60,
             NodeMaxDistance: 120,
             EventFiltering: {

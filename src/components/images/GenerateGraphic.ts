@@ -20,7 +20,7 @@
 import { EnumStates, EnumZones } from "@Enums/States"
 import { TypeEvent } from "StaticTypes/Event"
 import { Bootstrap } from "@Bootstrap"
-import { GetStringText } from "@ParsingText/GetStringText"
+import { GetStringText } from "@Utilities/GetStringText"
 import { GetEventGeometry } from "@Building/GetEventGeometry"
 import { GetGeographicalEvents } from "@ImageModules/GetGeographicalEvents"
 import { GetUnionPolygon } from "@Utilities/GetUnionPolygon"

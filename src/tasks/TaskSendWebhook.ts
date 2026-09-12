@@ -20,7 +20,7 @@
 import { TypeEvent } from "StaticTypes/Event"
 import { CreateHttp } from "@Utilities/CreateHttp";
 import { SetTimeoutAction } from "@Utilities/SetTimeoutAction";
-import { GetEmbededText } from "@ParsingText/GetEmbededText";
+import { GetEmbededText } from "@Utilities/GetEmbededText";
 import { readFile } from "fs/promises"
 
 interface TaskSendWebhookOptions {

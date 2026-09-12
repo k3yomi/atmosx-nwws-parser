@@ -24,18 +24,12 @@ import { SetDebug } from "@Utilities/SetDebug";
 
 interface TaskSendNTFYOptions {
     Event: TypeEvent
-    Toggles?: {
-        Audio?: boolean
-        Json?: boolean
-        Text?: boolean
-        Image?: boolean
-    },
     Priority: string | number
     Body: string
     Topic: string
 }
 
-export const TaskSendNTFY = async function({ Event, Toggles, Priority, Body, Topic }: TaskSendNTFYOptions): Promise<void> { 
+export const TaskSendNTFY = async function({ Event, Priority, Body, Topic }: TaskSendNTFYOptions): Promise<void> { 
     const { properties } = Event;
 
     const configurations = Bootstrap.Settings.NotifyServer;
@@ -44,33 +38,37 @@ export const TaskSendNTFY = async function({ Event, Toggles, Priority, Body, Top
         Password: configurations.Credentials.Password 
     } : undefined;
 
-    const image = properties?.metadata?.attachments?.find(a => a.name === "Image: Graphic") 
-        ?? (Toggles?.Image && configurations?.MediaStorage?.IMAGE 
-            ? { link: `${configurations?.MediaStorage?.IMAGE}/${properties.regions_string}//${properties?.event}_${properties?.metadata?.tracking}.png` 
-        } : undefined);
+    const image = configurations?.MediaStorage?.IMAGE ? { link: `${configurations?.MediaStorage?.IMAGE}/${properties.regions_string}//${properties?.event}_${properties?.metadata?.tracking}.png` } : undefined;
+    const SPCGraphic = properties?.metadata?.attachments?.find(a => a.name === "Image: SPC Graphic") 
         
     const buttons = [
-        ...(Toggles?.Audio && configurations?.MediaStorage?.AUDIO ? [{
+        ...(configurations?.MediaStorage?.AUDIO ? [{
             "action": "view",
-            "label": "Listen",
+            "label": "Audio",
             "url": `${configurations.MediaStorage.AUDIO}/${properties.regions_string}/${properties.event}_${properties.metadata.tracking}.wav`,
         }] : []),
-        ...(Toggles?.Text && configurations?.MediaStorage?.TEXT ? [{
+        ...(configurations?.MediaStorage?.TEXT ? [{
             "action": "view",
-            "label": "View Text",
+            "label": "Text",
             "url": `${configurations.MediaStorage.TEXT}/${properties.regions_string}/${properties.event}_${properties.metadata.tracking}.txt`,
         }] : []),
-        ...(image ? [{
+        ...(SPCGraphic ? [{
             "action": "view",
-            "label": "View Image",
-            "url": image.link,
+            "label": "Graphic",
+            "url": SPCGraphic.link,
         }] : []),
+        ... [{
+            "action": "copy",
+            "label": "Copy",
+            "value": `${properties.event} (${properties.status})\n${Body}\nTags: ${properties.parameters.tags?.join(",") ?? "N/A"}`
+        }]
     ];
 
     const headers = {
         "Title": `${properties.event} (${properties.status})`,
         "Tags": properties.parameters.tags?.join(",") ?? "N/A",
         "Priority": Priority ?? "5",
+        ...(image && { "Attach": image.link }),
         ...(buttons.length > 0 && { "Actions": JSON.stringify(buttons) }),
     };
 

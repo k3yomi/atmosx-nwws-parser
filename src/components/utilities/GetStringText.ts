@@ -18,7 +18,6 @@
 */
 
 import { TypeEvent } from "StaticTypes/Event"
-import { TypeSettings } from "Types/Settings"
 import { Bootstrap } from "@Bootstrap"
 
 export const GetStringText = (event: TypeEvent): string => {
@@ -53,6 +52,7 @@ export const GetStringText = (event: TypeEvent): string => {
         line(`Max Surface Wind:`, event?.properties?.watch_parameters?.max_wind_surface, !isExpired),
         line(`Max Tops (x100 feet):`, event?.properties?.watch_parameters?.max_tops_x100feet, !isExpired), 
         line(`Sender:`, event?.properties?.geocode?.office?.name ? `${event?.properties?.geocode?.office?.name} (${event?.properties?.geocode?.office?.office})` : event?.properties?.geocode?.office?.office),
+        line(`Population:`, event?.properties?.geocode?.census?.population, !isExpired),
         line(`Tracking:`, event?.properties?.metadata?.tracking),
     ].filter(Boolean).join('\n');
 }

@@ -51,6 +51,7 @@ export const GetEmbededText = (event: TypeEvent): string => {
         line(`**Max Tops (x100 feet):**`, event?.properties?.watch_parameters?.max_tops_x100feet, !isExpired), 
         line(`**Tags:**`, event?.properties?.parameters?.tags?.length > 0 ? event?.properties?.parameters?.tags.join(', ') : null, !isExpired),
         line(`**Sender:**`, event?.properties?.geocode?.office?.name ? `${event?.properties?.geocode?.office?.name} (${event?.properties?.geocode?.office?.office})` : event?.properties?.geocode?.office?.office),
+        line(`**Population:**`, event?.properties?.geocode?.census?.population, !isExpired),
         line(`**Tracking:**`, event?.properties?.metadata?.tracking),
         line(`**Logs:**`, event?.properties?.metadata?.history?.length > 0 ? event?.properties?.metadata?.history.length : null),
     ].filter(Boolean).join('\n');

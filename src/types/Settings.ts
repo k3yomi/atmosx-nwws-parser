@@ -82,6 +82,7 @@ export type TypeSettings = {
         DisableGeometryParsing: boolean
         UseShapefileCoordinates: boolean
         SPCWatchesOnly: boolean
+        CensusPopulationData: boolean
         NodeTTL: number
         NodeMaxDistance: number
         EventFiltering: {

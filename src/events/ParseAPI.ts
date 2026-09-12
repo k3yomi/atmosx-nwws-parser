@@ -66,6 +66,10 @@ export const ParseAPI = async (Stanza: TypeStanzaCompiled): Promise<void> => {
                     },
                     organization:  feature?.properties?.parameters?.WMOidentifier?.[0],
                     ugc: feature?.properties?.geocode?.UGC ?? [], 
+                    census: {
+                        population: null,
+                        cities: []
+                    },
                     polygon: feature?.geometry?.coordinates.length > 0 ? Buffer.from(JSON.stringify([feature?.geometry?.coordinates[0]])).toString('base64') : null,
                     polygon_generated: feature?.geometry?.coordinates.length > 0 ? true : false,
                 },

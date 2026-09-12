@@ -28,6 +28,7 @@ import { GetEventAttachments } from "@Building/GetEventAttachments"
 import { SetEventEmit } from "@Utilities/SetEventEmit"
 import { SetDebug } from "@Utilities/SetDebug"
 import { GetMatched } from "@Utilities/GetMatched"
+import { GetEventPopulation } from "@Building/GetEventPopulation"
 import { GetEventGeometry } from "@Building/GetEventGeometry"
 import { createHash } from "crypto"
 
@@ -131,8 +132,15 @@ export const ValidateEvents = async (events: TypeEvent[]): Promise<void> => {
         const enhanced = properties.event = GetEventEnhancedName(event)
         const filtered = isFiltered(define)
         if (!filtered) {
-            event.geometry = !bools?.DisableGeometryParsing ? GetEventGeometry({ Event: event }) : null;
-            properties.metadata.attachments = GetEventAttachments(event)
+            const tick2 = performance.now();
+            const geometry = !bools?.DisableGeometryParsing ? GetEventGeometry({ Event: event }) : null;
+            const population = GetEventPopulation(geometry)
+            const attachments = GetEventAttachments(event)
+            event.geometry = geometry;
+            event.properties.geocode.census.population = population.population;
+            event.properties.geocode.census.cities = population.cities;
+            properties.metadata.attachments = attachments;
+            SetDebug({ Title: `Filtered`, Message: `${Math.round(performance.now() - tick2)}ms` })
         }
         properties.metadata.hash = createHash("sha256").update(JSON.stringify(pre)).digest("hex")  
         SetEventEmit({ Event: `onProductType${enhanced.replace(/\s+/g, '')}`, Metadata: define });

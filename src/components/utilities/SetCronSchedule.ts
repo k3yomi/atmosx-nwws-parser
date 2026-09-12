@@ -33,29 +33,37 @@ export const SetCronSchedule = async (): Promise<void> => {
     const TTL = settings.GlobalSettings.ArchiveSettings.TTL
     const TTLCUT = Date.now() - TTL * 1000;
 
-    const walk = (dir: string, deleteFolder?: boolean): void => {
-        if (existsSync(dir)) {
-            const entries = readdirSync(dir, { withFileTypes: true });
-            for (const entry of entries) {
-                const fullPath = join(dir, entry.name);
-                if (entry.isDirectory()) { walk(fullPath, deleteFolder); continue; }
-                const stats = statSync(fullPath);
-                if (stats.mtime.getTime() < TTLCUT) {
-                    try {
-                        unlinkSync(fullPath);
-                    } catch (err) {
-                        console.error(`Failed to delete ${fullPath}:`, err);
-                    }
-                }
-                if (deleteFolder && readdirSync(dir).length === 0) {
-                    rmdirSync(dir);
+    const walk = (dir: string, deleteFolder = false): void => {
+        if (!existsSync(dir)) return;
+        const entries = readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+            const fullPath = join(dir, entry.name);
+            if (entry.isDirectory()) {
+                walk(fullPath, deleteFolder);
+                continue;
+            }
+            const stats = statSync(fullPath);
+            if (stats.mtime.getTime() < TTLCUT) {
+                try {
+                    unlinkSync(fullPath);
+                } catch (err) {
+                    console.error(`Failed to delete ${fullPath}:`, err);
                 }
             }
         }
+        if (deleteFolder) {
+            try {
+                if (readdirSync(dir).length === 0 && statSync(dir).mtime.getTime() < TTLCUT) {
+                    rmdirSync(dir);
+                }
+            } catch (err) {
+                console.error(`Failed to delete directory ${dir}:`, err);
+            }
+        }
     };
-    walk(settings.GlobalSettings.ArchiveSettings.TextDirectory)
-    walk(settings.GlobalSettings.ArchiveSettings.AudioDirectory)
-    walk(settings.GlobalSettings.ArchiveSettings.JSONDirectory)
+    walk(settings.GlobalSettings.ArchiveSettings.TextDirectory, true)
+    walk(settings.GlobalSettings.ArchiveSettings.AudioDirectory, true)
+    walk(settings.GlobalSettings.ArchiveSettings.JSONDirectory, true)
     walk(settings.GlobalSettings.ArchiveSettings.ImageDirectory, true)
 
 

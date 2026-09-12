@@ -18,8 +18,14 @@
 */
 
 import { TypeAttributes } from "StaticTypes/Attributes"
-    
 
+export type TypeCities = { 
+    name: string
+    state: string
+    county: string
+    population: number
+}
+    
 export type TypeEventProperties = {
     locations: string
     locations_array: string[]
@@ -34,6 +40,10 @@ export type TypeEventProperties = {
         }
         organization: string
         ugc: string[]
+        census?: {
+            population?: number
+            cities?: TypeCities[]
+        }
         polygon: string
         polygon_generated: boolean
     }

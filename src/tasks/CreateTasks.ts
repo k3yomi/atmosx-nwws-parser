@@ -22,7 +22,7 @@ import { TypeActions } from "Types/Actions"
 import { Bootstrap } from "@Bootstrap"
 import { SetDebug } from "@Utilities/SetDebug"
 import { GetMatched } from "@Utilities/GetMatched"
-import { GetStringText } from "@ParsingText/GetStringText"
+import { GetStringText } from "@Utilities/GetStringText"
 import { GetCleanedEvent } from "@Building/GetCleanedEvent"
 import { GenerateAudioMessage } from "@Audio/GenerateAudioMessage"
 import { TaskGenerateText } from "@Tasks/TaskGenerateText"
@@ -36,15 +36,15 @@ const Webhooks = new QueueManager({ Concurrency: 1 });
 const NTFY = new QueueManager({ Concurrency: 5 });
 
 export const CreateTasks = async (events: TypeEvent[]): Promise<void> => {
-    const tick = performance.now()
+    
     const settings = Bootstrap.Settings as TypeSettings;
     const { ActionSettings, GlobalSettings, NotifyServer } = settings;
     const actions = ActionSettings as TypeActions[];
     for (const event of events) {
+        const tick = performance.now()
         const { properties } = event;
         const isActioning = Array.isArray(actions) && actions.length > 0;
         if (!isActioning) { continue }
-
         for (const action of actions) {
             const { Events, Webhook, NotificationServer, Uploads } = action;
             const isValidAction = GetMatched({ Strings: Events, String: properties.event });
@@ -87,12 +87,6 @@ export const CreateTasks = async (events: TypeEvent[]): Promise<void> => {
                 await Promise.all([
                     NotificationServer?.Enabled && NotifyServer?.Enabled && NotificationServer?.Topic ? NTFY.enqueue(() => TaskSendNTFY({
                         Event: event,
-                        Toggles: {
-                            Audio: Uploads?.AUDIO,
-                            Json: Uploads?.JSON,
-                            Text: Uploads?.TEXT,
-                            Image: Uploads?.IMAGE
-                        },
                         Priority: NotificationServer?.Priority ?? 5,
                         Body: GetStringText(event),
                         Topic: NotificationServer?.Topic
@@ -119,5 +113,4 @@ export const CreateTasks = async (events: TypeEvent[]): Promise<void> => {
         }
         SetDebug({ Title: `Tasks/CompletedEventTask`, Message: `${Math.round(performance.now() - tick)}ms` })
     }
-    SetDebug({ Title: `Tasks/Global`, Message: `${Math.round(performance.now() - tick)}ms` })
 }

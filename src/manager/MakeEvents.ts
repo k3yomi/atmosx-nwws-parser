@@ -26,7 +26,7 @@ import { SetHash } from "@Manager/SetHash"
 import { UpdateNode } from "@Manager/UpdateNode"
 import { SetEventEmit } from "@Utilities/SetEventEmit"
 import { SetTimeoutAction } from "@Utilities/SetTimeoutAction"
-import { GetStringText } from "@ParsingText/GetStringText"
+import { GetStringText } from "@Utilities/GetStringText"
 
 export const MakeEvents = async (events: TypeEvent[]): Promise<void> => {
     let tasked = [] as TypeEvent[];
@@ -70,16 +70,8 @@ export const MakeEvents = async (events: TypeEvent[]): Promise<void> => {
                 if (getFeature) { 
                     const getIndex = features.indexOf(getFeature);
                     const cHistory = getFeature?.properties?.metadata?.history ?? [];
-                    const cLocations = getFeature?.properties?.locations?.split(";").map((l: string) => l.trim()) ?? [];
-                    const cUgc = getFeature?.properties?.geocode?.ugc ?? [];
-        
                     const iHistory = event.properties?.metadata?.history ?? [];
-                    const iLocations = event.properties?.locations?.split(";").map((l: string) => l.trim()) ?? [];
-                    const iUgc = event.properties?.geocode?.ugc ?? [];
-        
                     const mHistory = [...cHistory, ...iHistory].filter((v, i, a) => a.indexOf(v) === i).filter((v, i, a) => a.findIndex(h => h.description === v.description && h.issued === v.issued) === i);
-                    const mLocations = [...cLocations, ...iLocations].filter((v, i, a) => a.indexOf(v) === i).join('; ');
-                    const mUgc = [...cUgc, ...iUgc].filter((v, i, a) => a.indexOf(v) === i);
         
                     Bootstrap.Cache.Events.features[getIndex] = {
                         ...event,
@@ -88,11 +80,6 @@ export const MakeEvents = async (events: TypeEvent[]): Promise<void> => {
                             metadata: {
                                 ...event?.properties?.metadata,
                                 history: mHistory
-                            },
-                            locations: mLocations,
-                            geocode: {
-                                ...event?.properties?.geocode,  
-                                ugc: mUgc
                             },
                         }
                     };

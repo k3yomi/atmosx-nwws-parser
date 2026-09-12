@@ -43,7 +43,8 @@ export const EnumEnhanced: Record<string, Record<string, EnhancedEventType>> = {
         "PDS Ice Storm Warning": { description: "particularly dangerous situation" },
     },
     "Special Marine Warning": {
-        "Special Marine Warning (TPROB)": { tornado: `POSSIBLE` },
+        "Special Marine Warning (WPROB)": { tornado: `POSSIBLE` },
+        "Special Marine Warning (WCONF)": { tornado: `OBSERVED` },
     },
     "Tornado Watch": {
         "PDS Tornado Watch": { pdswatch: true }

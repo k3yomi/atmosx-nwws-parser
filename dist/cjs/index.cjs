@@ -15459,6 +15459,7 @@ var Bootstrap = {
       DisableGeometryParsing: false,
       UseShapefileCoordinates: true,
       SPCWatchesOnly: true,
+      CensusPopulationData: true,
       NodeTTL: 60,
       NodeMaxDistance: 120,
       EventFiltering: {
@@ -16262,7 +16263,7 @@ var EnumStateFIPS = {
   "56": "WY"
 };
 
-// src/parsers/text/GetStringText.ts
+// src/components/utilities/GetStringText.ts
 var GetStringText = (event) => {
   const timezone = Bootstrap.Settings.Timezone ?? `UTC`;
   const line = (label, value, condition = true) => condition && value ? `${label} ${value}` : null;
@@ -16295,6 +16296,7 @@ var GetStringText = (event) => {
     line(`Max Surface Wind:`, event?.properties?.watch_parameters?.max_wind_surface, !isExpired),
     line(`Max Tops (x100 feet):`, event?.properties?.watch_parameters?.max_tops_x100feet, !isExpired),
     line(`Sender:`, event?.properties?.geocode?.office?.name ? `${event?.properties?.geocode?.office?.name} (${event?.properties?.geocode?.office?.office})` : event?.properties?.geocode?.office?.office),
+    line(`Population:`, event?.properties?.geocode?.census?.population, !isExpired),
     line(`Tracking:`, event?.properties?.metadata?.tracking)
   ].filter(Boolean).join("\n");
 };
@@ -19412,6 +19414,7 @@ var GetEventProperties = ({ Message, Attributes, UGC, VTEC }) => {
       office: GetEventOffice({ Attributes, Organization: organization, VTEC }),
       organization,
       ugc: UGC?.Zones ?? [],
+      census: {},
       polygon: polygons.length > 0 ? Buffer.from(JSON.stringify([polygons])).toString("base64") : null,
       polygon_generated: polygons.length > 0 ? true : false
     },
@@ -20026,6 +20029,10 @@ var ParseAPI = async (Stanza) => {
           },
           organization: feature2?.properties?.parameters?.WMOidentifier?.[0],
           ugc: feature2?.properties?.geocode?.UGC ?? [],
+          census: {
+            population: null,
+            cities: []
+          },
           polygon: feature2?.geometry?.coordinates.length > 0 ? Buffer.from(JSON.stringify([feature2?.geometry?.coordinates[0]])).toString("base64") : null,
           polygon_generated: feature2?.geometry?.coordinates.length > 0 ? true : false
         },
@@ -20107,7 +20114,8 @@ var EnumEnhanced = {
     "PDS Ice Storm Warning": { description: "particularly dangerous situation" }
   },
   "Special Marine Warning": {
-    "Special Marine Warning (TPROB)": { tornado: `POSSIBLE` }
+    "Special Marine Warning (WPROB)": { tornado: `POSSIBLE` },
+    "Special Marine Warning (WCONF)": { tornado: `OBSERVED` }
   },
   "Tornado Watch": {
     "PDS Tornado Watch": { pdswatch: true }
@@ -20326,37 +20334,44 @@ var CreateHttp = async ({ URL: URL2, Headers, Timeout, Auth, Method, Body, Form 
 };
 
 // src/tasks/TaskSendNTFY.ts
-var TaskSendNTFY = async function({ Event, Toggles, Priority, Body, Topic }) {
+var TaskSendNTFY = async function({ Event, Priority, Body, Topic }) {
   const { properties } = Event;
   const configurations = Bootstrap.Settings.NotifyServer;
   const authentication = configurations?.Credentials?.Username && configurations?.Credentials?.Password ? {
     Username: configurations.Credentials.Username,
     Password: configurations.Credentials.Password
   } : void 0;
-  const image = properties?.metadata?.attachments?.find((a) => a.name === "Image: Graphic") ?? (Toggles?.Image && configurations?.MediaStorage?.IMAGE ? {
-    link: `${configurations?.MediaStorage?.IMAGE}/${properties.regions_string}//${properties?.event}_${properties?.metadata?.tracking}.png`
-  } : void 0);
+  const image = configurations?.MediaStorage?.IMAGE ? { link: `${configurations?.MediaStorage?.IMAGE}/${properties.regions_string}//${properties?.event}_${properties?.metadata?.tracking}.png` } : void 0;
+  const SPCGraphic = properties?.metadata?.attachments?.find((a) => a.name === "Image: SPC Graphic");
   const buttons = [
-    ...Toggles?.Audio && configurations?.MediaStorage?.AUDIO ? [{
+    ...configurations?.MediaStorage?.AUDIO ? [{
       "action": "view",
-      "label": "Listen",
+      "label": "Audio",
       "url": `${configurations.MediaStorage.AUDIO}/${properties.regions_string}/${properties.event}_${properties.metadata.tracking}.wav`
     }] : [],
-    ...Toggles?.Text && configurations?.MediaStorage?.TEXT ? [{
+    ...configurations?.MediaStorage?.TEXT ? [{
       "action": "view",
-      "label": "View Text",
+      "label": "Text",
       "url": `${configurations.MediaStorage.TEXT}/${properties.regions_string}/${properties.event}_${properties.metadata.tracking}.txt`
     }] : [],
-    ...image ? [{
+    ...SPCGraphic ? [{
       "action": "view",
-      "label": "View Image",
-      "url": image.link
-    }] : []
+      "label": "Graphic",
+      "url": SPCGraphic.link
+    }] : [],
+    ...[{
+      "action": "copy",
+      "label": "Copy",
+      "value": `${properties.event} (${properties.status})
+${Body}
+Tags: ${properties.parameters.tags?.join(",") ?? "N/A"}`
+    }]
   ];
   const headers = {
     "Title": `${properties.event} (${properties.status})`,
     "Tags": properties.parameters.tags?.join(",") ?? "N/A",
     "Priority": Priority ?? "5",
+    ...image && { "Attach": image.link },
     ...buttons.length > 0 && { "Actions": JSON.stringify(buttons) }
   };
   const post = async (topic) => {
@@ -20379,7 +20394,7 @@ var TaskSendNTFY = async function({ Event, Toggles, Priority, Body, Topic }) {
   await Promise.all([...new Set(topics)].map(post));
 };
 
-// src/parsers/text/GetEmbededText.ts
+// src/components/utilities/GetEmbededText.ts
 var GetEmbededText = (event) => {
   const line = (label, value, condition = true) => condition && value ? `${label} ${value}` : null;
   const isStatement = event.properties.status_metadata.is_statement;
@@ -20412,6 +20427,7 @@ var GetEmbededText = (event) => {
     line(`**Max Tops (x100 feet):**`, event?.properties?.watch_parameters?.max_tops_x100feet, !isExpired),
     line(`**Tags:**`, event?.properties?.parameters?.tags?.length > 0 ? event?.properties?.parameters?.tags.join(", ") : null, !isExpired),
     line(`**Sender:**`, event?.properties?.geocode?.office?.name ? `${event?.properties?.geocode?.office?.name} (${event?.properties?.geocode?.office?.office})` : event?.properties?.geocode?.office?.office),
+    line(`**Population:**`, event?.properties?.geocode?.census?.population, !isExpired),
     line(`**Tracking:**`, event?.properties?.metadata?.tracking),
     line(`**Logs:**`, event?.properties?.metadata?.history?.length > 0 ? event?.properties?.metadata?.history.length : null)
   ].filter(Boolean).join("\n");
@@ -20530,11 +20546,11 @@ var QueueManager = class {
 var Webhooks = new QueueManager({ Concurrency: 1 });
 var NTFY = new QueueManager({ Concurrency: 5 });
 var CreateTasks = async (events) => {
-  const tick = performance.now();
   const settings = Bootstrap.Settings;
   const { ActionSettings, GlobalSettings, NotifyServer } = settings;
   const actions = ActionSettings;
   for (const event of events) {
+    const tick = performance.now();
     const { properties } = event;
     const isActioning = Array.isArray(actions) && actions.length > 0;
     if (!isActioning) {
@@ -20583,12 +20599,6 @@ var CreateTasks = async (events) => {
         await Promise.all([
           NotificationServer?.Enabled && NotifyServer?.Enabled && NotificationServer?.Topic ? NTFY.enqueue(() => TaskSendNTFY({
             Event: event,
-            Toggles: {
-              Audio: Uploads?.AUDIO,
-              Json: Uploads?.JSON,
-              Text: Uploads?.TEXT,
-              Image: Uploads?.IMAGE
-            },
             Priority: NotificationServer?.Priority ?? 5,
             Body: GetStringText(event),
             Topic: NotificationServer?.Topic
@@ -20615,7 +20625,6 @@ var CreateTasks = async (events) => {
     }
     SetDebug({ Title: `Tasks/CompletedEventTask`, Message: `${Math.round(performance.now() - tick)}ms` });
   }
-  SetDebug({ Title: `Tasks/Global`, Message: `${Math.round(performance.now() - tick)}ms` });
 };
 
 // src/manager/SetHash.ts
@@ -20836,14 +20845,8 @@ var MakeEvents = async (events) => {
         if (getFeature) {
           const getIndex = features.indexOf(getFeature);
           const cHistory = getFeature?.properties?.metadata?.history ?? [];
-          const cLocations = getFeature?.properties?.locations?.split(";").map((l) => l.trim()) ?? [];
-          const cUgc = getFeature?.properties?.geocode?.ugc ?? [];
           const iHistory = event.properties?.metadata?.history ?? [];
-          const iLocations = event.properties?.locations?.split(";").map((l) => l.trim()) ?? [];
-          const iUgc = event.properties?.geocode?.ugc ?? [];
           const mHistory = [...cHistory, ...iHistory].filter((v2, i, a) => a.indexOf(v2) === i).filter((v2, i, a) => a.findIndex((h) => h.description === v2.description && h.issued === v2.issued) === i);
-          const mLocations = [...cLocations, ...iLocations].filter((v2, i, a) => a.indexOf(v2) === i).join("; ");
-          const mUgc = [...cUgc, ...iUgc].filter((v2, i, a) => a.indexOf(v2) === i);
           Bootstrap.Cache.Events.features[getIndex] = {
             ...event,
             properties: {
@@ -20851,11 +20854,6 @@ var MakeEvents = async (events) => {
               metadata: {
                 ...event?.properties?.metadata,
                 history: mHistory
-              },
-              locations: mLocations,
-              geocode: {
-                ...event?.properties?.geocode,
-                ugc: mUgc
               }
             }
           };
@@ -20975,6 +20973,37 @@ var GetEventAttachments = (event) => {
   return attachments;
 };
 
+// src/building/GetEventPopulation.ts
+var GetEventPopulation = (geometry) => {
+  const coordinates = geometry?.coordinates;
+  if (!coordinates || !Array.isArray(coordinates) || coordinates.length === 0 || !Bootstrap.Settings.GlobalSettings.CensusPopulationData) {
+    return { population: 0, cities: [] };
+  }
+  const normalized = NormalizePolygon(geometry);
+  const points = normalized.type === `Polygon` ? normalized.coordinates[0] : normalized.coordinates.flatMap((polygon) => polygon[0]);
+  const latitudes = points.map(([lon, lat]) => lat);
+  const longitudes = points.map(([lon, lat]) => lon);
+  const minLat = Math.min(...latitudes);
+  const maxLat = Math.max(...latitudes);
+  const minLon = Math.min(...longitudes);
+  const maxLon = Math.max(...longitudes);
+  const A2 = CreateQuery({
+    Query: `SELECT * FROM cities WHERE LAT BETWEEN ? AND ? AND LON BETWEEN ? AND ?`,
+    Parameters: [minLat, maxLat, minLon, maxLon]
+  });
+  const population = A2.reduce((acc, city) => {
+    const census = Number(city.population);
+    return acc + (isNaN(census) ? 0 : census);
+  }, 0);
+  const cities = A2.map((city) => ({
+    name: city.name,
+    state: city.state,
+    county: city.county.replace(/ County$/i, ``),
+    population: Number(city.population)
+  }));
+  return { population, cities };
+};
+
 // src/manager/ValidateEvents.ts
 var import_crypto2 = require("crypto");
 var ValidateEvents = async (events) => {
@@ -21074,8 +21103,15 @@ var ValidateEvents = async (events) => {
     const enhanced = properties.event = GetEventEnhancedName(event);
     const filtered = isFiltered(define2);
     if (!filtered) {
-      event.geometry = !bools?.DisableGeometryParsing ? GetEventGeometry({ Event: event }) : null;
-      properties.metadata.attachments = GetEventAttachments(event);
+      const tick2 = performance.now();
+      const geometry = !bools?.DisableGeometryParsing ? GetEventGeometry({ Event: event }) : null;
+      const population = GetEventPopulation(geometry);
+      const attachments = GetEventAttachments(event);
+      event.geometry = geometry;
+      event.properties.geocode.census.population = population.population;
+      event.properties.geocode.census.cities = population.cities;
+      properties.metadata.attachments = attachments;
+      SetDebug({ Title: `Filtered`, Message: `${Math.round(performance.now() - tick2)}ms` });
     }
     properties.metadata.hash = (0, import_crypto2.createHash)("sha256").update(JSON.stringify(pre)).digest("hex");
     SetEventEmit({ Event: `onProductType${enhanced.replace(/\s+/g, "")}`, Metadata: define2 });
@@ -21218,32 +21254,37 @@ var SetCronSchedule = async () => {
   const settings = Bootstrap.Settings;
   const TTL = settings.GlobalSettings.ArchiveSettings.TTL;
   const TTLCUT = Date.now() - TTL * 1e3;
-  const walk = (dir, deleteFolder) => {
-    if ((0, import_fs3.existsSync)(dir)) {
-      const entries = (0, import_fs3.readdirSync)(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        const fullPath = (0, import_path5.join)(dir, entry.name);
-        if (entry.isDirectory()) {
-          walk(fullPath, deleteFolder);
-          continue;
-        }
-        const stats = (0, import_fs3.statSync)(fullPath);
-        if (stats.mtime.getTime() < TTLCUT) {
-          try {
-            (0, import_fs3.unlinkSync)(fullPath);
-          } catch (err) {
-            console.error(`Failed to delete ${fullPath}:`, err);
-          }
-        }
-        if (deleteFolder && (0, import_fs3.readdirSync)(dir).length === 0) {
-          (0, import_fs3.rmdirSync)(dir);
+  const walk = (dir, deleteFolder = false) => {
+    if (!(0, import_fs3.existsSync)(dir)) return;
+    const entries = (0, import_fs3.readdirSync)(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = (0, import_path5.join)(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(fullPath, deleteFolder);
+        continue;
+      }
+      const stats = (0, import_fs3.statSync)(fullPath);
+      if (stats.mtime.getTime() < TTLCUT) {
+        try {
+          (0, import_fs3.unlinkSync)(fullPath);
+        } catch (err) {
+          console.error(`Failed to delete ${fullPath}:`, err);
         }
       }
     }
+    if (deleteFolder) {
+      try {
+        if ((0, import_fs3.readdirSync)(dir).length === 0 && (0, import_fs3.statSync)(dir).mtime.getTime() < TTLCUT) {
+          (0, import_fs3.rmdirSync)(dir);
+        }
+      } catch (err) {
+        console.error(`Failed to delete directory ${dir}:`, err);
+      }
+    }
   };
-  walk(settings.GlobalSettings.ArchiveSettings.TextDirectory);
-  walk(settings.GlobalSettings.ArchiveSettings.AudioDirectory);
-  walk(settings.GlobalSettings.ArchiveSettings.JSONDirectory);
+  walk(settings.GlobalSettings.ArchiveSettings.TextDirectory, true);
+  walk(settings.GlobalSettings.ArchiveSettings.AudioDirectory, true);
+  walk(settings.GlobalSettings.ArchiveSettings.JSONDirectory, true);
   walk(settings.GlobalSettings.ArchiveSettings.ImageDirectory, true);
   if (settings.EnableWireService) {
     if (settings.NOAAWeatherWireServiceSettings.ReconnectionSettings.Enabled) {

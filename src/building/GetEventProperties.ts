@@ -57,6 +57,7 @@ export const GetEventProperties = ({ Message, Attributes, UGC, VTEC }: GetEventP
             office: GetEventOffice({ Attributes: Attributes, Organization: organization, VTEC: VTEC }),
             organization: organization,
             ugc: UGC?.Zones ?? [],
+            census: {},
             polygon: polygons.length > 0 ? Buffer.from(JSON.stringify([polygons])).toString('base64') : null,
             polygon_generated: polygons.length > 0 ? true : false
         },
