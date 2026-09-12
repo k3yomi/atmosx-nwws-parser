@@ -44,22 +44,22 @@ export const TaskSendNTFY = async function({ Event, Priority, Body, Topic }: Tas
     const buttons = [
         ...(configurations?.MediaStorage?.AUDIO ? [{
             "action": "view",
-            "label": "Audio",
+            "label": "View Audio",
             "url": `${configurations.MediaStorage.AUDIO}/${properties.regions_string}/${properties.event}_${properties.metadata.tracking}.wav`,
         }] : []),
         ...(configurations?.MediaStorage?.TEXT ? [{
             "action": "view",
-            "label": "Text",
+            "label": "View Text",
             "url": `${configurations.MediaStorage.TEXT}/${properties.regions_string}/${properties.event}_${properties.metadata.tracking}.txt`,
         }] : []),
         ...(SPCGraphic ? [{
             "action": "view",
-            "label": "Graphic",
+            "label": "View Graphic",
             "url": SPCGraphic.link,
         }] : []),
         ... [{
             "action": "copy",
-            "label": "Copy",
+            "label": "Copy Card",
             "value": `${properties.event} (${properties.status})\n${Body}\nTags: ${properties.parameters.tags?.join(",") ?? "N/A"}`
         }]
     ];

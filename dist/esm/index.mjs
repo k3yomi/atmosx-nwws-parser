@@ -15345,7 +15345,7 @@ var EnumThemes = [
 import { EventEmitter } from "node:events";
 import { join } from "path";
 var Bootstrap = {
-  Version: `3.0.7`,
+  Version: `3.0.75`,
   Ready: true,
   Ratelimits: {},
   Session: null,
@@ -20323,22 +20323,22 @@ var TaskSendNTFY = async function({ Event, Priority, Body, Topic }) {
   const buttons = [
     ...configurations?.MediaStorage?.AUDIO ? [{
       "action": "view",
-      "label": "Audio",
+      "label": "View Audio",
       "url": `${configurations.MediaStorage.AUDIO}/${properties.regions_string}/${properties.event}_${properties.metadata.tracking}.wav`
     }] : [],
     ...configurations?.MediaStorage?.TEXT ? [{
       "action": "view",
-      "label": "Text",
+      "label": "View Text",
       "url": `${configurations.MediaStorage.TEXT}/${properties.regions_string}/${properties.event}_${properties.metadata.tracking}.txt`
     }] : [],
     ...SPCGraphic ? [{
       "action": "view",
-      "label": "Graphic",
+      "label": "View Graphic",
       "url": SPCGraphic.link
     }] : [],
     ...[{
       "action": "copy",
-      "label": "Copy",
+      "label": "Copy Card",
       "value": `${properties.event} (${properties.status})
 ${Body}
 Tags: ${properties.parameters.tags?.join(",") ?? "N/A"}`
